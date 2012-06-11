@@ -1,10 +1,10 @@
 smallfile
 =========
 
-distributed workload generator for POSIX-like filesystems
-Ben England developed this starting in 2009.
-See documentation in default.html.
+A distributed workload generator for POSIX-like filesystems.  Ben England developed this starting in 2009.  See documentation in default.html.  
+
 Copyright [2012] [Ben England]
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use files except in compliance with the License.
 You may obtain a copy of the License at
