@@ -48,7 +48,7 @@ min_files_per_sec = 15
 pct_files_min = 70  # minimum percentage of files for valid test
 
 def gen_host_result_filename(invoke_top, invoke_host):
-  return invoke_top + os.sep + invoke_host + '_result.pickle'
+  return invoke_top + os.sep + 'network_dir' + os.sep + invoke_host + '_result.pickle'
 
 # abort routine just cleans up threads
 
@@ -109,7 +109,7 @@ if prm_host_set and not prm_slave:
         if t.status != OK: 
           all_ok = False
           print 'ERROR: ssh thread for host %s completed with status %d'%(t.remote_host, t.status)
-  time.sleep(4) # give response files time to propagate to this host
+  time.sleep(5) # give response files time to propagate to this host
 
   # attempt to aggregate results by reading pickle files
   # containing smf_invocation instances with counters and times that we need
@@ -125,13 +125,15 @@ if prm_host_set and not prm_slave:
         # from python pickle of the list of smf_invocation objects
 
         pickle_fn = gen_host_result_filename(top_dir, short_hostname(h))
-        print 'read pickle file: %s'%pickle_fn
+        print 'reading pickle file: %s'%pickle_fn
         host_invoke_list = []
         try:
                 pickle_file = open(pickle_fn, "r")
                 host_invoke_list = pickle.load(pickle_file)
+                print ' read %d invoke objects'%len(host_invoke_list)
         except IOError as e:
                 if e.errno != errno.ENOENT: raise e
+                print '  pickle file not found'
         invoke_list.extend(host_invoke_list)
         smallfile.ensure_deleted(pickle_fn)
       #print 'invoke_list: %s'%invoke_list
@@ -222,8 +224,6 @@ if not prm_slave: smallfile.ensure_deleted(starting_gate)
 print "starting worker threads on host " + host
 smallfile.ensure_deleted(my_host_invoke.gen_host_ready_fname(host))
 for t in thread_list:
-    smallfile.ensure_dir_exists(t.invoke.src_dir)
-    smallfile.ensure_dir_exists(t.invoke.dest_dir)
     ensure_deleted(t.invoke.gen_thread_ready_fname(t.invoke.tid))
 time.sleep(1)
 

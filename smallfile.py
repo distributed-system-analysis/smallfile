@@ -136,8 +136,9 @@ class smf_invocation:
         self.is_shared_dir = False       # True if all threads share same directory
         self.opname = "create"        # what kind of file access
         self.iterations = 1           # how many files to access
-        self.src_dir = self.tmp_dir + "file_srcdir"    # what directory for test files
-        self.dest_dir = self.tmp_dir + "file_dstdir"   # target directory for renames
+        self.src_dir = os.path.join(self.tmp_dir, "file_srcdir")    # what directory for test files
+        self.dest_dir = os.path.join(self.tmp_dir, "file_dstdir")   # target directory for renames
+        self.network_dir = os.path.join(self.tmp_dir, "network_shared") # directory for files shared across hosts
         self.record_sz_kb = 8         # record size in KB
         self.total_sz_kb = 64         # total data read/written in KB
         self.files_per_dir = 1000       # determines how many directories to use
@@ -177,6 +178,7 @@ class smf_invocation:
         new.iterations = s.iterations
         new.src_dir = s.src_dir
         new.dest_dir = s.dest_dir
+        new.network_dir = s.network_dir
         new.is_shared_dir = s.is_shared_dir
         new.record_sz_kb = s.record_sz_kb
         new.total_sz_kb = s.total_sz_kb
@@ -213,6 +215,7 @@ class smf_invocation:
         s += " iterations="+str(self.iterations)
         s += " src_dir="+self.src_dir
         s += " dest_dir="+str(self.dest_dir)
+        s += " network_dir="+str(self.network_dir)
         s += " shared="+str(self.is_shared_dir)
         s += " record_sz_kb="+str(self.record_sz_kb)
         s += " total_sz_kb="+str(self.total_sz_kb)
@@ -302,7 +305,7 @@ class smf_invocation:
 
     def save_rsptimes(self):
         fname = 'rsptimes_'+str(self.tid)+'_'+short_hostname(None)+'_'+self.opname+'_'+str(self.start_time)+'.csv'
-        rsptime_fname = os.path.join(self.tmp_dir, fname)
+        rsptime_fname = os.path.join(self.network_dir, fname)
         f = open(rsptime_fname, "w")
         for (opname, start_time, rsp_time) in self.rsptimes:
             # time granularity is microseconds, accuracy is probably less than that
@@ -693,6 +696,7 @@ class smf_invocation:
 
     def do_workload(self):
         self.reset()
+        ensure_dir_exists(self.network_dir)
         self.start_log()
         self.log.info('do_workload: ' + str(self))
         self.make_all_subdirs()
@@ -834,7 +838,7 @@ class Test(unittest.TestCase):
      
     def test_a_MkFn(self):
         fn = self.invok.mk_file_nm(self.invok.src_dir)
-        expectedFn = self.invok.src_dir + os.sep + self.invok.prefix + "_" + self.invok.tid + "_" + str(self.invok.filenum) + "_" + self.invok.suffix
+        expectedFn = self.invok.src_dir + os.sep + self.invok.prefix + "_" + short_hostname(None) + '_' + self.invok.tid + "_" + str(self.invok.filenum) + "_" + self.invok.suffix
         self.assertTrue( fn == expectedFn )
         f = open(fn, "w+", 0666)
         f.close()
@@ -876,10 +880,11 @@ class Test(unittest.TestCase):
         self.runTest("chmod")
 
     def test_c6_xattr(self):
-        self.cleanup_files()
-        self.mk_files()
-        self.runTest("setxattr")
-        self.runTest("getxattr")
+        if not xattr_not_installed:
+          self.cleanup_files()
+          self.mk_files()
+          self.runTest("setxattr")
+          self.runTest("getxattr")
 
     def test_d_Delete(self):
         self.invok.measure_rsptimes = True
@@ -964,7 +969,7 @@ class Test(unittest.TestCase):
         self.invok.prefix = "thr_"
         self.invok.suffix = "foo"
         self.invok.iterations=10
-        sgate_file = self.invok.tmp_dir + "start"
+        sgate_file = os.path.join(self.invok.network_dir, "start")
         self.invok.starting_gate = sgate_file
         ensure_deleted(sgate_file)
         thread_ready_timeout = 4

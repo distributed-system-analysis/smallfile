@@ -9,7 +9,7 @@ import sys
 import os
 import smallfile
 
-version = '1.9.1'
+version = '1.9.3'
 
 def usage(msg):  # call if CLI syntax error or invalid parameter
     print
@@ -112,6 +112,7 @@ def parse():
   # parse command line
 
   argc = len(sys.argv)
+  if argc == 1: usage('you should specify at least --top')
   if argc%2 != 1: usage('all parameters consist of a name and a value')
 
   pass_on_prm_list = ''  # parameters passed to remote hosts if needed
@@ -222,7 +223,8 @@ def parse():
     for (prm_name, prm_value) in prm_list:
       print '%40s : %s'%(prm_name, prm_value)
 
-  inv.starting_gate = prm_top_dir + os.sep + 'starting_gate'   # location of file that signals start, end of test
+  inv.starting_gate = prm_top_dir + os.sep + 'network_dir' + os.sep + 'starting_gate'   # location of file that signals start, end of test
+  inv.network_dir = prm_top_dir + os.sep + 'network_dir'
   inv.src_dir = prm_top_dir + os.sep + 'src'
   inv.dest_dir = prm_top_dir + os.sep + 'dst'
   # construct command to run remote slave process using CLI parameters, we have them all here
