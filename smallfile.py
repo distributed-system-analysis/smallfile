@@ -41,7 +41,7 @@ try:
   import xattr
   xattr_not_installed = False
 except ImportError as e:
-  print 'WARNING: xattr module not present, getxattr and setxattr operations will not work'
+  pass
 
 class MFRdWrExc(Exception):
     def __init__(self, opname_in, filenum_in, rqnum_in, bytesrtnd_in):
@@ -116,7 +116,6 @@ class smf_invocation:
     biggest_buf_size_bits = 24
     random_seg_size_bits = 10
     biggest_buf_size = 1 << biggest_buf_size_bits
-    print 'biggest supported record size is %d bytes'%biggest_buf_size
 
     hexdigits='0123456789ABCDEF'
     bigprime=9533
@@ -339,10 +338,15 @@ class smf_invocation:
     def wait_for_gate(self):
         if self.starting_gate != "":
             gateReady = self.gen_thread_ready_fname(self.tid)
-            open(gateReady, "w").close()
+            #print 'thread at gate, file ' + gateReady
+            with open(gateReady, "w") as f: 
+              f.close()
             while not os.path.exists(self.starting_gate):
-                time.sleep(1)
+                time.sleep(0.3)
                 if self.abort: raise Exception("thread " + str(self.tid) + " saw abort flag")
+
+    def stonewall_fn(self):
+        return os.path.dirname(self.starting_gate) + os.sep + 'stonewall.tmp'
 
     # record info needed to compute test statistics 
 
@@ -350,16 +354,14 @@ class smf_invocation:
         self.rq_final = self.rq
         self.filenum_final = self.filenum
         self.end_time = time.time()
-        if self.starting_gate != "":
-            try:
-              sgf = open(self.starting_gate, 'w+')
-              sgf.write( self.tid + "," + str(self.end_time) + "," + str(self.filenum_final) + "," + str(self.rq_final))
-              sgf.flush()
-              os.fsync(sgf.fileno())
-              sgf.close()
-            except Exception, e:
-              if os.path.getsize(self.starting_gate) == 0:
-                log.error("unable to append to %s: %s"%(self.starting_gate, str(e)))
+        if self.filenum >= self.iterations:
+         try:
+            with open(self.stonewall_fn(), "w") as f: 
+                self.log.info('stonewall file written by thread %s on host %s'%(self.tid, short_hostname(None)))
+                f.close()
+         except IOError as e:
+            err = e.errno
+            if err != errno.EEXIST: raise e
 
     def test_ended(self):
         return self.end_time > self.start_time
@@ -368,8 +370,8 @@ class smf_invocation:
     # to minimize overhead we only check starting gate after every 100 files
     
     def do_another_file(self):
-        if self.stonewall and (self.starting_gate != "") and (self.filenum % self.files_between_checks == 0):
-                if (not self.test_ended()) and (os.path.getsize(self.starting_gate) > 0):
+        if self.stonewall and (self.filenum % self.files_between_checks == 0):
+                if (not self.test_ended()) and (os.access(self.stonewall_fn(), os.R_OK)):
                     self.log.info("stonewalled after " + str(self.filenum) + " iterations")
                     self.end_test()
         # if user doesn't want to finish all requests and test has ended, stop
@@ -415,6 +417,8 @@ class smf_invocation:
     # allocate buffer of correct size
 
     def prepare_buf(self):
+        if self.record_sz_kb * 1024 > smf_invocation.biggest_buf_size:
+          raise Exception('biggest supported record size is %d bytes'%smf_invocation.biggest_buf_size)
         if self.record_sz_kb == 0:
             rsz = self.total_sz_kb * 1024
         else:
@@ -533,6 +537,8 @@ class smf_invocation:
     # so that we can do multiple xattr operations per node
 
     def do_getxattr(self):
+        if xattr_not_installed:
+            raise Exception('xattr module not present, getxattr and setxattr operations will not work')
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dir)
             self.op_starttime()
@@ -545,6 +551,8 @@ class smf_invocation:
             self.op_endtime(self.opname)
 
     def do_setxattr(self):
+        if xattr_not_installed:
+            raise Exception('xattr module not present, getxattr and setxattr operations will not work')
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dir)
             self.op_starttime()
@@ -801,6 +809,9 @@ class Test(unittest.TestCase):
         self.invok.tid = "regtest"
         self.invok.start_log()
         self.invok.log.debug('Test.setup')
+        self.invok.network_dir = os.path.join(os.path.dirname(self.invok.src_dir) , 'network_dir')
+        if os.path.exists(self.invok.network_dir): self.deltree(self.invok.network_dir)
+        ensure_dir_exists(self.invok.network_dir)
 
     def deltree(self, topdir):
         if not os.path.exists(topdir): return
@@ -971,18 +982,17 @@ class Test(unittest.TestCase):
         self.invok.iterations=10
         sgate_file = os.path.join(self.invok.network_dir, "start")
         self.invok.starting_gate = sgate_file
-        ensure_deleted(sgate_file)
         thread_ready_timeout = 4
         thread_count = 4
         self.test1_recreate_src_dest_dirs()
         self.checkDirEmpty(self.invok.src_dir)
+        #self.checkDirEmpty(self.invok.dst_dir)
+        self.checkDirEmpty(self.invok.network_dir)
         invokeList = []
         for j in range(0, thread_count):
             s = smf_invocation.clone(self.invok)  # test copy constructor
             s.tid = str(j)
             s.do_sync_at_end = True;
-            thread_ready_file = s.gen_thread_ready_fname(s.tid)
-            ensure_deleted(thread_ready_file)
             invokeList.append(s)
         threadList=[]
         for s in invokeList: threadList.append(TestThread(s, s.prefix + s.tid))
@@ -992,8 +1002,12 @@ class Test(unittest.TestCase):
             threads_ready = True
             for s in invokeList:
                 thread_ready_file = s.gen_thread_ready_fname(s.tid)
-                if not os.access(thread_ready_file, os.R_OK): threads_ready = False
-            if threads_ready: break
+                #print 'waiting for ' + thread_ready_file
+                if not os.access(thread_ready_file, os.R_OK): 
+                  threads_ready = False
+                  break
+            if threads_ready: 
+              break
             time.sleep(1)
         if not threads_ready: raise Exception("threads did not show up within %d seconds"%thread_ready_timeout)
         time.sleep(1)

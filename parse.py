@@ -9,7 +9,7 @@ import sys
 import os
 import smallfile
 
-version = '1.9.3'
+version = '1.9.5'
 
 def usage(msg):  # call if CLI syntax error or invalid parameter
     print
