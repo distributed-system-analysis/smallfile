@@ -105,24 +105,23 @@ def parse():
   prm_slave = False
   prm_permute_host_dirs = False
   prm_remote_pgm_dir = os.getcwd()
-  prm_top_dir = os.getenv("TMPDIR")
-  if prm_top_dir == None: prm_top_dir = os.getenv("TEMP")
-  if prm_top_dir == None: prm_top_dir = "/var/tmp"
+  prm_top_dir = None
 
   # parse command line
 
   argc = len(sys.argv)
-  if argc == 1: usage('you should specify at least --top')
-  if argc%2 != 1: usage('all parameters consist of a name and a value')
 
   pass_on_prm_list = ''  # parameters passed to remote hosts if needed
   j=1
   while j < argc:
     rawprm = sys.argv[j]
-    val = sys.argv[j+1]
-    if len(rawprm) < 3: usage('parameter name not long enough' )
+    if rawprm == '-h' or rawprm == '--help':
+      usage('ok, so you need help, we all knew that ;-)')
     if rawprm[0:2] != '--': usage('parameter names begin with "--"')
     prm = rawprm[2:]
+    if argc%2 != 1: usage('all parameters consist of a name and a value')
+    val = sys.argv[j+1]
+    if len(rawprm) < 3: usage('parameter name not long enough' )
     pass_on_prm = rawprm + ' ' + val
     j += 2
     if   prm == 'files': 
@@ -188,32 +187,38 @@ def parse():
   if (inv.record_sz_kb != 0) and ((inv.total_sz_kb % inv.record_sz_kb) != 0):
     usage('file size must be multiple of record size if record size is non-zero')
 
-  if (prm_top_dir == '/'):
-    usage('cannot use filesystem root, too dangerous')
+  if prm_top_dir and (len(prm_top_dir) < 5):
+    usage('cannot use top of filesystem, too dangerous')
+  if prm_top_dir:
+    inv.set_top(prm_top_dir)
+  else:
+    prm_top_dir = os.path.dirname(inv.src_dir)
+  inv.starting_gate = os.path.join(inv.network_dir, 'starting_gate')   # location of file that signals start, end of test
 
   if inv.iterations < 10: inv.stonewall = False
 
   # display results of parse so user knows what default values are
+  # most important parameters come first
 
   prm_list = [ ('files/thread', '%d'%inv.iterations), \
+             ('operation', inv.opname), \
+             ('top test directory', prm_top_dir), \
              ('threads', '%d'%prm_thread_count), \
              ('record size (KB)', '%d'%inv.record_sz_kb), \
              ('file size (KB)', '%d'%inv.total_sz_kb), \
              ('files per dir', '%d'%inv.files_per_dir), \
              ('dirs per dir', '%d'%inv.dirs_per_dir), \
-             ('ext.attr.size', '%d'%inv.xattr_size), \
-             ('ext.attr.count', '%d'%inv.xattr_count), \
              ('finish all requests?', '%s'%bool2YN(inv.finish_all_rq)), \
              ('stonewall?', '%s'%bool2YN(inv.stonewall)), \
              ('measure response times?', '%s'%bool2YN(inv.measure_rsptimes)), \
              ('verify read?', '%s'%bool2YN(inv.verify_read)), \
              ('permute host directories?', '%s'%bool2YN(prm_permute_host_dirs)), \
-             ('pause between files (microsec)', '%d'%inv.pause_between_files), \
              ('files in same directory?', '%s'%bool2YN(inv.is_shared_dir)), \
              ('hosts in test', '%s'%prm_host_set), \
+             ('ext.attr.size', '%d'%inv.xattr_size), \
+             ('ext.attr.count', '%d'%inv.xattr_count), \
              ('filename prefix', inv.prefix), \
-             ('operation', inv.opname), \
-             ('top test directory', prm_top_dir), \
+             ('pause between files (microsec)', '%d'%inv.pause_between_files), \
              ('remote program directory', prm_remote_pgm_dir), \
              ('verbose?', inv.verbose), \
              ('log to stderr?', inv.log_to_stderr) ]
@@ -223,10 +228,6 @@ def parse():
     for (prm_name, prm_value) in prm_list:
       print '%40s : %s'%(prm_name, prm_value)
 
-  inv.starting_gate = prm_top_dir + os.sep + 'network_dir' + os.sep + 'starting_gate'   # location of file that signals start, end of test
-  inv.network_dir = prm_top_dir + os.sep + 'network_dir'
-  inv.src_dir = prm_top_dir + os.sep + 'src'
-  inv.dest_dir = prm_top_dir + os.sep + 'dst'
   # construct command to run remote slave process using CLI parameters, we have them all here
   remote_cmd = prm_remote_pgm_dir + os.sep + 'smallfile_cli.py ' + pass_on_prm_list
 

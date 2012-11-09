@@ -43,6 +43,9 @@ try:
 except ImportError as e:
   pass
 
+is_windows_os = False
+if os.getenv("HOMEDRIVE"): is_windows_os = True
+
 class MFRdWrExc(Exception):
     def __init__(self, opname_in, filenum_in, rqnum_in, bytesrtnd_in):
         self.opname = opname_in
@@ -106,7 +109,7 @@ class smf_invocation:
     max_files_between_checks = 100 # number of files between stonewalling check at smallest file size
     tmp_dir = os.getenv("TMPDIR")  # UNIX case
     if tmp_dir == None: tmp_dir = os.getenv("TEMP") # windows case
-    if tmp_dir == None: tmp_dir = "/var/tmp"  # should never happen anyway
+    if tmp_dir == None: tmp_dir = "/var/tmp"  # assume POSIX-like
     tmp_dir += '/'
     invocation_count = 0
 
@@ -135,9 +138,9 @@ class smf_invocation:
         self.is_shared_dir = False       # True if all threads share same directory
         self.opname = "create"        # what kind of file access
         self.iterations = 1           # how many files to access
-        self.src_dir = os.path.join(self.tmp_dir, "file_srcdir")    # what directory for test files
-        self.dest_dir = os.path.join(self.tmp_dir, "file_dstdir")   # target directory for renames
-        self.network_dir = os.path.join(self.tmp_dir, "network_shared") # directory for files shared across hosts
+        top = os.path.join(self.tmp_dir, 'smf')
+        self.set_top(top)
+        self.starting_gate = None     # file that tells thread when to start running
         self.record_sz_kb = 8         # record size in KB
         self.total_sz_kb = 64         # total data read/written in KB
         self.files_per_dir = 1000       # determines how many directories to use
@@ -145,10 +148,9 @@ class smf_invocation:
         self.xattr_size = 128         # size of extended attribute to read/write
         self.xattr_count = 1          # number of extended attribute to read/write
         self.files_between_checks = 8 # number of files between stonewalling check
-        self.starting_gate = ""       # wait for this file to exist before starting test
         self.prefix = ""              # prepend this to file name
         self.suffix = ""              # append this to file name
-        self.do_sync_at_end = True    # controls whether we sync at end
+        self.do_sync_at_end = False   # controls whether we sync at end
         self.stonewall = True         # if so, end test as soon as any thread finishes
         self.finish_all_rq = True     # if so, finish remaining requests after test ends
         self.measure_rsptimes = False # if so, append operation response times to .rsptimes
@@ -222,7 +224,7 @@ class smf_invocation:
         s += " dirs_per_dir=%d"%self.dirs_per_dir
         s += " xattr_size=%d"%self.xattr_size
         s += " xattr_count=%d"%self.xattr_count
-        s += " starting_gate="+self.starting_gate
+        s += " starting_gate="+str(self.starting_gate)
         s += " prefix="+self.prefix
         s += " suffix="+self.suffix
         s += " do_sync_at_end="+str(self.do_sync_at_end)
@@ -268,6 +270,13 @@ class smf_invocation:
         self.rsptime_filename = None
         self.pause_sec = self.pause_between_files / self.MICROSEC_PER_SEC
 
+    def set_top(self, top_dir, network_dir=None):
+        self.top_dir = top_dir                                     # directory that contains all files used in test
+        self.src_dir = os.path.join(top_dir, "file_srcdir")        # what directory to create files in
+        self.dest_dir = os.path.join(top_dir, "file_dstdir")       # target directory for renames
+        self.network_dir = os.path.join(top_dir, "network_shared") # directory for synchronization files shared across hosts
+        if network_dir: self.network_dir = network_dir
+
     # create per-thread log file
 
     def start_log(self):
@@ -275,8 +284,8 @@ class smf_invocation:
         if self.log_to_stderr:
           h = logging.StreamHandler()
         else:
-          BASENAME = self.tmp_dir + "invoke_logs"
-          h = logging.FileHandler(BASENAME+"_" + self.tid + ".log")
+          logfilename_base = self.tmp_dir + os.sep + "invoke_logs"
+          h = logging.FileHandler(logfilename_base + "-" + self.tid + ".log")
         formatter = logging.Formatter(self.tid + " %(asctime)s - %(levelname)s - %(message)s")
         h.setFormatter(formatter)
         self.log.addHandler(h)
@@ -319,13 +328,13 @@ class smf_invocation:
     # (i.e. it is ready to immediately begin generating workload)
 
     def gen_thread_ready_fname(self, tid, hostname=None):
-        return self.starting_gate + "." + short_hostname(hostname) + "_" + tid + ".tmp"
+        return self.network_dir + os.sep + "thread_ready." + short_hostname(hostname) + "_" + tid + ".tmp"
 
     # each host uses this to signal that it is at the starting gate
     # (i.e. it is ready to immediately begin generating workload)
 
     def gen_host_ready_fname(self, hostname=None):
-        return self.starting_gate + "." + short_hostname(hostname) + ".tmp"
+        return self.network_dir + os.sep + "host_ready." + short_hostname(hostname) + ".tmp"
 
     # tell test driver that we're at the starting gate
     # this is a 2 phase process
@@ -336,7 +345,7 @@ class smf_invocation:
     # that other hosts will also see it at the same time
 
     def wait_for_gate(self):
-        if self.starting_gate != "":
+        if self.starting_gate:
             gateReady = self.gen_thread_ready_fname(self.tid)
             #print 'thread at gate, file ' + gateReady
             with open(gateReady, "w") as f: 
@@ -346,7 +355,7 @@ class smf_invocation:
                 if self.abort: raise Exception("thread " + str(self.tid) + " saw abort flag")
 
     def stonewall_fn(self):
-        return os.path.dirname(self.starting_gate) + os.sep + 'stonewall.tmp'
+        return self.network_dir + os.sep + 'stonewall.tmp'
 
     # record info needed to compute test statistics 
 
@@ -475,21 +484,24 @@ class smf_invocation:
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dir)
             self.op_starttime()
-            fd = os.open( fn, os.O_CREAT|os.O_EXCL|os.O_WRONLY|self.direct )
-            if (fd < 0):
+            fd = -1
+            try: 
+              fd = os.open( fn, os.O_CREAT|os.O_EXCL|os.O_WRONLY|self.direct )
+              if (fd < 0):
                 raise MFRdWrExc(self.opname, self.filenum, 0, 0)
-            rszkb = self.record_sz_kb
-            if rszkb == 0: rszkb = self.total_sz_kb
-            rszbytes = rszkb * self.BYTES_PER_KB
-            remaining_kb = self.total_sz_kb
-            self.prepare_buf()
-            while remaining_kb > 0:
+              rszkb = self.record_sz_kb
+              if rszkb == 0: rszkb = self.total_sz_kb
+              rszbytes = rszkb * self.BYTES_PER_KB
+              remaining_kb = self.total_sz_kb
+              self.prepare_buf()
+              while remaining_kb > 0:
                 written = os.write(fd, self.buf)
                 self.rq += 1
                 if written != rszkb * self.BYTES_PER_KB:
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, written)
                 remaining_kb -= rszkb
-            os.close(fd)
+            finally:
+              if fd >= 0: os.close(fd)
             self.op_endtime(self.opname)
 
     def do_mkdir(self):
@@ -498,7 +510,7 @@ class smf_invocation:
             self.op_starttime()
             os.mkdir(dir)
             f = dir + os.sep + 'not-empty-directory'
-            os.close(os.open(f, os.O_CREAT|os.O_EXCL|os.O_WRONLY))
+            #os.close(os.opden(f, os.O_CREAT|os.O_EXCL|os.O_WRONLY))
             self.op_endtime(self.opname)
 
     def do_rmdir(self):
@@ -506,7 +518,7 @@ class smf_invocation:
             dir = self.mk_file_nm(self.src_dir) + '.d'
             f = dir + os.sep + 'not-empty-directory'
             self.op_starttime()
-            os.unlink(f)
+            #os.unlink(f)
             os.rmdir(dir)
             self.op_endtime(self.opname)
             
@@ -566,32 +578,37 @@ class smf_invocation:
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dir)
             self.op_starttime()
-            fd = os.open(fn, os.O_WRONLY|self.direct)
-            os.lseek(fd, 0, os.SEEK_END )
-            rszkb = self.record_sz_kb
-            if rszkb == 0: rszkb = self.total_sz_kb
-            remaining_kb = self.total_sz_kb
-            rszbytes = rszkb * self.BYTES_PER_KB
-            self.prepare_buf()
-            while remaining_kb > 0:
+            fd = -1
+            try:
+              fd = os.open(fn, os.O_WRONLY|self.direct)
+              os.lseek(fd, 0, os.SEEK_END )
+              rszkb = self.record_sz_kb
+              if rszkb == 0: rszkb = self.total_sz_kb
+              remaining_kb = self.total_sz_kb
+              rszbytes = rszkb * self.BYTES_PER_KB
+              self.prepare_buf()
+              while remaining_kb > 0:
                 written = os.write(fd, self.buf)
                 self.rq += 1
                 if written != rszbytes:
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, written)
                 remaining_kb -= rszkb
-            os.close(fd)
+            finally:
+              if fd >= 0: os.close(fd)
             self.op_endtime(self.opname)
                 
     def do_read(self):
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dir)
             self.op_starttime()
-            fd = os.open(fn, os.O_RDONLY|self.direct)
-            rszkb = self.record_sz_kb
-            if rszkb == 0: rszkb = self.total_sz_kb
-            remaining_kb = self.total_sz_kb
-            self.prepare_buf()
-            while remaining_kb > 0:
+            fd = -1
+            try:
+              fd = os.open(fn, os.O_RDONLY|self.direct)
+              rszkb = self.record_sz_kb
+              if rszkb == 0: rszkb = self.total_sz_kb
+              remaining_kb = self.total_sz_kb
+              self.prepare_buf()
+              while remaining_kb > 0:
                 bytesread = os.read(fd, rszkb * self.BYTES_PER_KB)
                 self.rq += 1
                 if len(bytesread) != (rszkb * self.BYTES_PER_KB):
@@ -602,7 +619,8 @@ class smf_invocation:
                   if self.buf != bytesread:
                     raise MFRdWrExc('read: buffer contents wrong', self.filenum, self.rq, len(bytesread))
                 remaining_kb -= rszkb
-            os.close(fd)
+            finally:
+              os.close(fd)
             self.op_endtime(self.opname)
 
     def do_rename(self):
@@ -809,8 +827,7 @@ class Test(unittest.TestCase):
         self.invok.tid = "regtest"
         self.invok.start_log()
         self.invok.log.debug('Test.setup')
-        self.invok.network_dir = os.path.join(os.path.dirname(self.invok.src_dir) , 'network_dir')
-        if os.path.exists(self.invok.network_dir): self.deltree(self.invok.network_dir)
+        self.deltree(self.invok.network_dir)
         ensure_dir_exists(self.invok.network_dir)
 
     def deltree(self, topdir):
@@ -866,7 +883,6 @@ class Test(unittest.TestCase):
         self.cleanup_files()
         self.runTest("mkdir")
         self.assertTrue(exists(self.invok.mk_file_nm(self.invok.src_dir)+'.d'))
-        self.assertTrue(exists(self.invok.mk_file_nm(self.invok.src_dir)+'.d'+os.sep+'not-empty-directory'))
 
     def test_c2_Rmdir(self):
         self.cleanup_files()
@@ -875,6 +891,7 @@ class Test(unittest.TestCase):
         self.assertTrue(not exists(self.invok.mk_file_nm(self.invok.src_dir)+'.d'))
 
     def test_c3_Symlink(self):
+        if is_windows_os: return
         self.cleanup_files()
         self.mk_files()
         self.runTest("symlink")
@@ -956,10 +973,10 @@ class Test(unittest.TestCase):
         self.invok.files_per_dir = 20
         self.invok.dirs_per_dir = 3
         d = self.invok.mk_dir_name(29)
-        self.assertTrue(d == 'd_000/d_000/d_002/')
+        self.assertTrue(d == 'd_000%sd_000%sd_002%s'%(os.sep, os.sep, os.sep))
         self.invok.dirs_per_dir = 7
         d = self.invok.mk_dir_name(320)
-        self.assertTrue(d == 'd_006/d_003/d_005/')
+        self.assertTrue(d == 'd_006%sd_003%sd_005%s'%(os.sep, os.sep, os.sep))
 
     def test_j1_deep_tree(self):
         self.invok.total_sz_kb = 0
@@ -986,17 +1003,18 @@ class Test(unittest.TestCase):
         thread_count = 4
         self.test1_recreate_src_dest_dirs()
         self.checkDirEmpty(self.invok.src_dir)
-        #self.checkDirEmpty(self.invok.dst_dir)
+        self.checkDirEmpty(self.invok.dest_dir)
         self.checkDirEmpty(self.invok.network_dir)
         invokeList = []
         for j in range(0, thread_count):
             s = smf_invocation.clone(self.invok)  # test copy constructor
             s.tid = str(j)
-            s.do_sync_at_end = True;
             invokeList.append(s)
         threadList=[]
-        for s in invokeList: threadList.append(TestThread(s, s.prefix + s.tid))
-        for t in threadList: t.start()
+        for s in invokeList: 
+            threadList.append(TestThread(s, s.prefix + s.tid))
+        for t in threadList: 
+            t.start()
         threads_ready = True
         for i in range(0, thread_ready_timeout):
             threads_ready = True

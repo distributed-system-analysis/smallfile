@@ -31,7 +31,8 @@ class subprocess(multiprocessing.Process):
           self.invoke.do_workload()
           self.invoke.log.debug('exiting subprocess and returning invoke '+ str(self.invoke))
         except Exception as e:
-          print 'Exception seen in thread %s (tail /var/tmp/invoke_logs_%s.log) '%(self.invoke.tid, self.invoke.tid)
+          print 'Exception seen in thread %s (tail %s%sinvoke_logs_%s.log) '%\
+                        (self.invoke.tid, self.invoke.tmp_dir, os.sep, self.invoke.tid)
           self.invoke.log.error(str(e))
           self.status = self.invoke.NOTOK
         finally:
@@ -41,65 +42,47 @@ class subprocess(multiprocessing.Process):
 
 # below are unit tests for smf_invocation
 # including multi-threaded test
+# to run, just do "python invoke_process.py"
 
 ok=0
 class Test(unittest.TestCase):
-    topdir='/var/tmp/subproctest'
     def setUp(self):
         self.invok = smallfile.smf_invocation()
         self.invok.debug = True
         self.invok.verbose = True
         self.invok.tid = "regtest"
-        self.invok.tmp_dir = self.topdir
-        self.invok.src_dir = self.topdir + os.sep + 'src'
-        self.invok.dest_dir = self.topdir + os.sep + 'dst'
         self.invok.start_log()
 
     def deltree(self):
-        self.invok.log.debug('deleting entire %s'%self.topdir)
-        if not os.path.exists(self.topdir): return
-        if not os.path.isdir(self.topdir): return
-        for (dir, subdirs, files) in os.walk(self.topdir, topdown=False):
+        if not os.path.exists(self.invok.top_dir): return
+        if not os.path.isdir(self.invok.top_dir): return
+        for (dir, subdirs, files) in os.walk(self.invok.top_dir, topdown=False):
             for f in files: os.unlink(os.path.join(dir,f))
             for d in subdirs: os.rmdir(os.path.join(dir,d))
-        os.rmdir(self.topdir)
+        os.rmdir(self.invok.top_dir)
         
-    def chk_status(self):
-        assert self.invok.status == ok
-
-    def runTest(self, opName):
-        self.invok.opname = opName
-        self.invok.do_workload()
-        self.chk_status()
-
-    def checkDirEmpty(self, emptyDir):
-        self.assertTrue(len(glob.glob(emptyDir + os.sep + "*")) == 0)
-
     def test_multiproc_stonewall(self):
-        self.invok.start_log()
         self.invok.log.info('starting stonewall test')
         thread_ready_timeout = 4
         thread_count = 4
         self.deltree()
-        os.mkdir(self.topdir)
+        os.mkdir(self.invok.top_dir)
         os.mkdir(self.invok.src_dir)
         os.mkdir(self.invok.dest_dir)
-        sgate_file = self.invok.tmp_dir + os.sep + "start"
-        smallfile.ensure_deleted(sgate_file)
+        os.mkdir(self.invok.network_dir)
+        self.invok.starting_gate = os.path.join(self.invok.network_dir, 'starting-gate')
+        sgate_file = self.invok.starting_gate
         invokeList = []
         for j in range(0, thread_count):
             s = smallfile.smf_invocation()
             #s.log_to_stderr = True
             s.verbose = True
             s.tid = str(j)
-            s.src_dir = self.invok.src_dir
-            s.dst_dir = self.invok.dest_dir
             s.prefix = "thr_"
             s.suffix = "foo"
             s.iterations=10
-            s.stonewall = True
+            s.stonewall = False
             s.starting_gate = sgate_file
-            s.do_sync_at_end = True;
             invokeList.append(s)
         threadList=[]
         for s in invokeList: threadList.append(subprocess(s))

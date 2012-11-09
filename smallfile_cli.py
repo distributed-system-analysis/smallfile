@@ -49,8 +49,8 @@ KB_PER_GB = (1<<20)
 min_files_per_sec = 15 
 pct_files_min = 70  # minimum percentage of files for valid test
 
-def gen_host_result_filename(invoke_top, invoke_host):
-  return invoke_top + os.sep + 'network_dir' + os.sep + invoke_host + '_result.pickle'
+def gen_host_result_filename(master_invoke, invoke_host):
+  return os.path.join(master_invoke.network_dir, invoke_host + '_result.pickle')
 
 # abort routine just cleans up threads
 
@@ -65,7 +65,6 @@ def abort_test(thread_list):
 (prm_host_set, prm_thread_count, master_invoke, remote_cmd, prm_slave, prm_permute_host_dirs) = parse.parse()
 starting_gate = master_invoke.starting_gate
 verbose = master_invoke.verbose
-top_dir = os.path.dirname(master_invoke.src_dir)
 
 # calculate timeouts to allow for initialization delays while directory tree is created
 
@@ -83,7 +82,7 @@ if prm_host_set and not prm_slave:
 
   # construct list of ssh threads to invoke in parallel
 
-  net_dir = os.path.join(top_dir, 'network_dir')
+  net_dir = os.path.join(master_invoke.top_dir, 'network_dir')
   rc = os.system('rm -rfv ' + net_dir + os.sep + '*.tmp')
   ensure_deleted(starting_gate)
   remote_cmd += ' --slave Y '
@@ -95,7 +94,7 @@ if prm_host_set and not prm_slave:
         if prm_permute_host_dirs:
           this_remote_cmd += ' --as-host %s'%prm_host_set[(j+1)%host_ct]
         if verbose: print this_remote_cmd
-        pickle_fn = gen_host_result_filename(top_dir, short_hostname(n))
+        pickle_fn = gen_host_result_filename(master_invoke, short_hostname(n))
         ensure_deleted(pickle_fn)
         ssh_thread_list.append(ssh_thread.ssh_thread(n, this_remote_cmd))
   time.sleep(2) # give other clients time to see changes
@@ -128,7 +127,7 @@ if prm_host_set and not prm_slave:
         # read results for each thread run in that host
         # from python pickle of the list of smf_invocation objects
 
-        pickle_fn = gen_host_result_filename(top_dir, short_hostname(h))
+        pickle_fn = gen_host_result_filename(master_invoke, short_hostname(h))
         if verbose: print 'reading pickle file: %s'%pickle_fn
         host_invoke_list = []
         try:
@@ -364,7 +363,7 @@ else:
     # if this is a multi-host test 
     # then write out this host's result in pickle format so test driver can pick up result
 
-    result_filename = gen_host_result_filename(top_dir, host)
+    result_filename = gen_host_result_filename(master_invoke, host)
     if verbose: print 'saving result to filename %s'%result_filename
     ensure_deleted(result_filename)
     result_file = open(result_filename, 'w')
