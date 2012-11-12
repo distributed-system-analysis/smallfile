@@ -26,6 +26,7 @@ def usage(msg):  # call if CLI syntax error or invalid parameter
     print '  --permute-host-dirs Y|N'
     print '  --file-size non-negative-integer-KB'
     print '  --prefix alphanumeric-string'
+    print '  --suffix alphanumeric-string'
     print '  --top directory-pathname'
     print '  --finish Y|N'
     print '  --verify-read Y|N'
@@ -86,6 +87,7 @@ def parse():
   inv.files_per_dir = 200
   inv.dirs_per_dir = 20
   inv.prefix = ''
+  inv.suffix = ''
   inv.log_to_stderr = False
   inv.verbose = False
   inv.opname = 'create'
@@ -119,7 +121,7 @@ def parse():
       usage('ok, so you need help, we all knew that ;-)')
     if rawprm[0:2] != '--': usage('parameter names begin with "--"')
     prm = rawprm[2:]
-    if argc%2 != 1: usage('all parameters consist of a name and a value')
+    if (j == argc - 1) and (argc%2 != 1): usage('all parameters consist of a name and a value')
     val = sys.argv[j+1]
     if len(rawprm) < 3: usage('parameter name not long enough' )
     pass_on_prm = rawprm + ' ' + val
@@ -149,6 +151,7 @@ def parse():
         chkNonNegInt(val, rawprm)
         inv.xattr_count = int(val) 
     elif prm == 'prefix': inv.prefix = val
+    elif prm == 'suffix': inv.suffix = val
     elif prm == 'operation': 
         if not smallfile.smf_invocation.all_op_names.__contains__(val):
             usage('unrecognized operation name: %s'%val)
@@ -157,6 +160,7 @@ def parse():
     elif prm == 'pause': 
         chkPositiveInt(val, rawprm)
         inv.pause_between_files = int(val)
+    elif prm == 'do-sync-at-end': inv.do_sync_at_end = str2bool(val, rawprm)
     elif prm == 'stonewall': inv.stonewall = str2bool(val, rawprm)
     elif prm == 'finish': inv.finish_all_rq = str2bool(val, rawprm)
     elif prm == 'permute-host-dirs': 
@@ -193,7 +197,7 @@ def parse():
     inv.set_top(prm_top_dir)
   else:
     prm_top_dir = os.path.dirname(inv.src_dir)
-  inv.starting_gate = os.path.join(inv.network_dir, 'starting_gate')   # location of file that signals start, end of test
+  inv.starting_gate = os.path.join(inv.network_dir, 'starting_gate.tmp')   # location of file that signals start, end of test
 
   if inv.iterations < 10: inv.stonewall = False
 
@@ -208,20 +212,24 @@ def parse():
              ('file size (KB)', '%d'%inv.total_sz_kb), \
              ('files per dir', '%d'%inv.files_per_dir), \
              ('dirs per dir', '%d'%inv.dirs_per_dir), \
+             ('threads share directories?', '%s'%bool2YN(inv.is_shared_dir)), \
+             ('hosts in test', '%s'%prm_host_set), \
+             ('filename prefix', inv.prefix), \
+             ('filename suffix', inv.suffix), \
+             ('pause between files (microsec)', '%d'%inv.pause_between_files), \
              ('finish all requests?', '%s'%bool2YN(inv.finish_all_rq)), \
              ('stonewall?', '%s'%bool2YN(inv.stonewall)), \
+             ('do sync at end?', '%s'%bool2YN(inv.do_sync_at_end)), \
              ('measure response times?', '%s'%bool2YN(inv.measure_rsptimes)), \
              ('verify read?', '%s'%bool2YN(inv.verify_read)), \
-             ('permute host directories?', '%s'%bool2YN(prm_permute_host_dirs)), \
-             ('files in same directory?', '%s'%bool2YN(inv.is_shared_dir)), \
-             ('hosts in test', '%s'%prm_host_set), \
-             ('ext.attr.size', '%d'%inv.xattr_size), \
-             ('ext.attr.count', '%d'%inv.xattr_count), \
-             ('filename prefix', inv.prefix), \
-             ('pause between files (microsec)', '%d'%inv.pause_between_files), \
-             ('remote program directory', prm_remote_pgm_dir), \
              ('verbose?', inv.verbose), \
              ('log to stderr?', inv.log_to_stderr) ]
+  if (not smallfile.xattr_not_installed) and (inv.opname == 'setxattr' or inv.opname == 'getxattr'):
+    prm_list.extend( [ ('ext.attr.size', '%d'%inv.xattr_size), ('ext.attr.count', '%d'%inv.xattr_count) ] )
+  if prm_host_set:
+    prm_list.extend( [ \
+             ('remote program directory', prm_remote_pgm_dir), \
+             ('permute host directories?', '%s'%bool2YN(prm_permute_host_dirs)) ] )
 
   if not prm_slave:
     print 'smallfile version %s'%version
