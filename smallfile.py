@@ -997,7 +997,7 @@ class Test(unittest.TestCase):
         self.invok.prefix = "thr_"
         self.invok.suffix = "foo"
         self.invok.iterations=10
-        sgate_file = os.path.join(self.invok.network_dir, "start")
+        sgate_file = os.path.join(self.invok.network_dir, "starting_gate.tmp")
         self.invok.starting_gate = sgate_file
         thread_ready_timeout = 4
         thread_count = 4
