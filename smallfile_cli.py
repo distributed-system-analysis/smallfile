@@ -58,37 +58,39 @@ def abort_test(thread_list):
     for t in thread_list:
         t.terminate()
 
-# if a --host-set parameter was passed, it's a multi-host workload
-# and we have to fire up this program in parallel on the remote hosts
-# each remote instance will wait until all instances have reached starting gate
+# main routine that does everything for this workload
+
+def run_workload():
+  # if a --host-set parameter was passed, it's a multi-host workload
+  # and we have to fire up this program in parallel on the remote hosts
+  # each remote instance will wait until all instances have reached starting gate
    
-(prm_host_set, prm_thread_count, master_invoke, remote_cmd, prm_slave, prm_permute_host_dirs) = parse.parse()
-starting_gate = master_invoke.starting_gate
-verbose = master_invoke.verbose
+  (prm_host_set, prm_thread_count, master_invoke, remote_cmd, prm_slave, prm_permute_host_dirs) = parse.parse()
+  starting_gate = master_invoke.starting_gate
+  verbose = master_invoke.verbose
 
-# calculate timeouts to allow for initialization delays while directory tree is created
+  # calculate timeouts to allow for initialization delays while directory tree is created
 
-startup_timeout = 20
-dirs = master_invoke.iterations / master_invoke.files_per_dir
-if dirs > 20:
-  dir_creation_timeout = dirs / 10
-  if verbose: print 'extending initialization timeout by %d seconds for directory creation'%dir_creation_timeout
-  startup_timeout += dir_creation_timeout
-host_startup_timeout = startup_timeout + 5
+  startup_timeout = 20
+  dirs = master_invoke.iterations / master_invoke.files_per_dir
+  if dirs > 20:
+    dir_creation_timeout = dirs / 10
+    if verbose: print 'extending initialization timeout by %d seconds for directory creation'%dir_creation_timeout
+    startup_timeout += dir_creation_timeout
+  host_startup_timeout = startup_timeout + 5
 
-# for multi-host test
+  # for multi-host test
 
-if prm_host_set and not prm_slave:
+  if prm_host_set and not prm_slave:
 
-  # construct list of ssh threads to invoke in parallel
+    # construct list of ssh threads to invoke in parallel
 
-  net_dir = os.path.join(master_invoke.top_dir, 'network_dir')
-  rc = os.system('rm -rfv ' + net_dir + os.sep + '*.tmp')
-  ensure_deleted(starting_gate)
-  remote_cmd += ' --slave Y '
-  ssh_thread_list = []
-  host_ct = len(prm_host_set)
-  for j in range(0, len(prm_host_set)):
+    rc = os.system('rm -rfv ' + master_invoke.network_dir + os.sep + '*.tmp')
+    ensure_deleted(starting_gate)
+    remote_cmd += ' --slave Y '
+    ssh_thread_list = []
+    host_ct = len(prm_host_set)
+    for j in range(0, len(prm_host_set)):
         n = prm_host_set[j]
         this_remote_cmd = remote_cmd
         if prm_permute_host_dirs:
@@ -97,27 +99,27 @@ if prm_host_set and not prm_slave:
         pickle_fn = gen_host_result_filename(master_invoke, short_hostname(n))
         ensure_deleted(pickle_fn)
         ssh_thread_list.append(ssh_thread.ssh_thread(n, this_remote_cmd))
-  time.sleep(2) # give other clients time to see changes
+    time.sleep(2) # give other clients time to see changes
 
-  # start them, pacing starts so that we don't get ssh errors
+    # start them, pacing starts so that we don't get ssh errors
 
-  for t in ssh_thread_list:
+    for t in ssh_thread_list:
         t.start()
 
-  # wait for them to finish
+    # wait for them to finish
 
-  all_ok = True
-  for t in ssh_thread_list:
+    all_ok = True
+    for t in ssh_thread_list:
         t.join()
         if t.status != OK: 
           all_ok = False
           print 'ERROR: ssh thread for host %s completed with status %d'%(t.remote_host, t.status)
-  time.sleep(5) # give response files time to propagate to this host
+    time.sleep(5) # give response files time to propagate to this host
 
-  # attempt to aggregate results by reading pickle files
-  # containing smf_invocation instances with counters and times that we need
+    # attempt to aggregate results by reading pickle files
+    # containing smf_invocation instances with counters and times that we need
 
-  try:
+    try:
       total_files = 0.0
       total_records = 0.0
       max_elapsed_time = 0.0
@@ -181,31 +183,31 @@ if prm_host_set and not prm_slave:
           print "%f IOPS"%iops
           mb_per_sec = iops * rszkb / 1024.0
           print "%f sec elapsed time, %f MB/sec"%(max_elapsed_time, mb_per_sec)
-        if (status == 'ok') and (pct_files < pct_files_min):
+      if (status == 'ok') and (pct_files < pct_files_min):
                 raise SMFResultException('not enough total files processed, change test parameters')
 
-  except IOError, e:
+    except IOError, e:
         print 'host %s filename %s: %s'%(h, pickle_fn, str(e))
         all_ok = False
-  except KeyboardInterrupt, e:
+    except KeyboardInterrupt, e:
         print 'control-C signal seen (SIGINT)'
         all_ok = False
-  except SMFResultException, e:
+    except SMFResultException, e:
         print 'exception: '+str(e)
         all_ok = False
-  if not all_ok: 
+    if not all_ok: 
         sys.exit(NOTOK)
-  sys.exit(OK)
+    sys.exit(OK)
 
-# what follows is code that gets done on each host
-# if --host-set option is not used, then 
-# this is all that gets run
+  # what follows is code that gets done on each host
+  # if --host-set option is not used, then 
+  # this is all that gets run
 
-# for each thread set up smf_invocation instance,
-# create a thread instance, and delete the thread-ready file 
+  # for each thread set up smf_invocation instance,
+  # create a thread instance, and delete the thread-ready file 
 
-thread_list=[]
-for k in range(0,prm_thread_count):
+  thread_list=[]
+  for k in range(0,prm_thread_count):
     nextinv = smallfile.smf_invocation.clone(master_invoke)
     nextinv.tid = "%02d"%k
     if not master_invoke.is_shared_dir:
@@ -214,31 +216,31 @@ for k in range(0,prm_thread_count):
     t = invoke_process.subprocess(nextinv)
     thread_list.append(t)
 
-starting_gate = thread_list[0].invoke.starting_gate
-my_host_invoke = thread_list[0].invoke
-host = short_hostname(None)
+  starting_gate = thread_list[0].invoke.starting_gate
+  my_host_invoke = thread_list[0].invoke
+  host = short_hostname(None)
 
-# start threads, wait for them to reach starting gate
-# to do this, look for thread-ready files 
+  # start threads, wait for them to reach starting gate
+  # to do this, look for thread-ready files 
 
-if not prm_slave:
-  ensure_deleted(my_host_invoke.stonewall_fn())
-  ensure_deleted(starting_gate)
-  ensure_deleted(my_host_invoke.gen_host_ready_fname(host))
-for t in thread_list:
+  if not prm_slave:
+    ensure_deleted(my_host_invoke.stonewall_fn())
+    ensure_deleted(starting_gate)
+    ensure_deleted(my_host_invoke.gen_host_ready_fname(host))
+  for t in thread_list:
     ensure_deleted(t.invoke.gen_thread_ready_fname(t.invoke.tid))
-time.sleep(1)
+  time.sleep(1)
 
-for t in thread_list:
+  for t in thread_list:
     t.start()
-if verbose: print "started %d worker threads on host %s"%(len(thread_list),host)
+  if verbose: print "started %d worker threads on host %s"%(len(thread_list),host)
 
-# wait for all threads to reach the starting gate
-# this makes it more likely that they will start simultaneously
+  # wait for all threads to reach the starting gate
+  # this makes it more likely that they will start simultaneously
 
-threads_ready = False  # really just to set scope of variable
-k=0
-for sec in range(0, startup_timeout):
+  threads_ready = False  # really just to set scope of variable
+  k=0
+  for sec in range(0, startup_timeout):
     threads_ready = True
     for t in thread_list:
         fn = t.invoke.gen_thread_ready_fname(t.invoke.tid)
@@ -248,79 +250,81 @@ for sec in range(0, startup_timeout):
     if threads_ready: break
     time.sleep(0.5)
 
-# if all threads didn't make it to the starting gate
+  # if all threads didn't make it to the starting gate
 
-if not threads_ready: 
+  if not threads_ready: 
     abort_test(thread_list)
     raise Exception('threads did not reach starting gate within %d sec'%startup_timeout)
 
-# declare that this host is at the starting gate
+  # declare that this host is at the starting gate
 
-with open(my_host_invoke.gen_host_ready_fname(), "w+") as f:
-  f.close()
-time.sleep(1)
+  with open(my_host_invoke.gen_host_ready_fname(), "w+") as f:
+    f.close()
+  time.sleep(1)
 
-# wait for hosts to arrive at starting gate
-# if only one host, then no wait will occur as starting gate file is already present
-
-hosts_ready = False  # set scope outside while loop
-if prm_slave or (prm_host_set == None):
-  if prm_host_set == None: prm_host_set = [ host ]
-  for sec in range(0, host_startup_timeout):
-    hosts_ready = True
-    for h in prm_host_set:
+  # wait for hosts to arrive at starting gate
+  # if only one host, then no wait will occur as starting gate file is already present
+  # FIXME: prm_host_set == None in slave, so we won't wait for other hosts, BAD
+  # FIXME: need to stop polling the same files, instead resume scan from last host file not found
+  hosts_ready = False  # set scope outside while loop
+  if prm_slave or (prm_host_set == None):
+    if prm_host_set == None: prm_host_set = [ host ]
+    for sec in range(0, host_startup_timeout):
+      hosts_ready = True
+      for h in prm_host_set:
         fn = my_host_invoke.gen_host_ready_fname(h.strip())
         if not os.access(fn, os.R_OK):
             hosts_ready = False
             break
-    if hosts_ready: break
-    time.sleep(1)
-  if not hosts_ready:
-    abort_test(thread_list)
-    raise Exception('hosts did not reach starting gate within %d seconds'%host_startup_timeout)
-if verbose: print "starting test on host " + host + " in 2 seconds"
-time.sleep(2 + random.random())  
+      if hosts_ready: break
+      time.sleep(1)
+    if not hosts_ready:
+      abort_test(thread_list)
+      raise Exception('hosts did not reach starting gate within %d seconds'%host_startup_timeout)
+  if verbose: print "starting test on host " + host + " in 2 seconds"
+  time.sleep(2 + random.random())  
 
-# ask all hosts to start the test
-# this is like firing the gun at the track meet
-# threads will wait 3 sec after starting gate is opened before 
-# we really apply workload.  This ensures that heavy workload
-# doesn't block some hosts from seeing the starting flag
+  # ask all hosts to start the test
+  # this is like firing the gun at the track meet
+  # threads will wait 3 sec after starting gate is opened before 
+  # we really apply workload.  This ensures that heavy workload
+  # doesn't block some hosts from seeing the starting flag
 
-if (prm_host_set != [] and not prm_slave) or (prm_host_set == [host]):
- try:
-  if not os.access(starting_gate, os.R_OK): 
-    with open(starting_gate, "w") as f:
-      f.close()
-    print 'starting gate file %s created by host %s'%(starting_gate, host)
- except IOError, e:
-  print e.errno
-  if (e.errno != errno.EEXIST) or not prm_slave: raise e
-  # if this is a multi-host test, then it's ok if file already existed, everyone tried to make it
+  if (prm_host_set != [] and not prm_slave) or (prm_host_set == [host]):
+   try:
+    if not os.access(starting_gate, os.R_OK): 
+      with open(starting_gate, "w") as f:
+        f.close()
+      print 'starting gate file %s created by host %s'%(starting_gate, host)
+   except IOError, e:
+      print e.errno
+      if (e.errno != errno.EEXIST) or not prm_slave: raise e
+      # if this is a multi-host test, then it's ok if file already existed, everyone tried to make it
 
-# FIXME: don't timeout the test, 
-# instead check thread progress and abort if you see any of them stalled
-# for long enough
-# problem is: if servers are heavily loaded you can't use filesystem to communicate this
+  # FIXME: don't timeout the test, 
+  # instead check thread progress and abort if you see any of them stalled
+  # for long enough
+  # problem is: if servers are heavily loaded you can't use filesystem to communicate this
 
-# wait for all threads on this host to finish
+  # wait for all threads on this host to finish
 
-for t in thread_list: 
+  for t in thread_list: 
     if verbose: print 'waiting for thread %s'%t.invoke.tid
     t.invoke = t.receiver.recv()  # must do this to get results from sub-process
     t.join()
 
-# if not a slave of some other host, print results (for this host)
+  # if not a slave of some other host, print results (for this host)
 
-exit_status = OK
-if not prm_slave:
-  try: 
-    total_files = 0.0
-    total_records = 0.0
-    max_elapsed_time = 0.0
-    threads_failed_to_start = 0
-    worst_status = 'ok'
-    for t in thread_list:
+  exit_status = OK
+  if not prm_slave:
+    try: 
+      total_files = 0.0
+      total_records = 0.0
+      max_elapsed_time = 0.0
+      threads_failed_to_start = 0
+      worst_status = 'ok'
+      # FIXME: code to aggregate results from list of invoke objects can be shared by multi-host and single-host cases
+      for t in thread_list:
         status = "ok"
         if t.invoke.status != OK: status = os.strerror(t.invoke.status)
         if worst_status == 'ok' and status != 'ok': worst_status = status
@@ -331,22 +335,20 @@ if not prm_slave:
         total_records += t.invoke.rq_final
         max_elapsed_time = max(max_elapsed_time, t.invoke.elapsed_time)
 
-    print "elapsed time = %f, total files = %d, total_records = %d"\
+      print "elapsed time = %f, total files = %d, total_records = %d"\
                   %(max_elapsed_time, total_files, total_records)
-    if threads_failed_to_start:
+      if threads_failed_to_start:
         raise SMFResultException('at least %d threads did not start'%threads_failed_to_start)
-    if (max_elapsed_time > 0):
-        files_per_sec = total_files / max_elapsed_time
-        max_files = my_host_invoke.iterations * len(thread_list)
-        pct_files = 100.0 * total_files / max_files
-        print '%6.2f%% of requested files processed, minimum is %6.2f'%(pct_files, pct_files_min)
-        if (worst_status == 'ok') and (pct_files < pct_files_min):
-                raise SMFResultException('not enough total files processed, change test parameters')
-        if (worst_status != 'ok'):
+      max_files = my_host_invoke.iterations * len(thread_list)
+      pct_files = 100.0 * total_files / max_files
+      print '%6.2f%% of requested files processed, minimum is %6.2f'%(pct_files, pct_files_min)
+      if worst_status != 'ok':
                 raise SMFResultException('at least one thread encountered error, test may be invalid')
-        print "%d sec elapsed time, %f files/sec"%(max_elapsed_time, files_per_sec)
-        if pct_files < pct_files_min:
+      if pct_files < pct_files_min:
                 raise SMFResultException('not enough total files processed, change test parameters')
+      if (max_elapsed_time > 0):
+        files_per_sec = total_files / max_elapsed_time
+        print "%d sec elapsed time, %f files/sec"%(max_elapsed_time, files_per_sec)
         if total_records > 0: 
             iops = total_records / max_elapsed_time
             print "%f IOPS"%iops
@@ -354,12 +356,12 @@ if not prm_slave:
             if rszkb == 0: rszkb = my_host_invoke.total_sz_kb
             mb_per_sec = iops * rszkb / 1024.0
             if mb_per_sec > 0: print "%f MB/sec"%mb_per_sec
-  except SMFResultException as e:
+    except SMFResultException as e:
         print 'ERROR: ' + str(e)
         exit_status = NOTOK
 
 
-else:
+  else:
     # if this is a multi-host test 
     # then write out this host's result in pickle format so test driver can pick up result
 
@@ -376,4 +378,11 @@ else:
     os.fsync(result_file.fileno())  # have to do this or reader may not see data
     result_file.close()
 
-sys.exit(exit_status)
+  sys.exit(exit_status)
+
+# for future windows compatibility, all global code (not contained in a class or subroutine)
+# must be moved to within a routine unless it's trivial (like constants)
+# because windows doesn't support fork().
+
+if __name__ == "__main__":
+  run_workload()
