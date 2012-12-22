@@ -9,7 +9,7 @@ import sys
 import os
 import smallfile
 
-version = '1.9.5'
+version = '1.9.6'
 
 def usage(msg):  # call if CLI syntax error or invalid parameter
     print
@@ -24,6 +24,7 @@ def usage(msg):  # call if CLI syntax error or invalid parameter
     print '  --xattr-size non-negative-integer-bytes'
     print '  --xattr-count non-negative-integer-bytes'
     print '  --permute-host-dirs Y|N'
+    print '  --hash-into-dirs Y|N'
     print '  --file-size non-negative-integer-KB'
     print '  --prefix alphanumeric-string'
     print '  --suffix alphanumeric-string'
@@ -34,6 +35,7 @@ def usage(msg):  # call if CLI syntax error or invalid parameter
     print '  --same-dir Y|N'
     print '  --pause microsec'
     print '  --host-set h1,h2,...,hN'
+    print '  --network-sync-dir directory-path'
     print '  --remote-pgm-dir directory-pathname'
     sys.exit(1)
 
@@ -86,10 +88,7 @@ def parse():
   inv.total_sz_kb = 64
   inv.files_per_dir = 200
   inv.dirs_per_dir = 20
-  inv.prefix = ''
-  inv.suffix = ''
   inv.log_to_stderr = False
-  inv.verbose = False
   inv.opname = 'create'
   inv.pause_between_files = 0
   inv.verify_read = True
@@ -106,7 +105,8 @@ def parse():
   prm_host_set = None
   prm_slave = False
   prm_permute_host_dirs = False
-  prm_remote_pgm_dir = os.getcwd()
+  prm_remote_pgm_dir = None
+  prm_network_sync_dir = None
   prm_top_dir = None
 
   # parse command line
@@ -152,6 +152,7 @@ def parse():
         inv.xattr_count = int(val) 
     elif prm == 'prefix': inv.prefix = val
     elif prm == 'suffix': inv.suffix = val
+    elif prm == 'hash-into-dirs': inv.hash_to_dir = str2bool(val, rawprm)
     elif prm == 'operation': 
         if not smallfile.smf_invocation.all_op_names.__contains__(val):
             usage('unrecognized operation name: %s'%val)
@@ -176,6 +177,7 @@ def parse():
         if len(prm_host_set) < 2: prm_host_set = val.strip().split()
         pass_on_prm = ''
     elif prm == 'remote-pgm-dir': prm_remote_pgm_dir = val
+    elif prm == 'network-sync-dir': prm_network_sync_dir = val
     # --slave should not be used by end-user
     elif prm == 'slave': prm_slave = str2bool(val, rawprm)
     # --ashost should not be used by end-user
@@ -197,6 +199,13 @@ def parse():
     inv.set_top(prm_top_dir)
   else:
     prm_top_dir = os.path.dirname(inv.src_dir)
+  if prm_network_sync_dir:
+    if not prm_host_set:
+      usage('you do not need to specify a network thread synchronization directory unless you use multiple hosts')
+    inv.network_dir = prm_network_sync_dir
+  if prm_remote_pgm_dir:
+    if not prm_host_set:
+      usage('you do not need to specify a remote program directory unless you use multiple hosts')
   inv.starting_gate = os.path.join(inv.network_dir, 'starting_gate.tmp')   # location of file that signals start, end of test
 
   if inv.iterations < 10: inv.stonewall = False
@@ -204,18 +213,20 @@ def parse():
   # display results of parse so user knows what default values are
   # most important parameters come first
 
-  prm_list = [ ('files/thread', '%d'%inv.iterations), \
+  prm_list = [ \
              ('operation', inv.opname), \
+             ('files/thread', '%d'%inv.iterations), \
              ('top test directory', prm_top_dir), \
              ('threads', '%d'%prm_thread_count), \
+             ('hosts in test', '%s'%prm_host_set), \
              ('record size (KB)', '%d'%inv.record_sz_kb), \
              ('file size (KB)', '%d'%inv.total_sz_kb), \
              ('files per dir', '%d'%inv.files_per_dir), \
              ('dirs per dir', '%d'%inv.dirs_per_dir), \
              ('threads share directories?', '%s'%bool2YN(inv.is_shared_dir)), \
-             ('hosts in test', '%s'%prm_host_set), \
              ('filename prefix', inv.prefix), \
              ('filename suffix', inv.suffix), \
+             ('hash file number into dir.?', bool2YN(inv.hash_to_dir)), \
              ('pause between files (microsec)', '%d'%inv.pause_between_files), \
              ('finish all requests?', '%s'%bool2YN(inv.finish_all_rq)), \
              ('stonewall?', '%s'%bool2YN(inv.stonewall)), \
@@ -228,8 +239,9 @@ def parse():
     prm_list.extend( [ ('ext.attr.size', '%d'%inv.xattr_size), ('ext.attr.count', '%d'%inv.xattr_count) ] )
   if prm_host_set:
     prm_list.extend( [ \
-             ('remote program directory', prm_remote_pgm_dir), \
              ('permute host directories?', '%s'%bool2YN(prm_permute_host_dirs)) ] )
+    if prm_remote_pgm_dir: prm_list.append( ('remote program directory', prm_remote_pgm_dir) )
+    if prm_network_sync_dir: prm_list.append( ('network thread sync. dir.', prm_network_sync_dir) )
 
   if not prm_slave:
     print 'smallfile version %s'%version
@@ -237,6 +249,7 @@ def parse():
       print '%40s : %s'%(prm_name, prm_value)
 
   # construct command to run remote slave process using CLI parameters, we have them all here
+  if not prm_remote_pgm_dir: prm_remote_pgm_dir = os.getcwd()
   remote_cmd = prm_remote_pgm_dir + os.sep + 'smallfile_cli.py ' + pass_on_prm_list
 
   # "inv" contains all per-thread parameters

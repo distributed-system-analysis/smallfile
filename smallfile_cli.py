@@ -85,7 +85,7 @@ def run_workload():
 
     # construct list of ssh threads to invoke in parallel
 
-    rc = os.system('rm -rfv ' + master_invoke.network_dir + os.sep + '*.tmp')
+    rc = os.system('rm -rf ' + master_invoke.network_dir + os.sep + '*.tmp')
     ensure_deleted(starting_gate)
     remote_cmd += ' --slave Y '
     ssh_thread_list = []

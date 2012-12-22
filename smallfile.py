@@ -112,6 +112,7 @@ class smf_invocation:
     if tmp_dir == None: tmp_dir = "/var/tmp"  # assume POSIX-like
     tmp_dir += '/'
     invocation_count = 0
+    some_prime = 900593
 
     # build largest supported buffer, then
     # just use a substring of it below
@@ -150,6 +151,7 @@ class smf_invocation:
         self.files_between_checks = 8 # number of files between stonewalling check
         self.prefix = ""              # prepend this to file name
         self.suffix = ""              # append this to file name
+        self.hash_to_dir = False      # controls whether directories are accessed sequentially or randomly
         self.do_sync_at_end = False   # controls whether we sync at end
         self.stonewall = True         # if so, end test as soon as any thread finishes
         self.finish_all_rq = True     # if so, finish remaining requests after test ends
@@ -191,6 +193,7 @@ class smf_invocation:
         new.starting_gate = s.starting_gate
         new.prefix = s.prefix
         new.suffix = s.suffix
+        new.hash_to_dir = s.hash_to_dir
         new.do_sync_at_end = s.do_sync_at_end
         new.stonewall = s.stonewall
         new.finish_all_rq = s.finish_all_rq
@@ -227,6 +230,7 @@ class smf_invocation:
         s += " starting_gate="+str(self.starting_gate)
         s += " prefix="+self.prefix
         s += " suffix="+self.suffix
+        s += " hash_to_dir="+str(self.hash_to_dir)
         s += " do_sync_at_end="+str(self.do_sync_at_end)
         s += " stonewall="+str(self.stonewall)
         s += " files_between_checks="+str(self.files_between_checks)
@@ -394,12 +398,37 @@ class smf_invocation:
         if self.pause_sec > 0.0: time.sleep(self.pause_sec)
         return True
 
-    def mk_dir_name(self, dir_num):
+    # in this method of directory selection, as filenum increments upwards, 
+    # we place F = files_per_dir files into directory, then next F files into directory D+1, etc.
+
+    def mk_seq_dir_name(self, file_num):
+        dir_num = file_num / self.files_per_dir
         path = ''
         while dir_num > 1:
-                path = 'd_%03d/'%(dir_num % self.dirs_per_dir) + path
+                dir_num_at_level = dir_num % self.dirs_per_dir
+                path = ('d_%03d/'%dir_num_at_level) + path
                 dir_num = dir_num / self.dirs_per_dir
         return path
+
+    def mk_hashed_dir_name(self, file_num):
+        path = ''
+        dir_num = file_num / self.files_per_dir
+        while dir_num > 1:
+                # try using floating point fraction to generate a uniform random distribution on directories
+                dir_num_hash = (dir_num * self.some_prime) % self.dirs_per_dir
+                #f = (file_num<<4) / prime
+                #fract = f - int(f)
+                #next_dir_num = int(fract * self.dirs_per_dir)
+                path = 'h_%03d/'%dir_num_hash + path
+                #print file_num, dirs_in_tree, f, fract, next_dir_num, hashed_path
+                #print file_num, dir_num_hash, path
+                dir_num /= self.dirs_per_dir
+        return path
+
+    def mk_dir_name(self, file_num):
+        if self.hash_to_dir: return self.mk_hashed_dir_name(file_num)
+        else: return self.mk_seq_dir_name(file_num)
+
 
     # generate file name to put in this directory
     # prefix can be used for process ID or host ID for example
@@ -410,10 +439,7 @@ class smf_invocation:
     def mk_file_nm(self, base_dir, filenum=-1):
         if filenum == -1: filenum = self.filenum
 
-        fpd = self.files_per_dir
-        dpd = self.dirs_per_dir
-        dir_num = filenum / self.files_per_dir
-        dirpath = self.mk_dir_name(dir_num)
+        dirpath = self.mk_dir_name(filenum)
 
         # implement directory tree fitting files as high in the tree as possible
         # for successive files use same directory when possible
@@ -444,9 +470,8 @@ class smf_invocation:
     def make_all_subdirs(self):
         if (self.tid != '00') and self.is_shared_dir: return
         for tree in [ self.src_dir, self.dest_dir ]:
-          subdirs = (self.iterations/self.files_per_dir) + 1
-          for j in range(0, subdirs):
-            fpath = self.mk_file_nm(tree, filenum=j*self.files_per_dir)
+          for j in range(0, self.iterations+1):
+            fpath = self.mk_file_nm(tree, j)
             dpath = os.path.dirname(fpath)
             #print 'making subdirectory %s'%dpath
             if not exists(dpath): 
@@ -722,9 +747,9 @@ class smf_invocation:
 
     def do_workload(self):
         self.reset()
-        ensure_dir_exists(self.network_dir)
         self.start_log()
         self.log.info('do_workload: ' + str(self))
+        ensure_dir_exists(self.network_dir)
         self.make_all_subdirs()
         self.prepare_buf()
         if self.total_sz_kb > 0:
@@ -972,10 +997,10 @@ class Test(unittest.TestCase):
     def test_j0_dir_name(self):
         self.invok.files_per_dir = 20
         self.invok.dirs_per_dir = 3
-        d = self.invok.mk_dir_name(29)
+        d = self.invok.mk_dir_name(29*self.invok.files_per_dir)
         self.assertTrue(d == 'd_000%sd_000%sd_002%s'%(os.sep, os.sep, os.sep))
         self.invok.dirs_per_dir = 7
-        d = self.invok.mk_dir_name(320)
+        d = self.invok.mk_dir_name(320*self.invok.files_per_dir)
         self.assertTrue(d == 'd_006%sd_003%sd_005%s'%(os.sep, os.sep, os.sep))
 
     def test_j1_deep_tree(self):
@@ -985,7 +1010,19 @@ class Test(unittest.TestCase):
         self.invok.dirs_per_dir = 3
         self.invok.iterations = 200
         self.invok.prefix = ''
-        self.invok.suffix = ''
+        self.invok.suffix = 'deep'
+        self.mk_files()
+        self.assertTrue(exists(self.invok.mk_file_nm(self.invok.src_dir,self.invok.iterations-1)))
+        self.cleanup_files()
+ 
+    def test_j2_deep_hashed_tree(self):
+        self.invok.suffix = 'deep_hashed'
+        self.invok.total_sz_kb = 0
+        self.invok.record_sz_kb = 0
+        self.invok.files_per_dir = 5 
+        self.invok.dirs_per_dir = 4
+        self.invok.iterations = 500 
+        self.hash_to_dir = True
         self.mk_files()
         self.assertTrue(exists(self.invok.mk_file_nm(self.invok.src_dir,self.invok.iterations-1)))
         self.cleanup_files()

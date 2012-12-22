@@ -3,11 +3,11 @@
 <HEAD>
 	<META HTTP-EQUIV="CONTENT-TYPE" CONTENT="text/html; charset=utf-8">
 	<TITLE>smallfile distributed I/O benchmark | Red Hat Intranet</TITLE>
-	<META NAME="GENERATOR" CONTENT="LibreOffice 3.4  (Unix)">
+	<META NAME="GENERATOR" CONTENT="LibreOffice 3.5  (Linux)">
 	<META NAME="AUTHOR" CONTENT="anonymous">
 	<META NAME="CREATED" CONTENT="0;0">
 	<META NAME="CHANGEDBY" CONTENT="Ben England">
-	<META NAME="CHANGED" CONTENT="20120829;13141100">
+	<META NAME="CHANGED" CONTENT="20121222;16101900">
 	<META NAME="category-departments" CONTENT="Engineering">
 	<META NAME="category-keywords" CONTENT="filesystem">
 	<META NAME="category-offices" CONTENT="Westford, MA">
@@ -16,15 +16,17 @@
 	<META NAME="status" CONTENT="1">
 	<META NAME="type" CONTENT="wiki_page">
 	<META NAME="CHANGEDBY" CONTENT="Ben England">
+	<META NAME="CHANGEDBY" CONTENT="Ben England">
 	<STYLE TYPE="text/css">
 	<!--
 		@page { margin: 0.79in }
-		P { color: #000000; font-family: "Liberation Serif", "Times New Roman", serif; font-size: 11pt; line-height: 138% }
 		H1 { margin-top: 0.1in; margin-bottom: 0in; border: none; padding: 0in; color: #000000; font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif; font-size: 22pt }
+		P { color: #000000; font-family: "Liberation Serif", "Times New Roman", serif; font-size: 11pt; line-height: 138% }
 		H2 { margin-top: 0.1in; margin-bottom: 0in; border: none; padding: 0in; color: #000000; font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif; font-size: 10pt; font-weight: normal; line-height: 130% }
 		H1.with-tabs { font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif; font-size: 22pt }
 		PRE { color: #000000 }
 		PRE.cjk { font-family: "WenQuanYi Zen Hei", monospace }
+		PRE.ctl { font-family: "Lohit Devanagari", monospace }
 		A:link { color: #003399; text-decoration: none }
 		A:visited { color: #000000 }
 	-->
@@ -45,7 +47,11 @@
 	<P><BR><BR>
 	</P>
 	<DIV ID="inner-wrap" DIR="LTR">
+		<P><BR><BR>
+		</P>
 		<DIV ID="center" DIR="LTR">
+			<P><BR><BR>
+			</P>
 			<DIV ID="tabs-wrapper" DIR="LTR">
 				<H1 CLASS="with-tabs" STYLE="margin-top: 0in; margin-bottom: 0.2in; border: none; padding: 0in">
 				smallfile distributed I/O benchmark</H1>
@@ -162,6 +168,10 @@
 					-- maximum number of subdirectories contained in any one
 					directory 
 					</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">--hash-into-dirs
+					– default N, if Y then assign next file to a directory using a
+					hash function, otherwise assign next –files-per-dir files to
+					next directory</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">--xattr-size
 					-- size of extended attribute value in bytes (names begin with
 					'user.smallfile-') 
@@ -263,8 +273,8 @@
 				<PRE CLASS="western" STYLE="margin-bottom: 0.2in; border: none; padding: 0in"><STRONG> </STRONG><STRONG><FONT SIZE=3># python smallfile.py </FONT></STRONG></PRE><P STYLE="margin-bottom: 0in; border: none; padding: 0in">
 				To run just one unit test module run</P>
 				<PRE CLASS="western" STYLE="margin-bottom: 0.2in; border: none; padding: 0in"><STRONG> </STRONG><STRONG><FONT SIZE=3># python -m unittest smallfile.Test.test_c3_Symlink </FONT></STRONG></PRE><P STYLE="margin-bottom: 0in; line-height: 100%">
-				<FONT FACE="Liberation Serif, serif"><FONT SIZE=3><FONT SIZE=4 STYLE="font-size: 16pt">Use
-				with non-networked filesystems</FONT></FONT></FONT></P>
+				<FONT FACE="Liberation Serif, serif"><FONT SIZE=4 STYLE="font-size: 16pt">Use
+				with non-networked filesystems</FONT></FONT></P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
 				</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">There
@@ -273,16 +283,15 @@
 				the “local” filesystem is really layered on a virtual disk
 				image which may be stored in a network filesystem. The benchmark
 				needs to share certain files across hosts to return results and
-				synchronize threads. We do this by creating a <B>network_dir</B>
-				subdirectory under the top test directory. This directory can be
-				a softlink or mountpoint that connects to a non-local directory
-				shared via a network filesystem. So you create the top test
-				directory on each host, and make sure the subdirectory
-				<B>network_dir</B> points to a directory shared by all hosts
-				participating in the tests as well as the test driver host. You
-				can then run the test as before. This feature is supported as of
-				V1.9.3.</P>
-				<H2 STYLE="margin-bottom: 0.2in"><BR><BR>
+				synchronize threads.    In such a case, you specify the
+				<B>–network-sync-dir</B> <I>directory-pathname</I><SPAN STYLE="font-style: normal">
+				parameter to have the benchmark use a directory in some shared
+				filesystem external to the test directory (specified with </SPAN><SPAN STYLE="font-style: normal"><B>–top</B></SPAN><SPAN STYLE="font-style: normal">
+				parameter).  By default, if this parameter is not specified then
+				the shared directory will be the subdirectory </SPAN><SPAN STYLE="font-style: normal"><B>network-dir</B></SPAN><SPAN STYLE="font-style: normal">
+				underneath the directory specified with the </SPAN><SPAN STYLE="font-style: normal"><B>–top</B></SPAN><SPAN STYLE="font-style: normal">
+				parameter.</SPAN></P>
+				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><BR><BR>
 				</H2>
 				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in; border: none; padding: 0in">
 				<FONT SIZE=4 STYLE="font-size: 16pt">Use of --pause in
@@ -306,7 +315,79 @@
 				running,try a 60/100000 = 600 microsecond pause.&nbsp; Verify
 				that this isn't affecting throughput by reducing the pause and
 				running a longer test.</P>
-				<H2 STYLE="margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Avoiding
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
+				</P>
+				<H2><FONT SIZE=4 STYLE="font-size: 16pt">Use of subdirectories</FONT></H2>
+				<P><BR><BR>
+				</P>
+				<P>Before a test even starts, the smallfile benchmark ensures
+				that the directories needed by that test already exist (there is
+				a specific operation type for testing performance of subdirectory
+				creation and deletion).  If the top directory (specified by –top
+				parameter) is T, then the top per-thread directory is T/host/dTT 
+				where TT is a 2-digit thread number and “host” is the
+				hostname.  If the test is not a distributed test, then it's just
+				whatever host the benchmark command was issued on, otherwise it
+				is each of the hosts specified by the –host-set parameter.  The
+				first F files (where F is the value of the –files-per-dir)
+				parameter are placed in this top per-thread directory.  If the
+				test uses more than F files/thread, then at least one
+				subdirectory from the first level of subdirectories must be used;
+				these subdirectories have the path T/host/dTT/dNNN where NNN is
+				the subdirectory number.  Suppose the value of the parameter
+				–subdirs-per-dir is D.  Then there are at most D subdirectories
+				of the top per-thread directory.  If the test requires more than
+				D(F+1) files per thread, then a second level of subdirectories
+				will have to be created, with pathnames like T/host/dTT/dNNN/dMMM
+				.   This process of adding subdirectories continues in this
+				fashion until there are sufficient subdirectories to hold all the
+				files.  The purpose of this approach is to simulate a mixture of
+				directories and files, and to not require the user to specify how
+				many levels of directories are required.</P>
+				<H2><FONT SIZE=4 STYLE="font-size: 16pt">Sharing directories
+				across threads</FONT></H2>
+				<P><BR><BR>
+				</P>
+				<P>Some applications require that many threads, possibly spread
+				across many host machines, need to share a set of directories. 
+				The<B> --same-dir</B> parameter makes it possible for the
+				benchmark to test this situation.  By default this parameter is
+				set to N, which means each thread has its own non-overlapping
+				directory tree.  This setting provides the best performance and
+				scalability.  However, if the user sets this parameter to Y, then
+				the top per-thread directory for all threads will be <B>T </B>instead
+				of <B>T/host/dTT</B> as described in preceding section.</P>
+				<H2><FONT SIZE=4 STYLE="font-size: 16pt">Hashing files into
+				directory tree</FONT></H2>
+				<P><FONT SIZE=2 STYLE="font-size: 11pt">For applications which
+				create very large numbers of small files (millions for example),
+				it is impossible or at the very least impractical to place them
+				all in the same directory, whether or not the filesystem supports
+				so many files in a single directory.  There are two ways which
+				applications can use to solve this problem:</FONT></P>
+				<UL>
+					<LI><P><FONT SIZE=2 STYLE="font-size: 11pt">insert files into 1
+					directory at a time – can create I/O and lock contention for
+					the directory metadata</FONT></P>
+					<LI><P><FONT SIZE=2 STYLE="font-size: 11pt">insert files into
+					many directories at the same time – relieves I/O and lock
+					contention for directory metadata, but increases the amount of
+					metadata caching needed to avoid cache misses</FONT></P>
+				</UL>
+				<P><FONT SIZE=2 STYLE="font-size: 11pt">The <B>–hash-into-dirs</B>
+				parameter is intended to enable simulation of this latter mode of
+				operation.    By default, the value of this parameter is N, and
+				in this case a smallfile thread will sequentially access
+				directories one at a time.  In other words, the first D (where D
+				= value of <B>–files-per-dir </B>parameter)  files will be
+				assigned to the top per-thread directory, then the next D files
+				will be assigned to the next per-thread directory, and so on. 
+				However, if the <B>–hash-into-dirs</B> parameter is set to Y,
+				then the number of the file being accessed by the thread will be
+				hashed into the set of directories that are being used by this
+				thread.   </FONT>
+				</P>
+				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Avoiding
 				caching effects</FONT></H2>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><A NAME="Avoiding_caching_effects"></A>
 				THere are two types of caching effects that we wish to avoid,
@@ -324,7 +405,7 @@
 				data written should be roughly 2 GB/server and the number of
 				files used should be roughly 8 times the number of servers.&nbsp;
 				Use of many separate files ensures that this cache eviction data
-				is spread across all servers approximately equally.<STRONG><FONT SIZE=3>&nbsp;</FONT></STRONG></P>
+				is spread across all servers approximately equally.<STRONG>&nbsp;</STRONG></P>
 				<H1 STYLE="margin-top: 0in; margin-bottom: 0.2in">Results</H1>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">All
 				tests display a &quot;files/sec&quot; result.&nbsp; If the test
