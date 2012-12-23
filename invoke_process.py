@@ -31,8 +31,8 @@ class subprocess(multiprocessing.Process):
           self.invoke.do_workload()
           self.invoke.log.debug('exiting subprocess and returning invoke '+ str(self.invoke))
         except Exception as e:
-          print 'Exception seen in thread %s (tail %s%sinvoke_logs_%s.log) '%\
-                        (self.invoke.tid, self.invoke.tmp_dir, os.sep, self.invoke.tid)
+          print 'Exception seen in thread %s host %s (tail %s%sinvoke_logs_%s.log) '%\
+                        (self.invoke.tid, self.invoke.onhost, self.invoke.tmp_dir, os.sep, self.invoke.tid)
           self.invoke.log.error(str(e))
           self.status = self.invoke.NOTOK
         finally:
