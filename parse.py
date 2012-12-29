@@ -9,7 +9,7 @@ import sys
 import os
 import smallfile
 
-version = '1.9.6'
+version = '1.9.7'
 
 def usage(msg):  # call if CLI syntax error or invalid parameter
     print
@@ -200,11 +200,11 @@ def parse():
   else:
     prm_top_dir = os.path.dirname(inv.src_dir)
   if prm_network_sync_dir:
-    if not prm_host_set:
+    if not prm_host_set and not prm_slave:
       usage('you do not need to specify a network thread synchronization directory unless you use multiple hosts')
     inv.network_dir = prm_network_sync_dir
   if prm_remote_pgm_dir:
-    if not prm_host_set:
+    if not prm_host_set and not prm_slave:
       usage('you do not need to specify a remote program directory unless you use multiple hosts')
   inv.starting_gate = os.path.join(inv.network_dir, 'starting_gate.tmp')   # location of file that signals start, end of test
 
@@ -212,13 +212,15 @@ def parse():
 
   # display results of parse so user knows what default values are
   # most important parameters come first
+  # display host set first because this can be very long, 
+  # this way the rest of the parameters appear together on the screen
 
   prm_list = [ \
+             ('hosts in test', '%s'%prm_host_set), \
              ('operation', inv.opname), \
              ('files/thread', '%d'%inv.iterations), \
              ('top test directory', prm_top_dir), \
              ('threads', '%d'%prm_thread_count), \
-             ('hosts in test', '%s'%prm_host_set), \
              ('record size (KB)', '%d'%inv.record_sz_kb), \
              ('file size (KB)', '%d'%inv.total_sz_kb), \
              ('files per dir', '%d'%inv.files_per_dir), \

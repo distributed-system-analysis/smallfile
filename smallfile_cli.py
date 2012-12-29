@@ -135,12 +135,13 @@ def run_workload():
         try:
                 pickle_file = open(pickle_fn, "r")
                 host_invoke_list = pickle.load(pickle_file)
+                pickle_file.close()
                 if verbose: print ' read %d invoke objects'%len(host_invoke_list)
+                invoke_list.extend(host_invoke_list)
+                ensure_deleted(pickle_fn)
         except IOError as e:
                 if e.errno != errno.ENOENT: raise e
-                print '  pickle file not found'
-        invoke_list.extend(host_invoke_list)
-        ensure_deleted(pickle_fn)
+                print '  pickle file %s not found'%pickle_fn
       #print 'invoke_list: %s'%invoke_list
 
       if len(invoke_list) < 1:
@@ -264,18 +265,22 @@ def run_workload():
 
   # wait for hosts to arrive at starting gate
   # if only one host, then no wait will occur as starting gate file is already present
-  # FIXME: prm_host_set == None in slave, so we won't wait for other hosts, BAD
-  # FIXME: need to stop polling the same files, instead resume scan from last host file not found
+  # every second we resume scan from last host file not found
+  # FIXME: for very large host sets, timeout only if no host responds within X seconds
+  
   hosts_ready = False  # set scope outside while loop
+  last_host_seen=-1
   if prm_slave or (prm_host_set == None):
     if prm_host_set == None: prm_host_set = [ host ]
     for sec in range(0, host_startup_timeout):
       hosts_ready = True
-      for h in prm_host_set:
+      for j in range(last_host_seen+1, len(prm_host_set)-1):
+        h=prm_host_set[j]
         fn = my_host_invoke.gen_host_ready_fname(h.strip())
         if not os.access(fn, os.R_OK):
             hosts_ready = False
             break
+        last_host_seen=j
       if hosts_ready: break
       time.sleep(1)
     if not hosts_ready:
@@ -297,8 +302,9 @@ def run_workload():
         f.close()
       print 'starting gate file %s created by host %s'%(starting_gate, host)
    except IOError, e:
-      print e.errno
-      if (e.errno != errno.EEXIST) or not prm_slave: raise e
+      print 'error writing starting gate: %s'%os.strerror(e.errno)
+      # workaround for Gluster bug returning EINVAL sometimes
+      if (e.errno != errno.EEXIST and e.errno != errno.EINVAL) or not prm_slave: raise e
       # if this is a multi-host test, then it's ok if file already existed, everyone tried to make it
 
   # FIXME: don't timeout the test, 

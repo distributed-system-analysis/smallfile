@@ -374,7 +374,10 @@ class smf_invocation:
                 f.close()
          except IOError as e:
             err = e.errno
-            if err != errno.EEXIST: raise e
+            if err != errno.EEXIST: 
+              # workaround for possible bug in Gluster
+              if err != errno.EINVAL: raise e
+              else: self.log.info('saw EINVAL on stonewall, ignoring it')
 
     def test_ended(self):
         return self.end_time > self.start_time
@@ -466,13 +469,17 @@ class smf_invocation:
         assert len(self.buf) == rsz
         
     # make all subdirectories needed for test in advance, don't include in measurement
-
+    # use set to avoid duplicating operations on directories
+    
     def make_all_subdirs(self):
         if (self.tid != '00') and self.is_shared_dir: return
+        dirset=set([])
         for tree in [ self.src_dir, self.dest_dir ]:
           for j in range(0, self.iterations+1):
             fpath = self.mk_file_nm(tree, j)
             dpath = os.path.dirname(fpath)
+            dirset.add(dpath)
+        for dpath in dirset:
             #print 'making subdirectory %s'%dpath
             if not exists(dpath): 
               try:
