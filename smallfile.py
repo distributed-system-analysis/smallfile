@@ -94,6 +94,11 @@ def short_hostname(h):
   if h == None: h = socket.gethostname()
   return h.split('.')[0]
 
+def hostaddr(h):
+  if h == None: a = socket.gethostbyname(socket.gethostname())
+  else: a = socket.gethostbyname(h)
+  return a
+
 # parameters for test stored here
 # initialize with default values
 # FIXME: do we need a copy constructor?
@@ -338,7 +343,7 @@ class smf_invocation:
     # (i.e. it is ready to immediately begin generating workload)
 
     def gen_host_ready_fname(self, hostname=None):
-        return self.network_dir + os.sep + "host_ready." + short_hostname(hostname) + ".tmp"
+        return self.network_dir + os.sep + "host_ready." + hostaddr(hostname) + ".tmp"
 
     # tell test driver that we're at the starting gate
     # this is a 2 phase process
@@ -356,7 +361,10 @@ class smf_invocation:
               f.close()
             while not os.path.exists(self.starting_gate):
                 time.sleep(0.3)
-                if self.abort: raise Exception("thread " + str(self.tid) + " saw abort flag")
+                if os.path.exists(self.abort_fn()): raise Exception("thread " + str(self.tid) + " saw abort flag")
+
+    def abort_fn(self):
+        return self.network_dir + os.sep + 'abort.tmp'
 
     def stonewall_fn(self):
         return self.network_dir + os.sep + 'stonewall.tmp'
@@ -762,9 +770,9 @@ class smf_invocation:
         if self.total_sz_kb > 0:
             self.files_between_checks = max(10, self.max_files_between_checks - (self.total_sz_kb/100))
         try:
-            self.wait_for_gate()
             self.end_time = 0.0
             self.start_time = time.time()
+            self.wait_for_gate()
             o = self.opname
             if o == "create":
                 self.do_create()

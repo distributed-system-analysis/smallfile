@@ -21,7 +21,7 @@ import os
 import os.path
 import errno
 import smallfile
-from smallfile import smf_invocation, ensure_deleted, short_hostname
+from smallfile import smf_invocation, ensure_deleted, short_hostname, hostaddr
 import invoke_process
 import threading
 import time
@@ -50,11 +50,15 @@ min_files_per_sec = 15
 pct_files_min = 70  # minimum percentage of files for valid test
 
 def gen_host_result_filename(master_invoke, invoke_host):
-  return os.path.join(master_invoke.network_dir, invoke_host + '_result.pickle')
+  return os.path.join(master_invoke.network_dir, hostaddr(invoke_host) + '_result.pickle')
 
 # abort routine just cleans up threads
 
-def abort_test(thread_list):
+def abort_test(abort_fn, thread_list):
+    try:
+      open(abort_fn, "w")
+    except Exception as e:
+      pass
     for t in thread_list:
         t.terminate()
 
@@ -86,6 +90,7 @@ def run_workload():
     # construct list of ssh threads to invoke in parallel
 
     rc = os.system('rm -rf ' + master_invoke.network_dir + os.sep + '*.tmp')
+    ensure_deleted(master_invoke.abort_fn())
     ensure_deleted(starting_gate)
     remote_cmd += ' --slave Y '
     ssh_thread_list = []
@@ -96,7 +101,7 @@ def run_workload():
         if prm_permute_host_dirs:
           this_remote_cmd += ' --as-host %s'%prm_host_set[(j+1)%host_ct]
         if verbose: print this_remote_cmd
-        pickle_fn = gen_host_result_filename(master_invoke, short_hostname(n))
+        pickle_fn = gen_host_result_filename(master_invoke, n)
         ensure_deleted(pickle_fn)
         ssh_thread_list.append(ssh_thread.ssh_thread(n, this_remote_cmd))
     time.sleep(2) # give other clients time to see changes
@@ -105,6 +110,44 @@ def run_workload():
 
     for t in ssh_thread_list:
         t.start()
+
+    # wait for hosts to arrive at starting gate
+    # if only one host, then no wait will occur as starting gate file is already present
+    # every second we resume scan from last host file not found
+    # FIXME: for very large host sets, timeout only if no host responds within X seconds
+  
+    hosts_ready = False  # set scope outside while loop
+    last_host_seen=-1
+    for sec in range(0, host_startup_timeout):
+      hosts_ready = True
+      for j in range(last_host_seen+1, len(prm_host_set)-1):
+        h=prm_host_set[j]
+        fn = master_invoke.gen_host_ready_fname(h.strip())
+        if not os.access(fn, os.R_OK):
+            hosts_ready = False
+            break
+        last_host_seen=j
+      if hosts_ready: break
+      time.sleep(1)
+      print 'last_host_seen=%d'%last_host_seen
+    if not hosts_ready:
+      abortfn = master_invoke.abort_fn()
+      open(abortfn, "w")
+      raise Exception('hosts did not reach starting gate within %d seconds'%host_startup_timeout)
+
+    # ask all hosts to start the test
+    # this is like firing the gun at the track meet
+    # threads will wait 3 sec after starting gate is opened before 
+    # we really apply workload.  This ensures that heavy workload
+    # doesn't block some hosts from seeing the starting flag
+
+    try:
+      if not os.access(starting_gate, os.R_OK): 
+        with open(starting_gate, "w") as f:
+          f.close()
+        print 'starting gate file %s created by host %s'%(starting_gate, master_invoke.onhost)
+    except IOError, e:
+        print 'error writing starting gate: %s'%os.strerror(e.errno)
 
     # wait for them to finish
 
@@ -129,7 +172,7 @@ def run_workload():
         # read results for each thread run in that host
         # from python pickle of the list of smf_invocation objects
 
-        pickle_fn = gen_host_result_filename(master_invoke, short_hostname(h))
+        pickle_fn = gen_host_result_filename(master_invoke, h)
         if verbose: print 'reading pickle file: %s'%pickle_fn
         host_invoke_list = []
         try:
@@ -227,6 +270,7 @@ def run_workload():
   if not prm_slave:
     ensure_deleted(my_host_invoke.stonewall_fn())
     ensure_deleted(starting_gate)
+    ensure_deleted(my_host_invoke.abort_fn())
     ensure_deleted(my_host_invoke.gen_host_ready_fname(host))
   for t in thread_list:
     ensure_deleted(t.invoke.gen_thread_ready_fname(t.invoke.tid))
@@ -254,7 +298,7 @@ def run_workload():
   # if all threads didn't make it to the starting gate
 
   if not threads_ready: 
-    abort_test(thread_list)
+    abort_test(my_host_invoke.abort_fn(), thread_list)
     raise Exception('threads did not reach starting gate within %d sec'%startup_timeout)
 
   # declare that this host is at the starting gate
@@ -263,49 +307,24 @@ def run_workload():
     f.close()
   time.sleep(1)
 
-  # wait for hosts to arrive at starting gate
-  # if only one host, then no wait will occur as starting gate file is already present
+  sg = my_host_invoke.starting_gate
+  if not prm_slave:
+    with open(sg, "w") as sgf: sgf.close()
+
+  # wait for starting_gate file to be created by test driver
   # every second we resume scan from last host file not found
-  # FIXME: for very large host sets, timeout only if no host responds within X seconds
   
-  hosts_ready = False  # set scope outside while loop
-  last_host_seen=-1
-  if prm_slave or (prm_host_set == None):
+  if prm_slave:
     if prm_host_set == None: prm_host_set = [ host ]
     for sec in range(0, host_startup_timeout):
-      hosts_ready = True
-      for j in range(last_host_seen+1, len(prm_host_set)-1):
-        h=prm_host_set[j]
-        fn = my_host_invoke.gen_host_ready_fname(h.strip())
-        if not os.access(fn, os.R_OK):
-            hosts_ready = False
-            break
-        last_host_seen=j
-      if hosts_ready: break
+      if os.access(sg, os.R_OK):
+        break
       time.sleep(1)
-    if not hosts_ready:
-      abort_test(thread_list)
-      raise Exception('hosts did not reach starting gate within %d seconds'%host_startup_timeout)
+    if not os.access(sg, os.R_OK):
+      abort_test(my_host_invoke.abort_fn(), thread_list)
+      raise Exception('starting signal not seen within %d seconds'%host_startup_timeout)
   if verbose: print "starting test on host " + host + " in 2 seconds"
   time.sleep(2 + random.random())  
-
-  # ask all hosts to start the test
-  # this is like firing the gun at the track meet
-  # threads will wait 3 sec after starting gate is opened before 
-  # we really apply workload.  This ensures that heavy workload
-  # doesn't block some hosts from seeing the starting flag
-
-  if (prm_host_set != [] and not prm_slave) or (prm_host_set == [host]):
-   try:
-    if not os.access(starting_gate, os.R_OK): 
-      with open(starting_gate, "w") as f:
-        f.close()
-      print 'starting gate file %s created by host %s'%(starting_gate, host)
-   except IOError, e:
-      print 'error writing starting gate: %s'%os.strerror(e.errno)
-      # workaround for Gluster bug returning EINVAL sometimes
-      if (e.errno != errno.EEXIST and e.errno != errno.EINVAL) or not prm_slave: raise e
-      # if this is a multi-host test, then it's ok if file already existed, everyone tried to make it
 
   # FIXME: don't timeout the test, 
   # instead check thread progress and abort if you see any of them stalled
