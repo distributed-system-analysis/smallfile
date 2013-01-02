@@ -7,7 +7,7 @@
 	<META NAME="AUTHOR" CONTENT="anonymous">
 	<META NAME="CREATED" CONTENT="0;0">
 	<META NAME="CHANGEDBY" CONTENT="Ben England">
-	<META NAME="CHANGED" CONTENT="20121222;16101900">
+	<META NAME="CHANGED" CONTENT="20130101;19004700">
 	<META NAME="category-departments" CONTENT="Engineering">
 	<META NAME="category-keywords" CONTENT="filesystem">
 	<META NAME="category-offices" CONTENT="Westford, MA">
@@ -15,6 +15,7 @@
 	<META NAME="modified" CONTENT="2012-06-08 11:49:32">
 	<META NAME="status" CONTENT="1">
 	<META NAME="type" CONTENT="wiki_page">
+	<META NAME="CHANGEDBY" CONTENT="Ben England">
 	<META NAME="CHANGEDBY" CONTENT="Ben England">
 	<META NAME="CHANGEDBY" CONTENT="Ben England">
 	<STYLE TYPE="text/css">
@@ -283,14 +284,17 @@
 				the “local” filesystem is really layered on a virtual disk
 				image which may be stored in a network filesystem. The benchmark
 				needs to share certain files across hosts to return results and
-				synchronize threads.    In such a case, you specify the
-				<B>–network-sync-dir</B> <I>directory-pathname</I><SPAN STYLE="font-style: normal">
-				parameter to have the benchmark use a directory in some shared
-				filesystem external to the test directory (specified with </SPAN><SPAN STYLE="font-style: normal"><B>–top</B></SPAN><SPAN STYLE="font-style: normal">
-				parameter).  By default, if this parameter is not specified then
-				the shared directory will be the subdirectory </SPAN><SPAN STYLE="font-style: normal"><B>network-dir</B></SPAN><SPAN STYLE="font-style: normal">
-				underneath the directory specified with the </SPAN><SPAN STYLE="font-style: normal"><B>–top</B></SPAN><SPAN STYLE="font-style: normal">
-				parameter.</SPAN></P>
+				synchronize threads. In such a case, you specify the
+				–<B>network-sync-dir</B> <I>directory-pathname</I><SPAN STYLE="font-variant: normal">
+				</SPAN><SPAN STYLE="font-variant: normal"><SPAN STYLE="font-style: normal">parameter
+				to have the benchmark use a directory in some shared filesystem
+				external to the test directory (specified with </SPAN></SPAN><SPAN STYLE="font-variant: normal">–</SPAN><SPAN STYLE="font-variant: normal"><SPAN STYLE="font-style: normal"><B>top</B></SPAN></SPAN><SPAN STYLE="font-variant: normal">
+				</SPAN><SPAN STYLE="font-variant: normal"><SPAN STYLE="font-style: normal">parameter).
+				By default, if this parameter is not specified then the shared
+				directory will be the subdirectory </SPAN></SPAN><SPAN STYLE="font-variant: normal"><SPAN STYLE="font-style: normal"><B>network-dir</B></SPAN></SPAN><SPAN STYLE="font-variant: normal">
+				</SPAN><SPAN STYLE="font-variant: normal"><SPAN STYLE="font-style: normal">underneath
+				the directory specified with the </SPAN></SPAN><SPAN STYLE="font-variant: normal">–</SPAN><SPAN STYLE="font-variant: normal"><SPAN STYLE="font-style: normal"><B>top</B></SPAN></SPAN><SPAN STYLE="font-variant: normal">
+				</SPAN><SPAN STYLE="font-variant: normal"><SPAN STYLE="font-style: normal">parameter.</SPAN></SPAN></P>
 				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><BR><BR>
 				</H2>
 				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in; border: none; padding: 0in">
@@ -317,53 +321,54 @@
 				running a longer test.</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
 				</P>
-				<H2><FONT SIZE=4 STYLE="font-size: 16pt">Use of subdirectories</FONT></H2>
+				<H2 STYLE="margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Use
+				of subdirectories</FONT></H2>
 				<P><BR><BR>
 				</P>
 				<P>Before a test even starts, the smallfile benchmark ensures
 				that the directories needed by that test already exist (there is
 				a specific operation type for testing performance of subdirectory
-				creation and deletion).  If the top directory (specified by –top
-				parameter) is T, then the top per-thread directory is T/host/dTT 
+				creation and deletion). If the top directory (specified by –top
+				parameter) is T, then the top per-thread directory is T/host/dTT
 				where TT is a 2-digit thread number and “host” is the
-				hostname.  If the test is not a distributed test, then it's just
+				hostname. If the test is not a distributed test, then it's just
 				whatever host the benchmark command was issued on, otherwise it
-				is each of the hosts specified by the –host-set parameter.  The
+				is each of the hosts specified by the –host-set parameter. The
 				first F files (where F is the value of the –files-per-dir)
-				parameter are placed in this top per-thread directory.  If the
+				parameter are placed in this top per-thread directory. If the
 				test uses more than F files/thread, then at least one
 				subdirectory from the first level of subdirectories must be used;
 				these subdirectories have the path T/host/dTT/dNNN where NNN is
-				the subdirectory number.  Suppose the value of the parameter
-				–subdirs-per-dir is D.  Then there are at most D subdirectories
-				of the top per-thread directory.  If the test requires more than
+				the subdirectory number. Suppose the value of the parameter
+				–subdirs-per-dir is D. Then there are at most D subdirectories
+				of the top per-thread directory. If the test requires more than
 				D(F+1) files per thread, then a second level of subdirectories
 				will have to be created, with pathnames like T/host/dTT/dNNN/dMMM
-				.   This process of adding subdirectories continues in this
-				fashion until there are sufficient subdirectories to hold all the
-				files.  The purpose of this approach is to simulate a mixture of
+				. This process of adding subdirectories continues in this fashion
+				until there are sufficient subdirectories to hold all the files.
+				The purpose of this approach is to simulate a mixture of
 				directories and files, and to not require the user to specify how
 				many levels of directories are required.</P>
-				<H2><FONT SIZE=4 STYLE="font-size: 16pt">Sharing directories
-				across threads</FONT></H2>
+				<H2 STYLE="margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Sharing
+				directories across threads</FONT></H2>
 				<P><BR><BR>
 				</P>
 				<P>Some applications require that many threads, possibly spread
-				across many host machines, need to share a set of directories. 
-				The<B> --same-dir</B> parameter makes it possible for the
-				benchmark to test this situation.  By default this parameter is
+				across many host machines, need to share a set of directories.
+				The <B>--same-dir</B> parameter makes it possible for the
+				benchmark to test this situation. By default this parameter is
 				set to N, which means each thread has its own non-overlapping
-				directory tree.  This setting provides the best performance and
-				scalability.  However, if the user sets this parameter to Y, then
+				directory tree. This setting provides the best performance and
+				scalability. However, if the user sets this parameter to Y, then
 				the top per-thread directory for all threads will be <B>T </B>instead
 				of <B>T/host/dTT</B> as described in preceding section.</P>
-				<H2><FONT SIZE=4 STYLE="font-size: 16pt">Hashing files into
-				directory tree</FONT></H2>
+				<H2 STYLE="margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Hashing
+				files into directory tree</FONT></H2>
 				<P><FONT SIZE=2 STYLE="font-size: 11pt">For applications which
 				create very large numbers of small files (millions for example),
 				it is impossible or at the very least impractical to place them
 				all in the same directory, whether or not the filesystem supports
-				so many files in a single directory.  There are two ways which
+				so many files in a single directory. There are two ways which
 				applications can use to solve this problem:</FONT></P>
 				<UL>
 					<LI><P><FONT SIZE=2 STYLE="font-size: 11pt">insert files into 1
@@ -374,18 +379,17 @@
 					contention for directory metadata, but increases the amount of
 					metadata caching needed to avoid cache misses</FONT></P>
 				</UL>
-				<P><FONT SIZE=2 STYLE="font-size: 11pt">The <B>–hash-into-dirs</B>
+				<P><FONT SIZE=2 STYLE="font-size: 11pt">The –<B>hash-into-dirs</B>
 				parameter is intended to enable simulation of this latter mode of
-				operation.    By default, the value of this parameter is N, and
-				in this case a smallfile thread will sequentially access
-				directories one at a time.  In other words, the first D (where D
-				= value of <B>–files-per-dir </B>parameter)  files will be
-				assigned to the top per-thread directory, then the next D files
-				will be assigned to the next per-thread directory, and so on. 
-				However, if the <B>–hash-into-dirs</B> parameter is set to Y,
-				then the number of the file being accessed by the thread will be
-				hashed into the set of directories that are being used by this
-				thread.   </FONT>
+				operation. By default, the value of this parameter is N, and in
+				this case a smallfile thread will sequentially access directories
+				one at a time. In other words, the first D (where D = value of
+				–<B>files-per-dir </B>parameter) files will be assigned to the
+				top per-thread directory, then the next D files will be assigned
+				to the next per-thread directory, and so on. However, if the
+				–<B>hash-into-dirs</B> parameter is set to Y, then the number
+				of the file being accessed by the thread will be hashed into the
+				set of directories that are being used by this thread. </FONT>
 				</P>
 				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Avoiding
 				caching effects</FONT></H2>
@@ -512,20 +516,19 @@
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">Although
 				there may be some useful tests that involve thread
 				synchronization or contention, but we don't want the tool to
-				FORCE thread synchronization or contention for resources.</P>
-				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">IN
-				order to run prolonged small-file tests (which is a requirement
-				for scalability to very large clusters),, each thread has to be
-				able to use more than one directory.&nbsp;&nbsp; Since some
-				filesystems perform very differently as the files/directory ratio
-				increases, and most applications and users do not rely on having
-				huge file/directory ratios, this is also important for testing
-				the filesystem with a realistic use case.&nbsp; This benchmark
-				does something similar to Ric Wheeler's fs_mark benchmark with
-				multiple directory levels.&nbsp;&nbsp; This benchmark imposes no
-				hard limit on how many directories can be used and how deep the
-				directory tree can go.&nbsp; Instead, it creates directories
-				according to these constraints:</P>
+				<I>force</I> thread synchronization or contention for resources. 
+				In order to run prolonged small-file tests (which is a
+				requirement for scalability to very large clusters),, each thread
+				has to be able to use more than one directory.&nbsp;&nbsp; Since
+				some filesystems perform very differently as the files/directory
+				ratio increases, and most applications and users do not rely on
+				having huge file/directory ratios, this is also important for
+				testing the filesystem with a realistic use case.&nbsp; This
+				benchmark does something similar to Ric Wheeler's fs_mark
+				benchmark with multiple directory levels.&nbsp;&nbsp; This
+				benchmark imposes no hard limit on how many directories can be
+				used and how deep the directory tree can go.&nbsp; Instead, it
+				creates directories according to these constraints:</P>
 				<OL>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">files
 					(and directories) are placed as close to the root of the
@@ -540,60 +543,88 @@
 					in the --dirs-per-dir test parameter 
 					</P>
 				</OL>
+				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><BR><BR>
+				</H2>
 				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><A NAME="Synchronization"></A>
 				<FONT SIZE=4 STYLE="font-size: 16pt">Synchronization</FONT></H2>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">A
-				shared cluster file system is used to synchronize the threads and
-				hosts (could be NFS or Gluster for example). This may seem
-				problematic, but we assume here that the file system is not very
-				busy when the test is run (otherwise why would you run a load
-				test on it?). So if a file is created on one host, it will
-				quickly be visible on the others, as long as the filesystem is
-				not heavily loaded.</P>
+				single directory is used to synchronize the threads and hosts.
+				This may seem problematic, but we assume here that the file
+				system is not very busy when the test is run (otherwise why would
+				you run a load test on it?).   So if a file is created by one
+				thread, it will quickly be visible on the others, as long as the
+				filesystem is not heavily loaded.  
+				</P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
+				</P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">If it's
+				a single-host test, any directory is sharable amongst threads,
+				but in a multi-host test only a directory shared by all
+				participating hosts can be used.  If the <B>–top</B> test
+				directory is in a network-accessible file system  (could be NFS
+				or Gluster for example), then the synchronization directory is by
+				default in the network_shared subdirectory by default and need
+				not be specified.  If the <B>–top</B> directory is in a
+				host-local filesystem, then the <B>–network-sync-dir</B> option
+				must be used to specify the synchronization directory.   When a
+				network directory is used, change propagation between hosts
+				cannot be assumed to occur in under two seconds.  
+				</P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
+				</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">We use
 				the concept of a &quot;starting gate&quot; -- each thread does
 				all preparation for test, then waits for a special file, the
 				&quot;starting gate&quot;, to appear in the shared area. When a
 				thread arrives at the starting gate, it announces its arrival by
 				creating a filename with the host and thread ID embedded in it.
-				When all thread have arrived, the controlling process will see
+				When all threads have arrived, the controlling process will see
 				all the expected &quot;thread ready&quot; files, and will then
-				create the &quot;starting gate&quot; file. When the starting gate
-				is seen, the thread pauses for a couple of seconds, then
-				commences generating workload. This initial pause reduces time
-				required for all threads to see the starting gate, thereby
-				minimizing chance of some threads being unable to start on time.
-				Synchronous thread startup reduces the &quot;warmup time&quot; of
-				the system significantly.</P>
+				create the <B>starting gate</B> file. When the starting gate is
+				seen, the thread pauses for a couple of seconds, then commences
+				generating workload. This initial pause reduces time required for
+				all threads to see the starting gate, thereby minimizing chance
+				of some threads being unable to start on time. Synchronous thread
+				startup reduces the &quot;warmup time&quot; of the system
+				significantly.</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
 				</P>
-				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">The
-				&quot;starting gate&quot; is also used as a checkered flag
-				(borrowing from car racing metaphor). Each thread periodically
-				checks the size of the &quot;starting gate&quot; file. If this
-				file is non-zero length, then the thread stops measuring
-				throughput at this time (but may optionally continue to perform
-				requested number of operations). When a thread completes the
-				requested number of operations, it appends a timestamp to this
-				file. Consequently throughput measurements for each thread may be
-				added to obtain an accurate aggregate throughput number. This
-				practice is sometimes called &quot;stonewalling&quot; in the
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">We also
+				need a checkered flag (borrowing from car racing metaphor). Once
+				test starts, each thread looks for a <B>stonewall</B> file in the
+				synchronization directory. If this file exists, then the thread
+				stops measuring throughput at this time (but can (and does by
+				default) optionally continue to perform requested number of
+				operations). Consequently throughput measurements for each thread
+				may be added to obtain an accurate aggregate throughput number.
+				This practice is sometimes called &quot;stonewalling&quot; in the
 				performance testing world.</P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
+				</P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">Synchronization
+				operations do not require the worker threads to read the
+				synchronization directory.   For distributed tests, the test
+				driver host has to check whether the various per-host
+				synchronization files exist, but this does not require a readdir
+				operation.  The test driver does this check in such a way that
+				the number of file lookups is only slightly more than the number
+				of hosts, and this does not require reading the entire directory,
+				only doing a set of lookup operations on individual files, so
+				it's <I>O(n)</I> scalable as well.</P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
+				</P>
 				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in; border: none; padding: 0in">
 				<FONT SIZE=4 STYLE="font-size: 16pt">How results are returned to
 				master process</FONT></H2>
 				<P>For either single-host or multi-host tests, each test thread
-				is implemented as a &quot;smf_invocation&quot; object and all
-				thread state is kept there.&nbsp; Results are returned by using
-				python &quot;pickle&quot; files to serialize the state of these
+				is implemented as a <B>smf_invocation</B> object and all thread
+				state is kept there.&nbsp; Results are returned by using python
+				&quot;pickle&quot; files to serialize the state of these
 				per-thread objects containing details of each thread's progress
 				during the test.&nbsp; The pickle files are stored in the shared
-				filesystem specified by the --top directory.&nbsp; If it's a
-				single-host test, any directory is sharable amongst threads, but
-				in a multi-host test only a directory shared by all participating
-				hosts can be used as --top.&nbsp; This restriction could be
-				lifted if it was important enough but that's how it works
-				today.<SCRIPT SRC="default_files/wysiwyg_002.js"></SCRIPT><SCRIPT>
+				synchronization directory.&nbsp; as <B>--top</B>.&nbsp; This
+				restriction could be lifted if it was important enough but that's
+				how it works today.<SCRIPT SRC="default_files/wysiwyg_002.js"></SCRIPT><SCRIPT>
 <!--//--><![CDATA[//><!--
 var _paq = _paq || [];(function(){var u=(("https:" == document.location.protocol) ? "https://metrics.corp.redhat.com/" : "https://metrics.corp.redhat.com/");_paq.push(["setSiteId", 1]);_paq.push(["setTrackerUrl", u+"piwik.php"]);_paq.push(["setDocumentTitle", "Home/smallfile+distributed+I%2FO+benchmark"]);_paq.push(["trackPageView"]);_paq.push(["enableLinkTracking"]);var d=document,g=d.createElement("script"),s=d.getElementsByTagName("script")[0];g.type="text/javascript";g.defer=true;g.async=true;g.src=u+"piwik.js";s.parentNode.insertBefore(g,s);})();
 //--><!]]>
