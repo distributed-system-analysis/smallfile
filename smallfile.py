@@ -240,6 +240,7 @@ class smf_invocation:
         s += " stonewall="+str(self.stonewall)
         s += " files_between_checks="+str(self.files_between_checks)
         s += " finish_all_rq=" + str(self.finish_all_rq)
+        s += " rsp_times=" + str(self.measure_rsptimes)
         s += " tid="+self.tid
         s += " direct=" + str(self.direct)
         s += " loglevel="+str(self.loglevel)

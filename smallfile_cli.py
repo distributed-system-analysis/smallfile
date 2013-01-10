@@ -82,10 +82,10 @@ def run_workload():
     if verbose: print 'extending initialization timeout by %d seconds for directory creation'%dir_creation_timeout
     startup_timeout += dir_creation_timeout
   host_startup_timeout = startup_timeout + 5
-
   # for multi-host test
 
   if prm_host_set and not prm_slave:
+    host_startup_timeout += len(prm_host_set)/30
 
     # construct list of ssh threads to invoke in parallel
 
@@ -118,7 +118,9 @@ def run_workload():
   
     hosts_ready = False  # set scope outside while loop
     last_host_seen=-1
-    for sec in range(0, host_startup_timeout):
+    sec = 0
+    sec_delta = 1
+    while sec < host_startup_timeout:
       hosts_ready = True
       for j in range(last_host_seen+1, len(prm_host_set)-1):
         h=prm_host_set[j]
@@ -128,8 +130,10 @@ def run_workload():
             break
         last_host_seen=j
       if hosts_ready: break
-      time.sleep(1)
-      print 'last_host_seen=%d'%last_host_seen
+      time.sleep(sec_delta)
+      sec += sec_delta
+      sec_delta += 1
+      print 'last_host_seen=%d sec=%d'%(last_host_seen,sec)
     if not hosts_ready:
       abortfn = master_invoke.abort_fn()
       open(abortfn, "w")
