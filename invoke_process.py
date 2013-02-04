@@ -92,7 +92,7 @@ class Test(unittest.TestCase):
             threads_ready = True
             for s in invokeList:
                 thread_ready_file = s.gen_thread_ready_fname(s.tid)
-                if not os.access(thread_ready_file, os.R_OK): threads_ready = False
+                if not os.path.exists(thread_ready_file): threads_ready = False
             if threads_ready: break
             time.sleep(1)
         if not threads_ready: raise Exception("threads did not show up within %d seconds"%thread_ready_timeout)

@@ -9,7 +9,7 @@ import sys
 import os
 import smallfile
 
-version = '1.9.8'
+version = '1.9.9'
 
 def usage(msg):  # call if CLI syntax error or invalid parameter
     print
@@ -96,7 +96,6 @@ def parse():
   inv.finish_all_rq = True
   inv.measure_rsptimes = False
   inv.is_shared_dir = False
-  inv.do_sync_at_end = False
 
   # parameters that can't be stored in a smf_invocation
   # describe how the smf_invocation threads work together
@@ -161,7 +160,6 @@ def parse():
     elif prm == 'pause': 
         chkPositiveInt(val, rawprm)
         inv.pause_between_files = int(val)
-    elif prm == 'do-sync-at-end': inv.do_sync_at_end = str2bool(val, rawprm)
     elif prm == 'stonewall': inv.stonewall = str2bool(val, rawprm)
     elif prm == 'finish': inv.finish_all_rq = str2bool(val, rawprm)
     elif prm == 'permute-host-dirs': 
@@ -232,7 +230,6 @@ def parse():
              ('pause between files (microsec)', '%d'%inv.pause_between_files), \
              ('finish all requests?', '%s'%bool2YN(inv.finish_all_rq)), \
              ('stonewall?', '%s'%bool2YN(inv.stonewall)), \
-             ('do sync at end?', '%s'%bool2YN(inv.do_sync_at_end)), \
              ('measure response times?', '%s'%bool2YN(inv.measure_rsptimes)), \
              ('verify read?', '%s'%bool2YN(inv.verify_read)), \
              ('verbose?', inv.verbose), \

@@ -27,6 +27,7 @@ assertok() {
 
 cleanup() {
   rm -rf /var/tmp/invoke*.log $testdir
+  mkdir $testdir
 }
 
 # test parsing
@@ -71,13 +72,12 @@ assertfail $?
 # run a command with all CLI options and verify that they were successfully parsed
 
 cleanup
-#$s --verify-read N --response-times Y --finish N --same-dir Y --pause 100 --operation cleanup --threads 5 --files 20 --files-per-dir 5 --dirs-per-dir 3 --record-size 6 --file-size 30 --host-set $localhost_name > $f
-$s --verify-read N --response-times Y --finish N --same-dir Y --pause 100 --operation cleanup --threads 5 --files 20 --files-per-dir 5 --dirs-per-dir 3 --record-size 6 --file-size 30 --host-set $localhost_name > $f
+$s --verify-read N --response-times Y --finish N --same-dir Y --pause 100 --operation cleanup --threads 5 --files 20 --files-per-dir 5 --dirs-per-dir 3 --record-size 6 --file-size 30 --host-set $localhost_name | tee $f
 assertok $?
 expect_strs=( 'verify read? : N' \
         'response times? : Y' \
         'finish all requests? : N' \
-        'files in same directory? : Y' \
+        'threads share directories? : Y' \
         'pause between files (microsec) : 100' \
         "top test directory : $testdir" \
         'operation : cleanup' \

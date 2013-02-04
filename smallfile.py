@@ -73,7 +73,7 @@ def ensure_deleted(fn):
       if os.path.lexists(fn): os.unlink(fn)
     except Exception, e:
       # could be race condition with other client processes/hosts
-      if os.access(fn, os.R_OK): # if was race condition, file will no longer be there
+      if os.path.exists(fn): # if was race condition, file will no longer be there
          raise Exception("exception while ensuring %s deleted: %s"%(fn, str(e)))
 
 # create directory if it's not already there
@@ -115,7 +115,6 @@ class smf_invocation:
     tmp_dir = os.getenv("TMPDIR")  # UNIX case
     if tmp_dir == None: tmp_dir = os.getenv("TEMP") # windows case
     if tmp_dir == None: tmp_dir = "/var/tmp"  # assume POSIX-like
-    tmp_dir += '/'
     invocation_count = 0
     some_prime = 900593
 
@@ -157,7 +156,6 @@ class smf_invocation:
         self.prefix = ""              # prepend this to file name
         self.suffix = ""              # append this to file name
         self.hash_to_dir = False      # controls whether directories are accessed sequentially or randomly
-        self.do_sync_at_end = False   # controls whether we sync at end
         self.stonewall = True         # if so, end test as soon as any thread finishes
         self.finish_all_rq = True     # if so, finish remaining requests after test ends
         self.measure_rsptimes = False # if so, append operation response times to .rsptimes
@@ -199,7 +197,6 @@ class smf_invocation:
         new.prefix = s.prefix
         new.suffix = s.suffix
         new.hash_to_dir = s.hash_to_dir
-        new.do_sync_at_end = s.do_sync_at_end
         new.stonewall = s.stonewall
         new.finish_all_rq = s.finish_all_rq
         new.measure_rsptimes = s.measure_rsptimes
@@ -236,14 +233,13 @@ class smf_invocation:
         s += " prefix="+self.prefix
         s += " suffix="+self.suffix
         s += " hash_to_dir="+str(self.hash_to_dir)
-        s += " do_sync_at_end="+str(self.do_sync_at_end)
         s += " stonewall="+str(self.stonewall)
         s += " files_between_checks="+str(self.files_between_checks)
         s += " finish_all_rq=" + str(self.finish_all_rq)
         s += " rsp_times=" + str(self.measure_rsptimes)
         s += " tid="+self.tid
         s += " direct=" + str(self.direct)
-        s += " loglevel="+str(self.loglevel)
+        s += " loglevel="+str(self.log_level)
         s += " filenum=" + str(self.filenum)
         s += " filenum_final=" + str(self.filenum_final)
         s += " rq=" + str(self.rq)
@@ -338,13 +334,19 @@ class smf_invocation:
     # (i.e. it is ready to immediately begin generating workload)
 
     def gen_thread_ready_fname(self, tid, hostname=None):
-        return self.network_dir + os.sep + "thread_ready." + short_hostname(hostname) + "_" + tid + ".tmp"
+        return self.tmp_dir + os.sep + "thread_ready." + short_hostname(hostname) + "_" + tid + ".tmp"
 
     # each host uses this to signal that it is at the starting gate
     # (i.e. it is ready to immediately begin generating workload)
 
     def gen_host_ready_fname(self, hostname=None):
         return self.network_dir + os.sep + "host_ready." + hostaddr(hostname) + ".tmp"
+
+    def abort_fn(self):
+        return self.network_dir + os.sep + 'abort.tmp'
+
+    def stonewall_fn(self):
+        return self.network_dir + os.sep + 'stonewall.tmp'
 
     # tell test driver that we're at the starting gate
     # this is a 2 phase process
@@ -361,14 +363,9 @@ class smf_invocation:
             with open(gateReady, "w") as f: 
               f.close()
             while not os.path.exists(self.starting_gate):
-                time.sleep(0.3)
                 if os.path.exists(self.abort_fn()): raise Exception("thread " + str(self.tid) + " saw abort flag")
-
-    def abort_fn(self):
-        return self.network_dir + os.sep + 'abort.tmp'
-
-    def stonewall_fn(self):
-        return self.network_dir + os.sep + 'stonewall.tmp'
+                # wait a little longer so that other clients have time to see that gate exists
+                time.sleep(2.0)
 
     # record info needed to compute test statistics 
 
@@ -396,7 +393,7 @@ class smf_invocation:
     
     def do_another_file(self):
         if self.stonewall and (self.filenum % self.files_between_checks == 0):
-                if (not self.test_ended()) and (os.access(self.stonewall_fn(), os.R_OK)):
+                if (not self.test_ended()) and (os.path.exists(self.stonewall_fn())):
                     self.log.info("stonewalled after " + str(self.filenum) + " iterations")
                     self.end_test()
         # if user doesn't want to finish all requests and test has ended, stop
@@ -752,7 +749,7 @@ class smf_invocation:
             fn = basenm + self.rename_suffix
             ensure_deleted(fn)
             dir = basenm + '.d'
-            if os.access(dir, os.R_OK):
+            if os.path.exists(dir):
               fn = dir + os.sep + 'not-empty-directory'
               ensure_deleted(fn)
               os.rmdir(dir)
@@ -811,12 +808,6 @@ class smf_invocation:
                 self.do_all()
             else:
                 raise MFNotImplYetExc()
-                
-            if self.do_sync_at_end:
-                synccmd = "sync >> " + self.tmp_dir + "sync." + str(self.tid) + ".log"
-                rc = os.system(synccmd)
-                if (rc != ok):
-                    raise MFSyncExc(rc)
             self.status = ok
         except KeyboardInterrupt, e:
             self.log.error( "control-C or equivalent signal received, ending test" )
@@ -1074,7 +1065,7 @@ class Test(unittest.TestCase):
             for s in invokeList:
                 thread_ready_file = s.gen_thread_ready_fname(s.tid)
                 #print 'waiting for ' + thread_ready_file
-                if not os.access(thread_ready_file, os.R_OK): 
+                if not os.path.exists(thread_ready_file): 
                   threads_ready = False
                   break
             if threads_ready: 

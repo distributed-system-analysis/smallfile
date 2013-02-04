@@ -21,7 +21,7 @@ import os
 import os.path
 import errno
 import smallfile
-from smallfile import smf_invocation, ensure_deleted, short_hostname, hostaddr
+from smallfile import smf_invocation, ensure_deleted, ensure_dir_exists, short_hostname, hostaddr
 import invoke_process
 import threading
 import time
@@ -32,6 +32,7 @@ import pickle
 import ssh_thread
 import math
 import random
+import shutil
 
 class SMFResultException(Exception):
   def __init__(self, msg):
@@ -81,7 +82,7 @@ def run_workload():
     dir_creation_timeout = dirs / 10
     if verbose: print 'extending initialization timeout by %d seconds for directory creation'%dir_creation_timeout
     startup_timeout += dir_creation_timeout
-  host_startup_timeout = startup_timeout + 5
+  host_startup_timeout = startup_timeout + 10
   # for multi-host test
 
   if prm_host_set and not prm_slave:
@@ -89,9 +90,9 @@ def run_workload():
 
     # construct list of ssh threads to invoke in parallel
 
-    rc = os.system('rm -rf ' + master_invoke.network_dir + os.sep + '*.tmp')
-    ensure_deleted(master_invoke.abort_fn())
-    ensure_deleted(starting_gate)
+    if os.path.exists( master_invoke.network_dir ): 
+      shutil.rmtree( master_invoke.network_dir )
+    ensure_dir_exists( master_invoke.network_dir )
     remote_cmd += ' --slave Y '
     ssh_thread_list = []
     host_ct = len(prm_host_set)
@@ -125,11 +126,15 @@ def run_workload():
       for j in range(last_host_seen+1, len(prm_host_set)-1):
         h=prm_host_set[j]
         fn = master_invoke.gen_host_ready_fname(h.strip())
-        if not os.access(fn, os.R_OK):
+        if not os.path.exists(fn):
             hosts_ready = False
             break
         last_host_seen=j
       if hosts_ready: break
+
+      # be patient for large tests
+      # give user some feedback about how many hosts have arrived at the starting gate
+
       time.sleep(sec_delta)
       sec += sec_delta
       sec_delta += 1
@@ -146,8 +151,12 @@ def run_workload():
     # doesn't block some hosts from seeing the starting flag
 
     try:
-      if not os.access(starting_gate, os.R_OK): 
+      if not os.path.exists(starting_gate): 
         with open(starting_gate, "w") as f:
+          f.write('hi')
+          f.flush()
+          fd = f.fileno()
+          os.fsync(fd)
           f.close()
         print 'starting gate file %s created by host %s'%(starting_gate, master_invoke.onhost)
     except IOError, e:
@@ -272,10 +281,9 @@ def run_workload():
   # to do this, look for thread-ready files 
 
   if not prm_slave:
-    ensure_deleted(my_host_invoke.stonewall_fn())
-    ensure_deleted(starting_gate)
-    ensure_deleted(my_host_invoke.abort_fn())
-    ensure_deleted(my_host_invoke.gen_host_ready_fname(host))
+    if os.path.exists( master_invoke.network_dir ): 
+      shutil.rmtree( master_invoke.network_dir )
+    ensure_dir_exists( master_invoke.network_dir )
   for t in thread_list:
     ensure_deleted(t.invoke.gen_thread_ready_fname(t.invoke.tid))
   time.sleep(1)
@@ -293,7 +301,7 @@ def run_workload():
     threads_ready = True
     for t in thread_list:
         fn = t.invoke.gen_thread_ready_fname(t.invoke.tid)
-        if not os.access(fn, os.R_OK): 
+        if not os.path.exists(fn): 
             threads_ready = False
             break
     if threads_ready: break
@@ -313,7 +321,11 @@ def run_workload():
 
   sg = my_host_invoke.starting_gate
   if not prm_slave:
-    with open(sg, "w") as sgf: sgf.close()
+    with open(sg, "w") as sgf: 
+      sgf.write('hi there')
+      sgf.flush()
+      os.fsync(sgf.fileno())
+      sgf.close()
 
   # wait for starting_gate file to be created by test driver
   # every second we resume scan from last host file not found
@@ -321,10 +333,10 @@ def run_workload():
   if prm_slave:
     if prm_host_set == None: prm_host_set = [ host ]
     for sec in range(0, host_startup_timeout):
-      if os.access(sg, os.R_OK):
+      if os.path.exists(sg):
         break
       time.sleep(1)
-    if not os.access(sg, os.R_OK):
+    if not os.path.exists(sg):
       abort_test(my_host_invoke.abort_fn(), thread_list)
       raise Exception('starting signal not seen within %d seconds'%host_startup_timeout)
   if verbose: print "starting test on host " + host + " in 2 seconds"
