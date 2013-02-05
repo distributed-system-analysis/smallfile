@@ -7,7 +7,7 @@
 	<META NAME="AUTHOR" CONTENT="anonymous">
 	<META NAME="CREATED" CONTENT="0;0">
 	<META NAME="CHANGEDBY" CONTENT="Ben England">
-	<META NAME="CHANGED" CONTENT="20130101;19004700">
+	<META NAME="CHANGED" CONTENT="20130205;9503800">
 	<META NAME="category-departments" CONTENT="Engineering">
 	<META NAME="category-keywords" CONTENT="filesystem">
 	<META NAME="category-offices" CONTENT="Westford, MA">
@@ -15,14 +15,11 @@
 	<META NAME="modified" CONTENT="2012-06-08 11:49:32">
 	<META NAME="status" CONTENT="1">
 	<META NAME="type" CONTENT="wiki_page">
-	<META NAME="CHANGEDBY" CONTENT="Ben England">
-	<META NAME="CHANGEDBY" CONTENT="Ben England">
-	<META NAME="CHANGEDBY" CONTENT="Ben England">
 	<STYLE TYPE="text/css">
 	<!--
 		@page { margin: 0.79in }
-		H1 { margin-top: 0.1in; margin-bottom: 0in; border: none; padding: 0in; color: #000000; font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif; font-size: 22pt }
 		P { color: #000000; font-family: "Liberation Serif", "Times New Roman", serif; font-size: 11pt; line-height: 138% }
+		H1 { margin-top: 0.1in; margin-bottom: 0in; border: none; padding: 0in; color: #000000; font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif; font-size: 22pt }
 		H2 { margin-top: 0.1in; margin-bottom: 0in; border: none; padding: 0in; color: #000000; font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif; font-size: 10pt; font-weight: normal; line-height: 130% }
 		H1.with-tabs { font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif; font-size: 22pt }
 		PRE { color: #000000 }
@@ -68,14 +65,9 @@
 				complement use of iozone benchmark for measuring performance of
 				large-file workloads, and borrows certain concepts from iozone
 				and Ric Wheeler's fs_mark.&nbsp;&nbsp;&nbsp; It was developed by
-				Ben England starting in March 2009, and is in process of being
-				open-sourced (I'll update this once it is).</P>
-				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">Download
-				of latest stable version is at <A HREF="http://perf1.lab.bos.redhat.com/bengland/laptop/perf-data-collection/smallfile-v1.9.1.tgz">smallfile-v1.9.1.tgz
-				</A>
-				</P>
-				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">Here's
-				an example of the kind of data that can be generated with it:</P>
+				Ben England starting in March 2009, and is now open-source. 
+				Here's an example of the kind of data that can be generated with
+				it:</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><IMG SRC="default_files/glusterfs-smallfile-2.jpg" NAME="graphics2" ALIGN=BOTTOM WIDTH=725 HEIGHT=614 BORDER=0></P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">Capabilities
 				include:</P>
@@ -142,73 +134,13 @@
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">To see
 				what parameters are supported by smallfile_cli.py, do &quot;python
 				smallfile_cli.py -h&quot;. Boolean true/false parameters can be
-				set to either Y (true) or N (false).</P>
+				set to either Y (true) or N (false).  Every command consists of a
+				sequence of parameter name-value pairs with the format <B>–name
+				value</B>  .</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">The
 				parameters are:</P>
 				<UL>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">--files
-					-- how many files should each thread process?&nbsp; 
-					</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">--threads
-					-- how many workload generator threads should each
-					invocation_cli process create? 
-					</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">--record-size
-					-- record size in KB, how much data is transferred in a single
-					read or write system call.&nbsp; If 0 then it is set to the file
-					size. 
-					</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">--file-size
-					-- total amount of data accessed per file. &nbsp; If zero then
-					no reads or writes are performed. 
-					</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">--files-per-dir
-					-- maximum number of files contained in any one directory 
-					</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">--dirs-per-dir
-					-- maximum number of subdirectories contained in any one
-					directory 
-					</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">--hash-into-dirs
-					– default N, if Y then assign next file to a directory using a
-					hash function, otherwise assign next –files-per-dir files to
-					next directory</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">--xattr-size
-					-- size of extended attribute value in bytes (names begin with
-					'user.smallfile-') 
-					</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">--xattr-count
-					-- number of extended attributes per file 
-					</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">--top
-					-- top-level directory, all file accesses are done inside this
-					directory tree 
-					</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">--host-set
-					-- comma-separated set of hosts used for this test (default is
-					current host name), no domain names allowed 
-					</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">--prefix
-					-- a string prefix to prepend to files (so they don't collide
-					with previous runs for example) 
-					</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">--finish
-					-- boolean, default Y, if Y, thread will complete all requested
-					file operations even if measurement has finished 
-					</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">--stonewall
-					-- boolean, default Y, if Y then thread will measure throughput
-					as soon as it detects that another thread has finished 
-					</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">--same-dir
-					-- boolean, default N, if Y then all files will be accessed from
-					a single directory 
-					</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">--pause
-					-- integer (microseconds), default 0, if non-zero each thread
-					will delay for this many microseconds before starting next file 
-					</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">--operation
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--operation</B>
 					-- operation name, one of the following: 
 					</P>
 					<UL>
@@ -255,11 +187,92 @@
 						<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">cleanup
 						-- delete any pre-existing files from a previous run 
 						</P>
-						<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">all
-						-- create, append, read, rename and delete each file. 
-						</P>
 					</UL>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">all
+					-- create, append, read, rename and delete each file. 
+					</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--files</B>
+					-- how many files should each thread process?&nbsp; 
+					</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--threads</B>
+					-- how many workload generator threads should each
+					invocation_cli process create? 
+					</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--file-size</B>
+					-- total amount of data accessed per file. &nbsp; If zero then
+					no reads or writes are performed. 
+					</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--record-size</B>
+					-- record size in KB, how much data is transferred in a single
+					read or write system call.&nbsp; If 0 then it is set to the file
+					size. 
+					</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--top</B>
+					-- top-level directory, all file accesses are done inside this
+					directory tree 
+					</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--host-set</B>
+					-- comma-separated set of hosts used for this test (default is
+					current host name), no domain names allowed 
+					</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--files-per-dir</B>
+					-- maximum number of files contained in any one directory 
+					</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--dirs-per-dir</B>
+					-- maximum number of subdirectories contained in any one
+					directory 
+					</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--hash-into-dirs</B>
+					– default N, if Y then assign next file to a directory using a
+					hash function, otherwise assign next –files-per-dir files to
+					next directory</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--permute-host-dirs</B>
+					– default N, if Y then have each host process a different
+					subdirectory tree than it otherwise would (see below for
+					directory tree structure).</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">-<B>-same-dir</B>
+					-- boolean, default N, if Y then threads will share a single
+					directory</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--network-sync-dir</B>
+					– don't need to specify unless you run a multi-host test and
+					the –top parameter points to a non-shared directory (see
+					discussion below)</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--xattr-size</B>
+					-- size of extended attribute value in bytes (names begin with
+					'user.smallfile-') 
+					</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--xattr-count</B>
+					-- number of extended attributes per file 
+					</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--prefix</B>
+					-- a string prefix to prepend to files (so they don't collide
+					with previous runs for example) 
+					</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--suffix</B>
+					-- a string suffix to append to files (so they don't collide
+					with previous runs for example) 
+					</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--finish</B>
+					-- boolean, default Y, if Y, thread will complete all requested
+					file operations even if measurement has finished 
+					</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--stonewall</B>
+					-- boolean, default Y, if Y then thread will measure throughput
+					as soon as it detects that another thread has finished 
+					</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--remote-pgm-dir
+					</B>– don't need to specify this unless the smallfile software
+					lives in a different directory on the target hosts and the
+					test-driver host.  
+					</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--pause
+					</B>-- integer (microseconds), default 0, if non-zero each
+					thread will delay for this many microseconds before starting
+					next file 
+					</P>
 				</UL>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
+				</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">So for
 				example, if you want to run <STRONG>smallfile_cli.py</STRONG> on
 				1 host with 8 threads each creating 2 GB of 1-MB files, you can
@@ -268,13 +281,29 @@
 				To run a 4-host test doing same thing:</P>
 				<PRE CLASS="western" STYLE="border: none; padding: 0in"><STRONG> </STRONG><STRONG><FONT SIZE=3># python smallfile_cli.py --operation create --threads 8 --file-size 1024 --files 2097 --top /mnt/gfs/smf \</FONT></STRONG>
 <STRONG>     </STRONG><STRONG><FONT SIZE=3>--host-set host1,host2,host3,host4</FONT></STRONG> </PRE><P STYLE="margin-bottom: 0in; border: none; padding: 0in">
-				Users should never need to run <STRONG>smallfile.py</STRONG> --
-				this is the python class which implements the workload generator.
+				Errors encountered by worker threads will be saved in
+				<B>/var/tmp/invoke-N.log</B> where <B>N</B> is the thread number.
+				 After each test, a summary of thread results is displayed, and
+				overall test results are aggregated for you, in three ways:</P>
+				<UL>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><I>files/sec</I>
+					– only metric relevant to all tests</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><I>IOPS</I>
+					– application I/O operations per second, rate at which
+					benchmark performed reads/writes</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><I>MB/s</I>
+					– megabytes/sec, rate at which application transferred data</P>
+				</UL>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">Users
+				should never need to run <STRONG>smallfile.py</STRONG> -- this is
+				the python class which implements the workload generator.
 				Developers can run this module to invoke its unit test however:</P>
 				<PRE CLASS="western" STYLE="margin-bottom: 0.2in; border: none; padding: 0in"><STRONG> </STRONG><STRONG><FONT SIZE=3># python smallfile.py </FONT></STRONG></PRE><P STYLE="margin-bottom: 0in; border: none; padding: 0in">
 				To run just one unit test module run</P>
-				<PRE CLASS="western" STYLE="margin-bottom: 0.2in; border: none; padding: 0in"><STRONG> </STRONG><STRONG><FONT SIZE=3># python -m unittest smallfile.Test.test_c3_Symlink </FONT></STRONG></PRE><P STYLE="margin-bottom: 0in; line-height: 100%">
-				<FONT FACE="Liberation Serif, serif"><FONT SIZE=4 STYLE="font-size: 16pt">Use
+				<PRE CLASS="western" STYLE="margin-bottom: 0.2in; border: none; padding: 0in"><STRONG> </STRONG><STRONG><FONT SIZE=3># python -m unittest smallfile.Test.test_c3_Symlink</FONT></STRONG></PRE><P STYLE="margin-bottom: 0in; line-height: 100%">
+				<BR>
+				</P>
+				<P STYLE="margin-bottom: 0in; line-height: 100%"><FONT FACE="Liberation Serif, serif"><FONT SIZE=4 STYLE="font-size: 16pt">Use
 				with non-networked filesystems</FONT></FONT></P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
 				</P>
@@ -321,7 +350,7 @@
 				running a longer test.</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
 				</P>
-				<H2 STYLE="margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Use
+				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Use
 				of subdirectories</FONT></H2>
 				<P><BR><BR>
 				</P>
@@ -349,7 +378,7 @@
 				The purpose of this approach is to simulate a mixture of
 				directories and files, and to not require the user to specify how
 				many levels of directories are required.</P>
-				<H2 STYLE="margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Sharing
+				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Sharing
 				directories across threads</FONT></H2>
 				<P><BR><BR>
 				</P>
@@ -362,7 +391,7 @@
 				scalability. However, if the user sets this parameter to Y, then
 				the top per-thread directory for all threads will be <B>T </B>instead
 				of <B>T/host/dTT</B> as described in preceding section.</P>
-				<H2 STYLE="margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Hashing
+				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Hashing
 				files into directory tree</FONT></H2>
 				<P><FONT SIZE=2 STYLE="font-size: 11pt">For applications which
 				create very large numbers of small files (millions for example),
@@ -516,7 +545,7 @@
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">Although
 				there may be some useful tests that involve thread
 				synchronization or contention, but we don't want the tool to
-				<I>force</I> thread synchronization or contention for resources. 
+				<I>force</I> thread synchronization or contention for resources.
 				In order to run prolonged small-file tests (which is a
 				requirement for scalability to very large clusters),, each thread
 				has to be able to use more than one directory.&nbsp;&nbsp; Since
@@ -551,24 +580,24 @@
 				single directory is used to synchronize the threads and hosts.
 				This may seem problematic, but we assume here that the file
 				system is not very busy when the test is run (otherwise why would
-				you run a load test on it?).   So if a file is created by one
+				you run a load test on it?). So if a file is created by one
 				thread, it will quickly be visible on the others, as long as the
-				filesystem is not heavily loaded.  
+				filesystem is not heavily loaded. 
 				</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
 				</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">If it's
 				a single-host test, any directory is sharable amongst threads,
 				but in a multi-host test only a directory shared by all
-				participating hosts can be used.  If the <B>–top</B> test
-				directory is in a network-accessible file system  (could be NFS
-				or Gluster for example), then the synchronization directory is by
+				participating hosts can be used. If the –<B>top</B> test
+				directory is in a network-accessible file system (could be NFS or
+				Gluster for example), then the synchronization directory is by
 				default in the network_shared subdirectory by default and need
-				not be specified.  If the <B>–top</B> directory is in a
-				host-local filesystem, then the <B>–network-sync-dir</B> option
-				must be used to specify the synchronization directory.   When a
+				not be specified. If the –<B>top</B> directory is in a
+				host-local filesystem, then the –<B>network-sync-dir</B> option
+				must be used to specify the synchronization directory. When a
 				network directory is used, change propagation between hosts
-				cannot be assumed to occur in under two seconds.  
+				cannot be assumed to occur in under two seconds. 
 				</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
 				</P>
@@ -603,14 +632,14 @@
 				</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">Synchronization
 				operations do not require the worker threads to read the
-				synchronization directory.   For distributed tests, the test
-				driver host has to check whether the various per-host
-				synchronization files exist, but this does not require a readdir
-				operation.  The test driver does this check in such a way that
-				the number of file lookups is only slightly more than the number
-				of hosts, and this does not require reading the entire directory,
-				only doing a set of lookup operations on individual files, so
-				it's <I>O(n)</I> scalable as well.</P>
+				synchronization directory. For distributed tests, the test driver
+				host has to check whether the various per-host synchronization
+				files exist, but this does not require a readdir operation. The
+				test driver does this check in such a way that the number of file
+				lookups is only slightly more than the number of hosts, and this
+				does not require reading the entire directory, only doing a set
+				of lookup operations on individual files, so it's <I>O(n)</I>
+				scalable as well.</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
 				</P>
 				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in; border: none; padding: 0in">
@@ -622,9 +651,8 @@
 				&quot;pickle&quot; files to serialize the state of these
 				per-thread objects containing details of each thread's progress
 				during the test.&nbsp; The pickle files are stored in the shared
-				synchronization directory.&nbsp; as <B>--top</B>.&nbsp; This
-				restriction could be lifted if it was important enough but that's
-				how it works today.<SCRIPT SRC="default_files/wysiwyg_002.js"></SCRIPT><SCRIPT>
+				synchronization directory.  This restriction could be lifted if
+				it was important enough but that's how it works today.<SCRIPT SRC="default_files/wysiwyg_002.js"></SCRIPT><SCRIPT>
 <!--//--><![CDATA[//><!--
 var _paq = _paq || [];(function(){var u=(("https:" == document.location.protocol) ? "https://metrics.corp.redhat.com/" : "https://metrics.corp.redhat.com/");_paq.push(["setSiteId", 1]);_paq.push(["setTrackerUrl", u+"piwik.php"]);_paq.push(["setDocumentTitle", "Home/smallfile+distributed+I%2FO+benchmark"]);_paq.push(["trackPageView"]);_paq.push(["enableLinkTracking"]);var d=document,g=d.createElement("script"),s=d.getElementsByTagName("script")[0];g.type="text/javascript";g.defer=true;g.async=true;g.src=u+"piwik.js";s.parentNode.insertBefore(g,s);})();
 //--><!]]>
