@@ -44,6 +44,15 @@ class subprocess(multiprocessing.Process):
 # including multi-threaded test
 # to run, just do "python invoke_process.py"
 
+def deltree(dir_tree):
+        assert(len(dir_tree) > 6)
+        if not os.path.exists(dir_tree): return
+        assert os.path.isdir(dir_tree)
+        for (dir, subdirs, files) in os.walk(dir_tree, topdown=False):
+            for f in files: os.unlink(os.path.join(dir,f))
+            for d in subdirs: os.rmdir(os.path.join(dir,d))
+        os.rmdir(dir_tree)
+        
 ok=0
 class Test(unittest.TestCase):
     def setUp(self):
@@ -53,22 +62,15 @@ class Test(unittest.TestCase):
         self.invok.tid = "regtest"
         self.invok.start_log()
 
-    def deltree(self):
-        if not os.path.exists(self.invok.top_dir): return
-        if not os.path.isdir(self.invok.top_dir): return
-        for (dir, subdirs, files) in os.walk(self.invok.top_dir, topdown=False):
-            for f in files: os.unlink(os.path.join(dir,f))
-            for d in subdirs: os.rmdir(os.path.join(dir,d))
-        os.rmdir(self.invok.top_dir)
-        
     def test_multiproc_stonewall(self):
         self.invok.log.info('starting stonewall test')
         thread_ready_timeout = 4
         thread_count = 4
-        self.deltree()
-        os.mkdir(self.invok.top_dir)
-        os.mkdir(self.invok.src_dir)
-        os.mkdir(self.invok.dest_dir)
+        for tree in self.invok.top_dirs: 
+          deltree(tree)
+          os.mkdir(tree)
+        for dir in self.invok.src_dirs: os.mkdir(dir)
+        for dir in self.invok.dest_dirs: os.mkdir(dir)
         os.mkdir(self.invok.network_dir)
         self.invok.starting_gate = os.path.join(self.invok.network_dir, 'starting-gate')
         sgate_file = self.invok.starting_gate

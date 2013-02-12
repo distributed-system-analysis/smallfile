@@ -7,7 +7,7 @@
 	<META NAME="AUTHOR" CONTENT="anonymous">
 	<META NAME="CREATED" CONTENT="0;0">
 	<META NAME="CHANGEDBY" CONTENT="Ben England">
-	<META NAME="CHANGED" CONTENT="20130205;9503800">
+	<META NAME="CHANGED" CONTENT="20130212;11374400">
 	<META NAME="category-departments" CONTENT="Engineering">
 	<META NAME="category-keywords" CONTENT="filesystem">
 	<META NAME="category-offices" CONTENT="Westford, MA">
@@ -65,7 +65,7 @@
 				complement use of iozone benchmark for measuring performance of
 				large-file workloads, and borrows certain concepts from iozone
 				and Ric Wheeler's fs_mark.&nbsp;&nbsp;&nbsp; It was developed by
-				Ben England starting in March 2009, and is now open-source. 
+				Ben England starting in March 2009, and is now open-source.
 				Here's an example of the kind of data that can be generated with
 				it:</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><IMG SRC="default_files/glusterfs-smallfile-2.jpg" NAME="graphics2" ALIGN=BOTTOM WIDTH=725 HEIGHT=614 BORDER=0></P>
@@ -134,9 +134,9 @@
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">To see
 				what parameters are supported by smallfile_cli.py, do &quot;python
 				smallfile_cli.py -h&quot;. Boolean true/false parameters can be
-				set to either Y (true) or N (false).  Every command consists of a
-				sequence of parameter name-value pairs with the format <B>–name
-				value</B>  .</P>
+				set to either Y (true) or N (false). Every command consists of a
+				sequence of parameter name-value pairs with the format –<B>name
+				value</B> .</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">The
 				parameters are:</P>
 				<UL>
@@ -187,10 +187,10 @@
 						<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">cleanup
 						-- delete any pre-existing files from a previous run 
 						</P>
+						<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">all
+						-- create, append, read, rename and delete each file. 
+						</P>
 					</UL>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">all
-					-- create, append, read, rename and delete each file. 
-					</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--files</B>
 					-- how many files should each thread process?&nbsp; 
 					</P>
@@ -209,8 +209,9 @@
 					</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--top</B>
 					-- top-level directory, all file accesses are done inside this
-					directory tree 
-					</P>
+					directory tree.  If you wish to use multiple mountpoints,provide
+					a list of top-level directories separated by comma (no
+					whitespace).</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--host-set</B>
 					-- comma-separated set of hosts used for this test (default is
 					current host name), no domain names allowed 
@@ -263,7 +264,7 @@
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--remote-pgm-dir
 					</B>– don't need to specify this unless the smallfile software
 					lives in a different directory on the target hosts and the
-					test-driver host.  
+					test-driver host. 
 					</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--pause
 					</B>-- integer (microseconds), default 0, if non-zero each
@@ -283,7 +284,7 @@
 <STRONG>     </STRONG><STRONG><FONT SIZE=3>--host-set host1,host2,host3,host4</FONT></STRONG> </PRE><P STYLE="margin-bottom: 0in; border: none; padding: 0in">
 				Errors encountered by worker threads will be saved in
 				<B>/var/tmp/invoke-N.log</B> where <B>N</B> is the thread number.
-				 After each test, a summary of thread results is displayed, and
+				After each test, a summary of thread results is displayed, and
 				overall test results are aggregated for you, in three ways:</P>
 				<UL>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><I>files/sec</I>
@@ -378,6 +379,8 @@
 				The purpose of this approach is to simulate a mixture of
 				directories and files, and to not require the user to specify how
 				many levels of directories are required.</P>
+				<P>The use of multiple mountpoints is supported.  This features
+				is useful for testing NFS, etc.</P>
 				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Sharing
 				directories across threads</FONT></H2>
 				<P><BR><BR>
@@ -476,7 +479,7 @@
 				about all the ones that I've heard of. Here are the ones I have
 				looked at:</P>
 				<UL>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">Bonnie++
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>Bonnie++</B>
 					-- works well for a single host, but you cannot generate load
 					from multiple hosts because the benchmark will not synchronize
 					its activities, so different phases of the benchmark will be
@@ -484,35 +487,34 @@
 					</P>
 				</UL>
 				<UL>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">iozone
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>iozone</B>
 					-- this is a great tool for large-file testing, but it can only
 					do 1 file/thread in its current form. 
 					</P>
 				</UL>
 				<UL>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">postmark
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>postmark</B>
 					-- works fine for a single client, not as useful for
 					multi-client tests 
 					</P>
 				</UL>
 				<UL>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">grinder
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>grinder</B>
 					-- has not to date been useful for filesystem testing, though it
 					works well for web services testing. 
 					</P>
 				</UL>
 				<UL>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">JMeter
-					-- I don't know how to run without GUI, reliance on Java is
-					somewhat of a liability 
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>JMeter</B>
+					– has been used successfully by others in the past. 
 					</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">fs_mark
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>fs_mark</B>
 					-- Ric Wheeler's filesystem benchmark, is very good at creating
 					files 
 					</P>
 				</UL>
 				<UL>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">fio
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>fio</B>
 					-- Linux test tool -- broader coverage of Linux system calls
 					particularly around async. and direct I/O 
 					</P>
@@ -651,8 +653,8 @@
 				&quot;pickle&quot; files to serialize the state of these
 				per-thread objects containing details of each thread's progress
 				during the test.&nbsp; The pickle files are stored in the shared
-				synchronization directory.  This restriction could be lifted if
-				it was important enough but that's how it works today.<SCRIPT SRC="default_files/wysiwyg_002.js"></SCRIPT><SCRIPT>
+				synchronization directory. This restriction could be lifted if it
+				was important enough but that's how it works today.<SCRIPT SRC="default_files/wysiwyg_002.js"></SCRIPT><SCRIPT>
 <!--//--><![CDATA[//><!--
 var _paq = _paq || [];(function(){var u=(("https:" == document.location.protocol) ? "https://metrics.corp.redhat.com/" : "https://metrics.corp.redhat.com/");_paq.push(["setSiteId", 1]);_paq.push(["setTrackerUrl", u+"piwik.php"]);_paq.push(["setDocumentTitle", "Home/smallfile+distributed+I%2FO+benchmark"]);_paq.push(["trackPageView"]);_paq.push(["enableLinkTracking"]);var d=document,g=d.createElement("script"),s=d.getElementsByTagName("script")[0];g.type="text/javascript";g.defer=true;g.async=true;g.src=u+"piwik.js";s.parentNode.insertBefore(g,s);})();
 //--><!]]>

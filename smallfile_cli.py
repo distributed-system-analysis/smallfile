@@ -268,8 +268,10 @@ def run_workload():
     nextinv = smallfile.smf_invocation.clone(master_invoke)
     nextinv.tid = "%02d"%k
     if not master_invoke.is_shared_dir:
-        nextinv.src_dir +=  os.sep + master_invoke.onhost + os.sep + "d" + nextinv.tid
-        nextinv.dest_dir += os.sep + master_invoke.onhost + os.sep + "d" + nextinv.tid
+        nextinv.src_dirs = [ d + os.sep + master_invoke.onhost + os.sep + "d" + nextinv.tid \
+                             for d in nextinv.src_dirs ]
+        nextinv.dest_dirs = [ d + os.sep + master_invoke.onhost + os.sep + "d" + nextinv.tid \
+                             for d in nextinv.dest_dirs ]
     t = invoke_process.subprocess(nextinv)
     thread_list.append(t)
 

@@ -9,13 +9,16 @@ import sys
 import os
 import smallfile
 
-version = '1.9.9'
+version = '1.9.10'
 
 def usage(msg):  # call if CLI syntax error or invalid parameter
     print
     print 'ERROR: ' + msg
     print 'usage: smallfile_cli.py '
     print '  --operation create|append|read|rename|delete|delete-renamed|symlink|mkdir|rmdir|stat|chmod|setxattr|getxattr'
+    print '  --top top-dir | top-dir1,top-dir2,...,top-dirN'
+    print '  --host-set h1,h2,...,hN'
+    print '  --network-sync-dir directory-path'
     print '  --files positive-integer'
     print '  --files-per-dir positive-integer'
     print '  --dirs-per-dir positive-integer'
@@ -28,14 +31,11 @@ def usage(msg):  # call if CLI syntax error or invalid parameter
     print '  --file-size non-negative-integer-KB'
     print '  --prefix alphanumeric-string'
     print '  --suffix alphanumeric-string'
-    print '  --top directory-pathname'
     print '  --finish Y|N'
     print '  --verify-read Y|N'
     print '  --response-times Y|N'
     print '  --same-dir Y|N'
     print '  --pause microsec'
-    print '  --host-set h1,h2,...,hN'
-    print '  --network-sync-dir directory-path'
     print '  --remote-pgm-dir directory-pathname'
     sys.exit(1)
 
@@ -156,7 +156,8 @@ def parse():
         if not smallfile.smf_invocation.all_op_names.__contains__(val):
             usage('unrecognized operation name: %s'%val)
         inv.opname = val
-    elif prm == 'top': prm_top_dir = val
+    elif prm == 'top': 
+        prm_top_dir = val.split(',')
     elif prm == 'pause': 
         chkPositiveInt(val, rawprm)
         inv.pause_between_files = int(val)
@@ -191,12 +192,14 @@ def parse():
   if (inv.record_sz_kb != 0) and ((inv.total_sz_kb % inv.record_sz_kb) != 0):
     usage('file size must be multiple of record size if record size is non-zero')
 
-  if prm_top_dir and (len(prm_top_dir) < 5):
-    usage('cannot use top of filesystem, too dangerous')
+  if prm_top_dir: 
+    for d in prm_top_dir:
+      if len(d) < 6:
+        usage('directory less than 6 characters, cannot use top of filesystem, too dangerous')
   if prm_top_dir:
     inv.set_top(prm_top_dir)
   else:
-    prm_top_dir = os.path.dirname(inv.src_dir)
+    prm_top_dir = inv.top_dirs
   if prm_network_sync_dir:
     if not prm_host_set and not prm_slave:
       usage('you do not need to specify a network thread synchronization directory unless you use multiple hosts')
@@ -215,9 +218,9 @@ def parse():
 
   prm_list = [ \
              ('hosts in test', '%s'%prm_host_set), \
+             ('top test directory(s)', str(prm_top_dir)), \
              ('operation', inv.opname), \
              ('files/thread', '%d'%inv.iterations), \
-             ('top test directory', prm_top_dir), \
              ('threads', '%d'%prm_thread_count), \
              ('record size (KB)', '%d'%inv.record_sz_kb), \
              ('file size (KB)', '%d'%inv.total_sz_kb), \
