@@ -8,8 +8,9 @@ See Appendix on this page for instructions pertaining to license.
 import sys
 import os
 import smallfile
+from smallfile import smf_invocation
 
-version = '1.9.10'
+version = '1.9.11'
 
 def usage(msg):  # call if CLI syntax error or invalid parameter
     print
@@ -26,6 +27,7 @@ def usage(msg):  # call if CLI syntax error or invalid parameter
     print '  --record-size non-negative-integer-KB'
     print '  --xattr-size non-negative-integer-bytes'
     print '  --xattr-count non-negative-integer-bytes'
+    print '  --file-size-distribution exponential'
     print '  --permute-host-dirs Y|N'
     print '  --hash-into-dirs Y|N'
     print '  --file-size non-negative-integer-KB'
@@ -82,7 +84,7 @@ def parse():
   # default does short test in /var/tmp so you can see the program run 
   # store as much as you can in smf_invocation object so per-thread invocations inherit
 
-  inv = smallfile.smf_invocation()
+  inv = smf_invocation()
   inv.iterations = 3
   inv.record_sz_kb = 4
   inv.total_sz_kb = 64
@@ -143,6 +145,10 @@ def parse():
     elif prm == 'file-size': 
         chkNonNegInt(val, rawprm)
         inv.total_sz_kb = int(val)
+    elif prm == 'file-size-distribution':
+        if val != 'exponential':
+          usage('unrecognized file size distribution: %s'%val)
+        inv.filesize_distr = smf_invocation.filesize_distr_random_exponential
     elif prm == 'xattr-size':
         chkNonNegInt(val, rawprm)
         inv.xattr_size = int(val) 
@@ -153,7 +159,7 @@ def parse():
     elif prm == 'suffix': inv.suffix = val
     elif prm == 'hash-into-dirs': inv.hash_to_dir = str2bool(val, rawprm)
     elif prm == 'operation': 
-        if not smallfile.smf_invocation.all_op_names.__contains__(val):
+        if not smf_invocation.all_op_names.__contains__(val):
             usage('unrecognized operation name: %s'%val)
         inv.opname = val
     elif prm == 'top': 
@@ -186,6 +192,8 @@ def parse():
 
     pass_on_prm_list += ' ' + pass_on_prm  # parameter options that workload generators will need
 
+  # validate parameters further now that we know what they all are
+
   if inv.record_sz_kb > inv.total_sz_kb and inv.total_sz_kb != 0:
     usage('record size cannot exceed file size')
 
@@ -216,6 +224,10 @@ def parse():
   # display host set first because this can be very long, 
   # this way the rest of the parameters appear together on the screen
 
+  size_distribution_string = 'fixed'
+  if inv.filesize_distr == smf_invocation.filesize_distr_random_exponential: 
+    size_distribution_string = 'random exponential'
+
   prm_list = [ \
              ('hosts in test', '%s'%prm_host_set), \
              ('top test directory(s)', str(prm_top_dir)), \
@@ -224,6 +236,7 @@ def parse():
              ('threads', '%d'%prm_thread_count), \
              ('record size (KB)', '%d'%inv.record_sz_kb), \
              ('file size (KB)', '%d'%inv.total_sz_kb), \
+             ('file size distribution', size_distribution_string), \
              ('files per dir', '%d'%inv.files_per_dir), \
              ('dirs per dir', '%d'%inv.dirs_per_dir), \
              ('threads share directories?', '%s'%bool2YN(inv.is_shared_dir)), \
