@@ -30,6 +30,11 @@ cleanup() {
   mkdir $testdir
 }
 
+# run the smallfile.py module's self-test
+
+python smallfile.py
+assertok $?
+
 # test parsing
 
 s="./smallfile_cli.py --top $testdir "
@@ -72,14 +77,27 @@ assertfail $?
 # run a command with all CLI options and verify that they were successfully parsed
 
 cleanup
-$s --verify-read N --response-times Y --finish N --same-dir Y --pause 100 --operation cleanup --threads 5 --files 20 --files-per-dir 5 --dirs-per-dir 3 --record-size 6 --file-size 30 --host-set $localhost_name | tee $f
+$s --verify-read N --response-times Y --finish N --stonewall N --permute-host-dirs Y --top $testdir --same-dir Y --operation cleanup --threads 5 --files 20 --files-per-dir 5 --dirs-per-dir 3 --record-size 6 --file-size 30 --file-size-distribution exponential --prefix a --suffix b --hash-into-dirs Y --pause 5 --host-set $localhost_name | tee $f
 assertok $?
 expect_strs=( 'verify read? : N' \
+        "hosts in test : \['$localhost_name'\]" \
+        'top test directory(s) : ' \
+        'file size distribution : random exponential'\
+        'filename prefix : a' \
+        'filename suffix : b' \
+        'hash file number into dir.? : Y' \
+        'pause between files (microsec) : 5' \
+        'finish all requests? : N' \
+        'stonewall? : N' \
+        'measure response times? : Y' \
+        'log to stderr? : False' \
+        'permute host directories? : Y' \
+        'verbose? : False' \
         'response times? : Y' \
         'finish all requests? : N' \
         'threads share directories? : Y' \
-        'pause between files (microsec) : 100' \
-        "top test directory : $testdir" \
+        'pause between files (microsec) : 5' \
+        "top test directory(s) : \['$testdir'\]" \
         'operation : cleanup' \
         'threads : 5' \
         'files/thread : 20' \
@@ -90,7 +108,8 @@ expect_strs=( 'verify read? : N' \
 expect_ct=${#expect_strs[*]}
 for j in `seq 1 $expect_ct` ; do 
   ((k = $j - 1))
-  expected_str=${expect_strs[$k]}
+  expected_str="${expect_strs[$k]}"
+  echo "expecting: $expected_str"
   grep "$expected_str" $f
   assertok $?
 done
