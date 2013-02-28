@@ -7,7 +7,7 @@
 	<META NAME="AUTHOR" CONTENT="anonymous">
 	<META NAME="CREATED" CONTENT="0;0">
 	<META NAME="CHANGEDBY" CONTENT="Ben England">
-	<META NAME="CHANGED" CONTENT="20130212;11374400">
+	<META NAME="CHANGED" CONTENT="20130228;13514500">
 	<META NAME="category-departments" CONTENT="Engineering">
 	<META NAME="category-keywords" CONTENT="filesystem">
 	<META NAME="category-offices" CONTENT="Westford, MA">
@@ -15,11 +15,12 @@
 	<META NAME="modified" CONTENT="2012-06-08 11:49:32">
 	<META NAME="status" CONTENT="1">
 	<META NAME="type" CONTENT="wiki_page">
+	<META NAME="CHANGEDBY" CONTENT="Ben England">
 	<STYLE TYPE="text/css">
 	<!--
 		@page { margin: 0.79in }
-		P { color: #000000; font-family: "Liberation Serif", "Times New Roman", serif; font-size: 11pt; line-height: 138% }
 		H1 { margin-top: 0.1in; margin-bottom: 0in; border: none; padding: 0in; color: #000000; font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif; font-size: 22pt }
+		P { color: #000000; font-family: "Liberation Serif", "Times New Roman", serif; font-size: 11pt; line-height: 138% }
 		H2 { margin-top: 0.1in; margin-bottom: 0in; border: none; padding: 0in; color: #000000; font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif; font-size: 10pt; font-weight: normal; line-height: 130% }
 		H1.with-tabs { font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif; font-size: 22pt }
 		PRE { color: #000000 }
@@ -87,6 +88,8 @@
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">-
 				provides CLI for scripted use, but workload generator is separate
 				from CLI and can also be invoked directly from a GUI if desired</P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">-
+				supports either fixed file size or random exponential file size</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">- can
 				capture response time data in .csv format, provides utility to
 				reduce this data to statistics</P>
@@ -119,8 +122,7 @@
 					restriction) 
 					</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">does
-					not support HTTP access (a separate <A HREF="http://perf1.lab.bos.redhat.com/bengland/laptop/matte/ufo/parallel_curl.py">parallel_curl.py</A>
-					benchmark program is available) 
+					not support HTTP access 
 					</P>
 				</UL>
 				<H1 STYLE="margin-top: 0in; margin-bottom: 0.2in">How to run</H1>
@@ -202,6 +204,9 @@
 					-- total amount of data accessed per file. &nbsp; If zero then
 					no reads or writes are performed. 
 					</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">-<B>-file-size-distribution</B>
+					– only supported value today is <B>exponential</B>, default
+					value is fixed file size.</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--record-size</B>
 					-- record size in KB, how much data is transferred in a single
 					read or write system call.&nbsp; If 0 then it is set to the file
@@ -209,7 +214,7 @@
 					</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--top</B>
 					-- top-level directory, all file accesses are done inside this
-					directory tree.  If you wish to use multiple mountpoints,provide
+					directory tree. If you wish to use multiple mountpoints,provide
 					a list of top-level directories separated by comma (no
 					whitespace).</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--host-set</B>
@@ -379,8 +384,8 @@
 				The purpose of this approach is to simulate a mixture of
 				directories and files, and to not require the user to specify how
 				many levels of directories are required.</P>
-				<P>The use of multiple mountpoints is supported.  This features
-				is useful for testing NFS, etc.</P>
+				<P>The use of multiple mountpoints is supported. This features is
+				useful for testing NFS, etc.</P>
 				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Sharing
 				directories across threads</FONT></H2>
 				<P><BR><BR>
@@ -423,6 +428,33 @@
 				of the file being accessed by the thread will be hashed into the
 				set of directories that are being used by this thread. </FONT>
 				</P>
+				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Random
+				file size distribution option</FONT></H2>
+				<P STYLE="margin-bottom: 0.2in"><FONT SIZE=2 STYLE="font-size: 11pt">In
+				real life, users don't create files that all have the same size. 
+				Typically there is a file size distribution with a majority of
+				small files and a lesser number of larger files.  This benchmark
+				supports use of the random exponential distribution to
+				approximate that behavior.   If you specify </FONT>
+				</P>
+				<P STYLE="margin-left: 0.79in; margin-bottom: 0.2in">–<FONT FACE="Courier 10 Pitch"><FONT SIZE=2 STYLE="font-size: 11pt">file-size-distribution
+				<B>exponential</B> –file-size <B>S</B>   </FONT></FONT>
+				</P>
+				<P STYLE="margin-bottom: 0.2in"><FONT SIZE=2 STYLE="font-size: 11pt">The
+				meaning of the <B>–file-size</B> parameter changes to the
+				<I>maximum</I> file size (<B>S</B> KB), and the mean file size
+				becomes <B>S</B>/8.  All file sizes are rounded down to the
+				nearest kilobyte boundary, and the smallest allowed file size is
+				1 KB.  When this option is used, the smallfile benchmark saves
+				the seed for each thread's random number generator object in a
+				<B>.seed</B> file stored in the <B>TMPDIR</B> directory
+				(typically <B>/var/tmp</B>).  This allows the file reader to
+				recreate the sequence of random numbers used by the file writer
+				to generate file sizes, so that the reader knows exactly how big
+				each file should be without asking the file system for this
+				information.   The append operation works in the same way.  All
+				other operations are metadata operations and do not require that
+				the file size be known in advance.</FONT></P>
 				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Avoiding
 				caching effects</FONT></H2>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><A NAME="Avoiding_caching_effects"></A>
