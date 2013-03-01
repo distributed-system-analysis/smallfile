@@ -30,13 +30,20 @@ cleanup() {
   mkdir $testdir
 }
 
-# run the smallfile.py module's self-test
+# run the smallfile.py module's unit test
 
+echo "running smallfile.py unit test"
 python smallfile.py
+assertok $?
+
+# run the invoke_process.py unit test
+echo "running invoke_process.py unit test"
+python invoke_process.py
 assertok $?
 
 # test parsing
 
+echo "testing parsing"
 s="./smallfile_cli.py --top $testdir "
 f=smfregtest.log
 cleanup
@@ -118,12 +125,14 @@ pass1="$s --files 1000 --files-per-dir 20 --dirs-per-dir 3 --threads 4 --file-si
 
 allops="cleanup create append read chmod stat setxattr getxattr symlink mkdir rmdir rename delete-renamed cleanup"
 
+echo "******** testing non-distributed operations"
 for op in $allops ; do
   rm -rf /var/tmp/invoke*.log
   $pass1 --operation $op
   assertok $?
 done
 
+echo "******** testing distributed operations"
 pass1="$pass1 --host-set $localhost_name"
 for op in $allops ; do
   rm -rf /var/tmp/invoke*.log
