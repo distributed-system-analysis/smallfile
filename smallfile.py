@@ -100,6 +100,7 @@ def hostaddr(h):
 invocation_count = 0
 
 class smf_invocation:
+    workloads = None  # will be filled in at bottom of class when all per-workload-type do_ functions are defined
     rename_suffix = ".rnm"
     separator = os.sep  # makes it portable to Windows
     all_op_names = [ "create", "delete", "append", "read", "rename", "delete-renamed", "cleanup", "all", "symlink", "mkdir", "rmdir", "stat", "chmod", "setxattr", "getxattr" ]
@@ -750,31 +751,59 @@ class smf_invocation:
             fn = self.mk_file_nm(self.src_dirs)
             filename_list.append(fn)
             self.op_starttime()
+            next_fsz = self.get_next_file_size()
             fd = os.open(fn, os.O_WRONLY|os.O_CREAT|self.direct)
             rszkb = self.record_sz_kb
-            if rszkb == 0: rszkb = self.total_sz_kb
-            remaining_kb = self.total_sz_kb
+            if rszkb == 0: rszkb = next_fsz
+            remaining_kb = next_fsz
             while remaining_kb > 0:
-                written = os.write(fd, self.buf)
+                if remaining_kb < rszkb: rszkb = remaining_kb
+                rszbytes = rszkb * self.BYTES_PER_KB
+                if rszkb != len(self.buf):
+                  written = os.write(fd, self.buf[0:rszbytes])
+                else:
+                  written = os.write(fd, self.buf)
                 self.rq += 1
-                if written != (rszkb * self.BYTES_PER_KB):
+                if written != rszbytes:
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, written)
                 remaining_kb -= rszkb
             os.close(fd)
             self.op_endtime('create')
 
             self.op_starttime()
+            xa = xattr.xattr(fn)
+            for j in range(0, self.xattr_count):
+              try: 
+                v = xa.get('user.smallfile-all-%d'%j)
+              except IOError as e:
+                if e.errno != errno.ENODATA: raise e
+            self.op_endtime('getxattr')
+
+            self.op_starttime()
+            xa = xattr.xattr(fn)
+            for j in range(0, self.xattr_count):
+              xa.set('user.smallfile-all-%d'%j, self.buf[j:self.xattr_size+j])
+            self.op_endtime('setxattr')
+
+            self.op_starttime()
             os.rename(fn, fn + self.rename_suffix)
+            fn = fn + self.rename_suffix
             self.op_endtime('rename')
 
-            fn = fn + self.rename_suffix
+            self.op_starttime()
+            os.chmod(fn, 0667)
+            self.op_endtime('chmod')
+
             self.op_starttime()
             fd = os.open(fn, os.O_RDONLY|self.direct)
-            remaining_kb = self.total_sz_kb
+            remaining_kb = next_fsz
+            rszkb = self.record_sz_kb
             while remaining_kb > 0:
                 self.rq += 1
-                bytesread = os.read(fd, rszkb * self.BYTES_PER_KB)
-                if len(bytesread) != (rszkb * self.BYTES_PER_KB):
+                if rszkb > remaining_kb: rszkb = remaining_kb
+                rszbytes = rszkb * self.BYTES_PER_KB
+                bytesread = os.read(fd, rszbytes)
+                if len(bytesread) != rszbytes:
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, len(bytesread))
                 remaining_kb -= rszkb
             os.close(fd)
@@ -826,38 +855,11 @@ class smf_invocation:
             self.start_time = time.time()
             self.wait_for_gate()
             o = self.opname
-            if o == "create":
-                self.do_create()
-            elif o == "delete":
-                self.do_delete()
-            elif o == "symlink":
-                self.do_symlink()
-            elif o == "mkdir":
-                self.do_mkdir()
-            elif o == "rmdir":
-                self.do_rmdir()
-            elif o == "stat":
-                self.do_stat()
-            elif o == "getxattr":
-                self.do_getxattr()
-            elif o == "setxattr":
-                self.do_setxattr()
-            elif o == "chmod":
-                self.do_chmod()
-            elif o == "append":
-                self.do_append()
-            elif o == "read":
-                self.do_read()
-            elif o == "rename":
-                self.do_rename()
-            elif o == "delete-renamed":
-                self.do_delete_renamed()
-            elif o == "cleanup":
-                self.do_cleanup()
-            elif o == "all":
-                self.do_all()
-            else:
-                raise MFNotImplYetExc()
+            try: 
+              func = smf_invocation.workloads[o]
+            except KeyError as e:
+              raise Exception('invalid workload type ' + o)
+            func(self) # call the do_ function for that workload type
             self.status = ok
         except KeyboardInterrupt, e:
             self.log.error( "control-C or equivalent signal received, ending test" )
@@ -872,6 +874,26 @@ class smf_invocation:
         self.elapsed_time = self.end_time - self.start_time
         logging.shutdown()
         return self.status
+
+    # we look up the function for the workload type by workload name in this dictionary (hash table)
+
+    workloads = { \
+        'create'        : do_create, \
+        'delete'        : do_delete, \
+        'symlink'       : do_symlink, \
+        'mkdir'         : do_mkdir, \
+        'rmdir'         : do_rmdir, \
+        'stat'          : do_stat, \
+        'getxattr'      : do_getxattr, \
+        'setxattr'      : do_setxattr, \
+        'chmod'         : do_chmod, \
+        'append'        : do_append, \
+        'read'          : do_read, \
+        'rename'        : do_rename, \
+        'delete-renamed': do_delete_renamed, \
+        'cleanup'       : do_cleanup, \
+        'all'           : do_all
+        }
 
 # threads used to do multi-threaded unit testing
 
@@ -1070,9 +1092,13 @@ class Test(unittest.TestCase):
 
     def test_i_doall(self):
         self.cleanup_files()
+        self.invok.invocations=10
+        self.invok.record_sz_kb = 5
+        self.invok.total_sz_kb = 64
+        self.invok.filesize_distr = self.invok.filesize_distr_random_exponential
         self.runTest("all")
-        self.checkDirListEmpty(self.invok.src_dirs)
         self.checkDirListEmpty(self.invok.dest_dirs)
+        self.checkDirListEmpty(self.invok.src_dirs)
         self.cleanup_files()
 
     def test_j0_dir_name(self):
