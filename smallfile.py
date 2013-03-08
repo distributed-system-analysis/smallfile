@@ -86,7 +86,13 @@ def ensure_dir_exists( dirpath ):
 
 def short_hostname(h):
   if h == None: h = socket.gethostname()
-  return h.split('.')[0]
+  # if this is an IP address, don't split it
+  first_token = h.split('.')[0]
+  try:
+    addr_octet = int(first_token)
+  except ValueError as e:
+    return first_token
+  return h
 
 def hostaddr(h):
   if h == None: a = socket.gethostbyname(socket.gethostname())
@@ -163,7 +169,7 @@ class smf_invocation:
         self.verify_read = True       # if so, compare read data to what was written
         self.pause_between_files = 0  # how many microsec to sleep between each file
         self.pause_sec = 0.0          # same as pause_between_files but in floating-point seconds
-        self.onhost = ""              # record which host the invocation ran on
+        self.onhost = short_hostname(None) # record which host the invocation ran on
         self.tid = ""                 # thread ID 
         self.direct = 0               # set for direct I/O
         self.log_to_stderr = False    # set to true for debugging to screen
@@ -273,7 +279,6 @@ class smf_invocation:
         self.end_time = None
         self.op_start_time = None;
         self.elapsed_time = 0
-        self.onhost = short_hostname(None)
         self.abort = False
         self.status = self.NOTOK
         self.rsptimes = []
@@ -348,7 +353,7 @@ class smf_invocation:
     # (i.e. it is ready to immediately begin generating workload)
 
     def gen_host_ready_fname(self, hostname=None):
-        return self.network_dir + os.sep + "host_ready." + hostaddr(hostname) + ".tmp"
+        return self.network_dir + os.sep + "host_ready." + self.onhost + ".tmp"
 
     def abort_fn(self):
         return self.network_dir + os.sep + 'abort.tmp'

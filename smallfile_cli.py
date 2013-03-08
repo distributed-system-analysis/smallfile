@@ -50,8 +50,9 @@ KB_PER_GB = (1<<20)
 min_files_per_sec = 15 
 pct_files_min = 70  # minimum percentage of files for valid test
 
-def gen_host_result_filename(master_invoke, invoke_host):
-  return os.path.join(master_invoke.network_dir, hostaddr(invoke_host) + '_result.pickle')
+def gen_host_result_filename(master_invoke, result_host=None):
+  if result_host == None: result_host = master_invoke.onhost
+  return os.path.join(master_invoke.network_dir, result_host + '_result.pickle')
 
 # abort routine just cleans up threads
 
@@ -101,8 +102,10 @@ def run_workload():
         this_remote_cmd = remote_cmd
         if prm_permute_host_dirs:
           this_remote_cmd += ' --as-host %s'%prm_host_set[(j+1)%host_ct]
+	else:
+	  this_remote_cmd += ' --as-host %s'%n
         if verbose: print this_remote_cmd
-        pickle_fn = gen_host_result_filename(master_invoke, n)
+        pickle_fn = gen_host_result_filename(master_invoke)
         ensure_deleted(pickle_fn)
         ssh_thread_list.append(ssh_thread.ssh_thread(n, this_remote_cmd))
     time.sleep(2) # give other clients time to see changes
@@ -277,7 +280,7 @@ def run_workload():
 
   starting_gate = thread_list[0].invoke.starting_gate
   my_host_invoke = thread_list[0].invoke
-  host = short_hostname(None)
+  host = short_hostname(my_host_invoke.onhost)
 
   # start threads, wait for them to reach starting gate
   # to do this, look for thread-ready files 
@@ -408,7 +411,7 @@ def run_workload():
     # if this is a multi-host test 
     # then write out this host's result in pickle format so test driver can pick up result
 
-    result_filename = gen_host_result_filename(master_invoke, host)
+    result_filename = gen_host_result_filename(master_invoke)
     if verbose: print 'saving result to filename %s'%result_filename
     ensure_deleted(result_filename)
     result_file = open(result_filename, 'w')
