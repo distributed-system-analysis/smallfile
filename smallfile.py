@@ -112,6 +112,7 @@ class smf_invocation:
     tmp_dir = os.getenv("TMPDIR")  # UNIX case
     filesize_distr_fixed = -1 # no file size distribution
     filesize_distr_random_exponential = 0 # a file size distribution type
+    random_size_limit = 8 # multiply mean size by this to get max file size
     if tmp_dir == None: tmp_dir = os.getenv("TEMP") # windows case
     if tmp_dir == None: tmp_dir = "/var/tmp"  # assume POSIX-like
     some_prime = 900593
@@ -379,7 +380,7 @@ class smf_invocation:
     def get_next_file_size(self):
       next_size = self.total_sz_kb
       if self.filesize_distr == self.filesize_distr_random_exponential:
-        next_size = max(1, min(int(self.randstate.expovariate(8.0/self.total_sz_kb)), self.total_sz_kb))
+        next_size = max(1, min(int(self.randstate.expovariate(1.0/self.total_sz_kb)), self.total_sz_kb*self.random_size_limit))
         self.log.debug('rnd expn file size %d KB'%next_size)
       else:
         self.log.debug('fixed file size %d KB'%next_size)
@@ -505,7 +506,7 @@ class smf_invocation:
         if self.record_sz_kb * 1024 > smf_invocation.biggest_buf_size:
           raise Exception('biggest supported record size is %d bytes'%smf_invocation.biggest_buf_size)
         if self.record_sz_kb == 0:
-            rsz = self.total_sz_kb * 1024
+            rsz = self.total_sz_kb * self.random_size_limit * 1024
         else:
             rsz = self.record_sz_kb * 1024
         if rsz > self.biggest_buf_size:
@@ -578,7 +579,7 @@ class smf_invocation:
                   rszbytes = remaining_kb * self.BYTES_PER_KB
                   written = os.write(fd, self.buf[0:rszbytes])
                 else:
-                  rszbytes = rszkb * self.BYTES_PER_KB
+                  rszbytes = len(self.buf)
                   written = os.write(fd, self.buf)
                 self.log.debug('create fn %s next_fsz %u remain %u rszbytes %u written %u'%(fn, next_fsz, remaining_kb, rszbytes, written))
                 if written != rszbytes:
@@ -794,25 +795,6 @@ class smf_invocation:
             os.chmod(fn, 0667)
             self.op_endtime('chmod')
 
-            self.op_starttime()
-            fd = os.open(fn, os.O_RDONLY|self.direct)
-            remaining_kb = next_fsz
-            rszkb = self.record_sz_kb
-            while remaining_kb > 0:
-                self.rq += 1
-                if rszkb > remaining_kb: rszkb = remaining_kb
-                rszbytes = rszkb * self.BYTES_PER_KB
-                bytesread = os.read(fd, rszbytes)
-                if len(bytesread) != rszbytes:
-                    raise MFRdWrExc(self.opname, self.filenum, self.rq, len(bytesread))
-                remaining_kb -= rszkb
-            os.close(fd)
-            self.op_endtime('read')
-
-            self.op_starttime()
-            os.unlink(fn)
-            self.op_endtime('delete')
-
     # unlike other ops, cleanup must always finish regardless of other threads
 
     def do_cleanup(self):
@@ -825,6 +807,8 @@ class smf_invocation:
             ensure_deleted(sym)
             basenm = self.mk_file_nm(self.src_dirs)
             fn = basenm
+            ensure_deleted(fn)
+            fn += self.rename_suffix
             ensure_deleted(fn)
             fn = self.mk_file_nm(self.dest_dirs)
             ensure_deleted(fn)
@@ -1071,21 +1055,21 @@ class Test(unittest.TestCase):
     def test_z1_create(self):
         self.cleanup_files()
         self.invok.filesize_distr = self.invok.filesize_distr_random_exponential
-        self.invok.invocations = 4
+        self.invok.invocations = 40
         self.invok.record_sz_kb = 0
         self.invok.total_sz_kb = 16
         self.runTest("create")
 
     def test_z2_append(self):
         self.invok.filesize_distr = self.invok.filesize_distr_random_exponential
-        self.invok.invocations = 4
+        self.invok.invocations = 40
         self.invok.record_sz_kb = 0
         self.invok.total_sz_kb = 16
         self.runTest("append")
 
     def test_z3_read(self):
         self.invok.filesize_distr = self.invok.filesize_distr_random_exponential
-        self.invok.invocations = 4
+        self.invok.invocations = 40
         self.invok.record_sz_kb = 0
         self.invok.total_sz_kb = 16
         self.runTest("read")
@@ -1097,8 +1081,6 @@ class Test(unittest.TestCase):
         self.invok.total_sz_kb = 64
         self.invok.filesize_distr = self.invok.filesize_distr_random_exponential
         self.runTest("all")
-        self.checkDirListEmpty(self.invok.dest_dirs)
-        self.checkDirListEmpty(self.invok.src_dirs)
         self.cleanup_files()
 
     def test_j0_dir_name(self):
