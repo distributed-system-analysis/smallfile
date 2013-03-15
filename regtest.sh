@@ -123,7 +123,7 @@ done
 
 pass1="$s --files 1000 --files-per-dir 20 --dirs-per-dir 3 --threads 4 --file-size 4 --record-size 16 --file-size 32  --response-times N --pause 1000"
 
-allops="cleanup create append read chmod stat setxattr getxattr symlink mkdir rmdir rename delete-renamed cleanup"
+allops="cleanup create append read chmod stat setxattr getxattr symlink mkdir rmdir rename delete-renamed swift-put swift-get cleanup"
 
 echo "******** testing non-distributed operations"
 for op in $allops ; do
