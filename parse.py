@@ -13,10 +13,15 @@ from smallfile import smf_invocation
 version = '1.9.11'
 
 def usage(msg):  # call if CLI syntax error or invalid parameter
+    opnames = '  --operation '
+    for op in smf_invocation.all_op_names:
+      opnames += op + '|'
+    opnames = opnames[:-1]
+
     print
     print 'ERROR: ' + msg
     print 'usage: smallfile_cli.py '
-    print '  --operation create|append|read|rename|delete|delete-renamed|symlink|mkdir|rmdir|stat|chmod|setxattr|getxattr'
+    print opnames
     print '  --top top-dir | top-dir1,top-dir2,...,top-dirN'
     print '  --host-set h1,h2,...,hN'
     print '  --network-sync-dir directory-path'
