@@ -10,7 +10,6 @@ Created on Apr 22, 2009
 # allow for multi-thread tests with stonewalling
 # we can launch any combination of these to simulate more complex workloads
 # possible enhancements: 
-#    do stonewalling based on I/O request count to get cluster iozone functionality
 #    embed parallel python and thread launching logic so we can have both
 #    CLI and GUI interfaces to same code
 #
@@ -35,7 +34,8 @@ import threading
 import socket
 import errno
 
-#OS_SEEK_END = 2 # required for python 2.4
+# unfortunately python 2.x does not come with extended attribute module, so we have to install it,
+# but we can at least throw an exception saying what's wrong
 
 xattr_not_installed = True
 try:
@@ -43,6 +43,8 @@ try:
   xattr_not_installed = False
 except ImportError as e:
   pass
+
+# Windows 2008 server seemed to have this environment variable, didn't check if it's universal
 
 is_windows_os = False
 if os.getenv("HOMEDRIVE"): is_windows_os = True
@@ -55,10 +57,6 @@ class MFRdWrExc(Exception):
         self.bytesrtnd = bytesrtnd_in
     def __str__(self):
         return "file " + str(self.filenum) + " request " + str(self.rqnum) + " byte count " + str(self.bytesrtnd) + ' ' + self.opname
-
-class MFNotImplYetExc(Exception):
-    def __str__(self):
-        return "not implemented yet"
 
 # avoid exception if file we wish to delete is not there
 
@@ -84,6 +82,9 @@ def ensure_dir_exists( dirpath ):
         if not os.path.isdir(dirpath):
             raise Exception("%s already exists and is not a directory!"%dirpath)
 
+# if this routine is passed an IP addr, it just accepts the whole thing
+# if it is passed a name of some sort, it only takes the short name and omits the DNS domain
+
 def short_hostname(h):
   if h == None: h = socket.gethostname()
   # if this is an IP address, don't split it
@@ -93,6 +94,8 @@ def short_hostname(h):
   except ValueError as e:
     return first_token
   return h
+
+# return the IP address of a hostname
 
 def hostaddr(h):
   if h == None: a = socket.gethostbyname(socket.gethostname())
@@ -104,13 +107,14 @@ def hostaddr(h):
 # FIXME: do we need a copy constructor?
 
 invocation_count = 0
+loggers = {}  # so we only instantiate logger for a given thread name once
 
 class smf_invocation:
     workloads = None  # will be filled in at bottom of class when all per-workload-type do_ functions are defined
     rename_suffix = ".rnm"
     separator = os.sep  # makes it portable to Windows
-    all_op_names = [ "create", "delete", "append", "read", "rename", "delete-renamed", "cleanup", "all", "symlink", "mkdir", "rmdir", "stat", "chmod", "setxattr", "getxattr" ]
-    #OK = 0
+    all_op_names = [ "create", "delete", "append", "read", "rename", "delete-renamed", "cleanup", "symlink", "mkdir", "rmdir", "stat", "chmod", "setxattr", "getxattr", "swift-get", "swift-put" ]
+    OK = 0
     NOTOK = 1
     BYTES_PER_KB = 1024  # bytes per kilobyte
     MICROSEC_PER_SEC = 1000000.0  
@@ -123,7 +127,7 @@ class smf_invocation:
     if tmp_dir == None: tmp_dir = "/var/tmp"  # assume POSIX-like
     some_prime = 900593
 
-    # build largest supported buffer, then
+    # build largest supported buffer, and fill it full of random hex digits, then
     # just use a substring of it below
     biggest_buf = ''
     biggest_buf_size_bits = 24
@@ -171,7 +175,6 @@ class smf_invocation:
         self.pause_sec = 0.0          # same as pause_between_files but in floating-point seconds
         self.onhost = short_hostname(None) # record which host the invocation ran on
         self.tid = ""                 # thread ID 
-        self.direct = 0               # set for direct I/O
         self.log_to_stderr = False    # set to true for debugging to screen
         self.verbose = False          # set this to true for debugging
          # for internal use only
@@ -215,7 +218,6 @@ class smf_invocation:
         new.onhost = s.onhost
         new.log_to_stderr = s.log_to_stderr
         new.verbose = s.verbose
-        new.direct = s.direct
         new.log_level = s.log_level
         new.log = None
         new.tid = None
@@ -248,7 +250,6 @@ class smf_invocation:
         s += " finish_all_rq=" + str(self.finish_all_rq)
         s += " rsp_times=" + str(self.measure_rsptimes)
         s += " tid="+self.tid
-        s += " direct=" + str(self.direct)
         s += " loglevel="+str(self.log_level)
         s += " filenum=" + str(self.filenum)
         s += " filenum_final=" + str(self.filenum_final)
@@ -274,7 +275,6 @@ class smf_invocation:
         self.filenum_final = 0 # how many files accessed when test ended
         self.rq = 0         # how many reads/writes have been attempted so far
         self.rq_final = 0  # how many reads/writes completed when test ended
-        #self.start_time = time.time()
         self.start_time = None
         self.end_time = None
         self.op_start_time = None;
@@ -297,20 +297,27 @@ class smf_invocation:
         if network_dir: self.network_dir = network_dir
 
     # create per-thread log file
+    # we have to avoid getting the logger for self.tid more than once, or else we'll
+    # add a handler more than once to this logger and cause duplicate log messages in per-invoke log file
 
     def start_log(self):
-        self.log = logging.getLogger(self.tid)
-        if self.log_to_stderr:
-          h = logging.StreamHandler()
-        else:
-          logfilename_base = self.tmp_dir + os.sep + "invoke_logs"
-          h = logging.FileHandler(logfilename_base + "-" + self.tid + ".log")
-        formatter = logging.Formatter(self.tid + " %(asctime)s - %(levelname)s - %(message)s")
-        h.setFormatter(formatter)
-        self.log.addHandler(h)
-        self.loglevel = logging.INFO
-        if self.verbose: self.loglevel = logging.DEBUG
-        self.log.setLevel(self.loglevel)
+        global loggers
+        try:
+          self.log = loggers[self.tid]
+        except KeyError as e:
+          self.log = logging.getLogger(self.tid)
+          loggers[self.tid] = self.log
+          if self.log_to_stderr:
+            h = logging.StreamHandler()
+          else:
+            logfilename_base = self.tmp_dir + os.sep + "invoke_logs"
+            h = logging.FileHandler(logfilename_base + "-" + self.tid + ".log")
+          formatter = logging.Formatter(self.tid + " %(asctime)s - %(levelname)s - %(message)s")
+          h.setFormatter(formatter)
+          self.log.addHandler(h)
+          self.loglevel = logging.INFO
+          if self.verbose: self.loglevel = logging.DEBUG
+          self.log.setLevel(self.loglevel)
 
     # indicate start of an operation
 
@@ -370,13 +377,13 @@ class smf_invocation:
       fn = self.gen_thread_ready_fname(self.tid, hostname=self.onhost) + '.seed'
       thread_seed = str(time.time())
       self.log.debug('seed opname: '+self.opname)
-      if self.opname == 'create':
+      if self.opname == 'create' or self.opname == 'swift-put':
           thread_seed = str(time.time()) + ' ' + self.tid
           ensure_deleted(fn)
           with open(fn, "w") as seedfile:
             seedfile.write(str(thread_seed))
             self.log.debug('write seed %s '%thread_seed)
-      elif self.opname == 'append' or self.opname == 'read':
+      elif self.opname == 'append' or self.opname == 'read' or self.opname == 'swift-get':
           with open(fn, "r") as seedfile:
             thread_seed = seedfile.readlines()[0].strip()
             self.log.debug('read seed %s '%thread_seed)
@@ -571,7 +578,7 @@ class smf_invocation:
             self.op_starttime()
             fd = -1
             try: 
-              fd = os.open( fn, os.O_CREAT|os.O_EXCL|os.O_WRONLY|self.direct )
+              fd = os.open( fn, os.O_CREAT|os.O_EXCL|os.O_WRONLY )
               if (fd < 0):
                 raise MFRdWrExc(self.opname, self.filenum, 0, 0)
               next_fsz = self.get_next_file_size()
@@ -672,7 +679,7 @@ class smf_invocation:
             fd = -1
             try:
               next_fsz = self.get_next_file_size()
-              fd = os.open(fn, os.O_WRONLY|self.direct)
+              fd = os.open(fn, os.O_WRONLY)
               os.lseek(fd, 0, os.SEEK_END )
               rszkb = self.record_sz_kb
               if rszkb == 0: rszkb = next_fsz
@@ -700,7 +707,7 @@ class smf_invocation:
             fd = -1
             try:
               next_fsz = self.get_next_file_size()
-              fd = os.open(fn, os.O_RDONLY|self.direct)
+              fd = os.open(fn, os.O_RDONLY)
               rszkb = self.record_sz_kb
               if rszkb == 0: rszkb = next_fsz
               self.prepare_buf()
@@ -749,31 +756,76 @@ class smf_invocation:
             os.unlink(fn)
             self.op_endtime(self.opname)
 
-    # for mixed workloads, do every single thing you can in a single operation
-    def do_all(self):
-        in_same_dir = (self.dest_dirs == self.src_dirs)
-        filename_list = []
+    # this operation tries to emulate a OpenStack Swift GET request behavior
+
+    def do_swift_get(self):
+        while self.do_another_file():
+          fn = self.mk_file_nm(self.dest_dirs)
+          self.log.debug('swift_get fn %s '%fn)
+          next_fsz = self.get_next_file_size()
+          self.op_starttime()
+          fd = os.open(fn, os.O_RDONLY)
+          rszkb = self.record_sz_kb
+          if rszkb == 0: rszkb = next_fsz
+          remaining_kb = next_fsz
+          self.prepare_buf()
+          remaining_kb = next_fsz
+          while remaining_kb > 0:
+                next_kb = min(rszkb, remaining_kb)
+                rszbytes = next_kb * self.BYTES_PER_KB
+                self.log.debug('swift_get fd %d next_fsz %u remain %u rszbytes %u '%(fd, next_fsz, remaining_kb, rszbytes))
+                bytesread = os.read(fd, rszbytes)
+                self.rq += 1
+                if len(bytesread) != rszbytes:
+                    raise MFRdWrExc(self.opname, self.filenum, self.rq, len(bytesread))
+                if self.verify_read:
+                  self.log.debug('swift_get bytesread %u'%len(bytesread))
+                  if self.buf[0:rszbytes] != bytesread:
+                    #print 'self.buf: ' + self.buf[0:rszbytes]
+                    #print 'bytesread: ' + bytesread
+                    raise MFRdWrExc('read: buffer contents wrong', self.filenum, self.rq, len(bytesread))
+                remaining_kb -= rszkb
+          os.close(fd)
+          self.op_endtime(self.opname)
+
+          self.op_starttime()
+          xa = xattr.xattr(fn)
+          for j in range(0, self.xattr_count):
+              try: 
+                v = xa.get('user.smallfile-all-%d'%j)
+              except IOError as e:
+                if e.errno != errno.ENODATA: raise e
+          self.op_endtime('swift-get-xattr')
+
+    # this operation type tries to emulate what a Swift PUT request does
+
+    def do_swift_put(self):
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
-            filename_list.append(fn)
             self.op_starttime()
             next_fsz = self.get_next_file_size()
-            fd = os.open(fn, os.O_WRONLY|os.O_CREAT|self.direct)
-            rszkb = self.record_sz_kb
-            if rszkb == 0: rszkb = next_fsz
-            remaining_kb = next_fsz
-            while remaining_kb > 0:
+            self.prepare_buf()
+            try:
+              fd = os.open(fn, os.O_WRONLY|os.O_CREAT)
+              rszkb = self.record_sz_kb
+              if rszkb == 0: rszkb = next_fsz
+              remaining_kb = next_fsz
+              while remaining_kb > 0:
+                self.rq += 1
                 if remaining_kb < rszkb: rszkb = remaining_kb
                 rszbytes = rszkb * self.BYTES_PER_KB
                 if rszkb != len(self.buf):
+                  #print 'swift put self.buf: ' + self.buf[0:rszbytes]
                   written = os.write(fd, self.buf[0:rszbytes])
                 else:
                   written = os.write(fd, self.buf)
-                self.rq += 1
                 if written != rszbytes:
+                    self.log.error('written byte count %u not correct byte count %u'%(written, rszbytes))
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, written)
                 remaining_kb -= rszkb
-            os.close(fd)
+            finally:
+              os.fsync(fd)
+              os.close(fd)
             self.op_endtime('create')
 
             self.op_starttime()
@@ -792,12 +844,12 @@ class smf_invocation:
             self.op_endtime('setxattr')
 
             self.op_starttime()
-            os.rename(fn, fn + self.rename_suffix)
-            fn = fn + self.rename_suffix
+            fn2 = self.mk_file_nm(self.dest_dirs)
+            os.rename(fn, fn2)
             self.op_endtime('rename')
 
             self.op_starttime()
-            os.chmod(fn, 0667)
+            os.chmod(fn2, 0667)
             self.op_endtime('chmod')
 
     # unlike other ops, cleanup must always finish regardless of other threads
@@ -881,7 +933,8 @@ class smf_invocation:
         'rename'        : do_rename, \
         'delete-renamed': do_delete_renamed, \
         'cleanup'       : do_cleanup, \
-        'all'           : do_all
+        'swift-put'     : do_swift_put, \
+        'swift-get'     : do_swift_get
         }
 
 # threads used to do multi-threaded unit testing
@@ -915,8 +968,6 @@ class Test(unittest.TestCase):
         self.invok.prefix = "p"
         self.invok.suffix = "s"
         self.invok.tid = "regtest"
-        self.invok.start_log()
-        self.invok.log.debug('Test.setup')
         self.deltree(self.invok.network_dir)
         ensure_dir_exists(self.invok.network_dir)
 
@@ -1079,13 +1130,20 @@ class Test(unittest.TestCase):
         self.invok.total_sz_kb = 16
         self.runTest("read")
 
-    def test_i_doall(self):
+    def test_i1_do_swift_put(self):
         self.cleanup_files()
         self.invok.invocations=10
         self.invok.record_sz_kb = 5
         self.invok.total_sz_kb = 64
         self.invok.filesize_distr = self.invok.filesize_distr_random_exponential
-        self.runTest("all")
+        self.runTest("swift-put")
+
+    def test_i2_do_swift_get(self):
+        self.invok.invocations=10
+        self.invok.record_sz_kb = 5
+        self.invok.total_sz_kb = 64
+        self.invok.filesize_distr = self.invok.filesize_distr_random_exponential
+        self.runTest("swift-get")
         self.cleanup_files()
 
     def test_j0_dir_name(self):
@@ -1122,7 +1180,6 @@ class Test(unittest.TestCase):
         self.cleanup_files()
 
     def test_multithr_stonewall(self):
-        self.invok.log.info('starting stonewall test')
         self.invok.stonewall = True
         self.invok.finish = True
         self.invok.prefix = "thr_"
