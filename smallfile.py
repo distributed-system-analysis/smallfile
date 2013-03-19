@@ -802,6 +802,7 @@ class smf_invocation:
     def do_swift_put(self):
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
+            topdir = self.top_dirs[0]
             self.op_starttime()
             next_fsz = self.get_next_file_size()
             self.prepare_buf()
@@ -851,6 +852,20 @@ class smf_invocation:
             self.op_starttime()
             os.chmod(fn2, 0667)
             self.op_endtime('chmod')
+
+            xa = xattr.xattr(topdir)
+            for j in range(0, self.xattr_count):
+              try: 
+                v = xa.get('user.smallfile-all-%d'%j)
+              except IOError as e:
+                if e.errno != errno.ENODATA: raise e
+            self.op_endtime('getxattr')
+
+            self.op_starttime()
+            xa = xattr.xattr(topdir)
+            for j in range(0, self.xattr_count):
+              xa.set('user.smallfile-all-%d'%j, self.buf[j:self.xattr_size+j])
+            self.op_endtime('setxattr')
 
     # unlike other ops, cleanup must always finish regardless of other threads
 
@@ -913,7 +928,8 @@ class smf_invocation:
         if self.filenum != self.iterations: self.log.info("stopped after " + str(self.filenum) + " files")
         if self.rq_final < 0: self.end_test()
         self.elapsed_time = self.end_time - self.start_time
-        logging.shutdown()
+        # this next call works fine with python 2.7 but not with python 2.6, why?
+        #logging.shutdown()
         return self.status
 
     # we look up the function for the workload type by workload name in this dictionary (hash table)
@@ -1200,6 +1216,7 @@ class Test(unittest.TestCase):
             invokeList.append(s)
         threadList=[]
         for s in invokeList: 
+            ensure_deleted(s.gen_thread_ready_fname(s.tid))
             threadList.append(TestThread(s, s.prefix + s.tid))
         for t in threadList: 
             t.start()

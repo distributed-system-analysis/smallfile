@@ -263,6 +263,9 @@ def run_workload():
   # if --host-set option is not used, then 
   # this is all that gets run
 
+  if (not prm_slave) and os.path.exists( master_invoke.network_dir ): 
+      shutil.rmtree( master_invoke.network_dir )
+
   # for each thread set up smf_invocation instance,
   # create a thread instance, and delete the thread-ready file 
 
@@ -277,6 +280,7 @@ def run_workload():
                              for d in nextinv.dest_dirs ]
     t = invoke_process.subprocess(nextinv)
     thread_list.append(t)
+    ensure_deleted(nextinv.gen_thread_ready_fname(nextinv.tid))
 
   starting_gate = thread_list[0].invoke.starting_gate
   my_host_invoke = thread_list[0].invoke
