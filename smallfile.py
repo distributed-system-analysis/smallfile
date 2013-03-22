@@ -113,7 +113,7 @@ class smf_invocation:
     workloads = None  # will be filled in at bottom of class when all per-workload-type do_ functions are defined
     rename_suffix = ".rnm"
     separator = os.sep  # makes it portable to Windows
-    all_op_names = [ "create", "delete", "append", "read", "rename", "delete-renamed", "cleanup", "symlink", "mkdir", "rmdir", "stat", "chmod", "setxattr", "getxattr", "swift-get", "swift-put" ]
+    all_op_names = [ "create", "delete", "append", "read", "readdir", "rename", "delete-renamed", "cleanup", "symlink", "mkdir", "rmdir", "stat", "chmod", "setxattr", "getxattr", "swift-get", "swift-put", "ls-l" ]
     OK = 0
     NOTOK = 1
     BYTES_PER_KB = 1024  # bytes per kilobyte
@@ -729,6 +729,38 @@ class smf_invocation:
               os.close(fd)
             self.op_endtime(self.opname)
 
+    def do_readdir(self):
+        if self.hash_to_dir:
+                raise Exception("cannot do readdir test with --hash-into-dirs option")
+        prev_dir = ''
+        while self.do_another_file():
+            fn = self.mk_file_nm(self.src_dirs)
+            dir = os.path.dirname(fn)
+            if dir != prev_dir: 
+                self.op_starttime()
+                dir_contents = os.listdir(dir)
+                self.op_endtime(self.opname)
+                prev_dir = dir
+
+    # this operation simulates a user doing "ls -lR" on a big directory tree
+    # eventually we'll be able to use readdirplus() system call?
+
+    def do_ls_l(self):
+        if self.hash_to_dir:
+                raise Exception("cannot do readdir test with --hash-into-dirs option")
+        prev_dir = ''
+        while self.do_another_file():
+            fn = self.mk_file_nm(self.src_dirs)
+            dir = os.path.dirname(fn)
+            if dir != prev_dir: 
+                self.op_starttime()
+                dir_contents = os.listdir(dir)
+                self.op_endtime(self.opname+'-readdir')
+                prev_dir = dir
+            self.op_starttime()
+            os.stat(fn)
+            self.op_endtime(self.opname+'-stat')
+
     def do_rename(self):
         in_same_dir = (self.dest_dirs == self.src_dirs)
         while self.do_another_file():
@@ -941,6 +973,8 @@ class smf_invocation:
         'symlink'       : do_symlink, \
         'mkdir'         : do_mkdir, \
         'rmdir'         : do_rmdir, \
+        'readdir'       : do_readdir, \
+        'ls-l'          : do_ls_l, \
         'stat'          : do_stat, \
         'getxattr'      : do_getxattr, \
         'setxattr'      : do_setxattr, \
@@ -1065,6 +1099,16 @@ class Test(unittest.TestCase):
         self.mk_files()
         self.runTest("stat")
 
+    def test_c44_Readdir(self):
+        self.cleanup_files()
+        self.mk_files()
+        self.runTest("readdir")
+
+    def test_c45_Ls_l(self):
+        self.cleanup_files()
+        self.mk_files()
+        self.runTest("ls-l")
+
     def test_c5_Chmod(self):
         self.cleanup_files()
         self.mk_files()
@@ -1133,6 +1177,7 @@ class Test(unittest.TestCase):
         self.invok.total_sz_kb = 16
         self.runTest("create")
 
+    # inherits files from the z1_create test
     def test_z2_append(self):
         self.invok.filesize_distr = self.invok.filesize_distr_random_exponential
         self.invok.invocations = 40
@@ -1140,6 +1185,7 @@ class Test(unittest.TestCase):
         self.invok.total_sz_kb = 16
         self.runTest("append")
 
+    # inherits files from the z1_create test
     def test_z3_read(self):
         self.invok.filesize_distr = self.invok.filesize_distr_random_exponential
         self.invok.invocations = 40
@@ -1155,6 +1201,7 @@ class Test(unittest.TestCase):
         self.invok.filesize_distr = self.invok.filesize_distr_random_exponential
         self.runTest("swift-put")
 
+    # inherits files from the i1_do_swift_put test
     def test_i2_do_swift_get(self):
         self.invok.invocations=10
         self.invok.record_sz_kb = 5

@@ -10,7 +10,7 @@ import os
 import smallfile
 from smallfile import smf_invocation
 
-version = '1.9.11'
+version = '1.9.12'
 
 def usage(msg):  # call if CLI syntax error or invalid parameter
     opnames = '  --operation '
