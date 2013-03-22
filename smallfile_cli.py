@@ -93,6 +93,7 @@ def run_workload():
 
     if os.path.exists( master_invoke.network_dir ): 
       shutil.rmtree( master_invoke.network_dir )
+      time.sleep(2)
     ensure_dir_exists( master_invoke.network_dir )
     remote_cmd += ' --slave Y '
     ssh_thread_list = []
@@ -105,7 +106,7 @@ def run_workload():
 	else:
 	  this_remote_cmd += ' --as-host %s'%n
         if verbose: print this_remote_cmd
-        pickle_fn = gen_host_result_filename(master_invoke)
+        pickle_fn = gen_host_result_filename(master_invoke, n)
         ensure_deleted(pickle_fn)
         ssh_thread_list.append(ssh_thread.ssh_thread(n, this_remote_cmd))
     time.sleep(2) # give other clients time to see changes

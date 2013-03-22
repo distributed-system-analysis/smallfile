@@ -185,6 +185,8 @@ def parse():
     elif prm == 'host-set': 
         prm_host_set = val.split(",")
         if len(prm_host_set) < 2: prm_host_set = val.strip().split()
+        if len(prm_host_set) == 0:
+            usage('host list must be non-empty when --host-set option used')
         pass_on_prm = ''
     elif prm == 'remote-pgm-dir': prm_remote_pgm_dir = val
     elif prm == 'network-sync-dir': prm_network_sync_dir = val

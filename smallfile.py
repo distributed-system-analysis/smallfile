@@ -360,7 +360,8 @@ class smf_invocation:
     # (i.e. it is ready to immediately begin generating workload)
 
     def gen_host_ready_fname(self, hostname=None):
-        return self.network_dir + os.sep + "host_ready." + self.onhost + ".tmp"
+        if not hostname: hostname = self.onhost
+        return self.network_dir + os.sep + "host_ready." + hostname + ".tmp"
 
     def abort_fn(self):
         return self.network_dir + os.sep + 'abort.tmp'
