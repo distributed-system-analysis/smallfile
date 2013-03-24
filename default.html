@@ -7,7 +7,7 @@
 	<META NAME="AUTHOR" CONTENT="anonymous">
 	<META NAME="CREATED" CONTENT="0;0">
 	<META NAME="CHANGEDBY" CONTENT="Ben England">
-	<META NAME="CHANGED" CONTENT="20130322;17102500">
+	<META NAME="CHANGED" CONTENT="20130324;17155100">
 	<META NAME="category-departments" CONTENT="Engineering">
 	<META NAME="category-keywords" CONTENT="filesystem">
 	<META NAME="category-offices" CONTENT="Westford, MA">
@@ -192,13 +192,14 @@
 						<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">cleanup
 						-- delete any pre-existing files from a previous run 
 						</P>
-						<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">all
-						-- create, append, read, rename and delete each file. 
+						<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">swift-put
+						– simulates OpenStack Swift behavior when doing PUT operation</P>
+						<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">swift-get
+						– simulates OpenStack Swift behavior for each GET operation. 
 						</P>
 					</UL>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--files</B>
-					-- how many files should each thread process?&nbsp; 
-					</P>
+					-- how many files should each thread process?&nbsp;</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--threads</B>
 					-- how many workload generator threads should each
 					invocation_cli process create? 
@@ -208,44 +209,41 @@
 					no reads or writes are performed. 
 					</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">-<B>-file-size-distribution</B>
-					– only supported value today is <B>exponential</B>, default
-					value is fixed file size.</P>
+					– only supported value today is <B>exponential.  </B><SPAN STYLE="font-weight: normal">Default:
+					</SPAN> fixed file size.</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--record-size</B>
 					-- record size in KB, how much data is transferred in a single
 					read or write system call.&nbsp; If 0 then it is set to the file
-					size. 
-					</P>
+					size.  Default: 0</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--top</B>
 					-- top-level directory, all file accesses are done inside this
 					directory tree. If you wish to use multiple mountpoints,provide
 					a list of top-level directories separated by comma (no
 					whitespace).</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--host-set</B>
-					-- comma-separated set of hosts used for this test (default is
-					current host name), no domain names allowed 
-					</P>
+					-- comma-separated set of hosts used for this test, no domain
+					names allowed.  Default: non-distributed test.</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--files-per-dir</B>
-					-- maximum number of files contained in any one directory 
-					</P>
+					-- maximum number of files contained in any one directory. 
+					Default: 200</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--dirs-per-dir</B>
 					-- maximum number of subdirectories contained in any one
-					directory 
-					</P>
+					directory. Default: 20</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--hash-into-dirs</B>
-					– default N, if Y then assign next file to a directory using a
-					hash function, otherwise assign next –files-per-dir files to
-					next directory</P>
+					– if Y then assign next file to a directory using a hash
+					function, otherwise assign next –files-per-dir files to next
+					directory.  Default: N</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--permute-host-dirs</B>
-					– default N, if Y then have each host process a different
-					subdirectory tree than it otherwise would (see below for
-					directory tree structure).</P>
+					–  if Y then have each host process a different subdirectory
+					tree than it otherwise would (see below for directory tree
+					structure).  Default: N</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">-<B>-same-dir</B>
-					-- boolean, default N, if Y then threads will share a single
-					directory</P>
+					-- if Y then threads will share a single directory.  Default: N</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--network-sync-dir</B>
 					– don't need to specify unless you run a multi-host test and
-					the –top parameter points to a non-shared directory (see
-					discussion below)</P>
+					the <B>–top</B> parameter points to a non-shared directory
+					(see discussion below).  Default: <B>network_shared</B>
+					subdirectory under <B>–top</B> dir.</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--xattr-size</B>
 					-- size of extended attribute value in bytes (names begin with
 					'user.smallfile-') 
@@ -262,23 +260,19 @@
 					with previous runs for example) 
 					</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--finish</B>
-					-- boolean, default Y, if Y, thread will complete all requested
-					file operations even if measurement has finished 
-					</P>
+					-- if Y, thread will complete all requested file operations even
+					if measurement has finished.  Default: Y</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--stonewall</B>
-					-- boolean, default Y, if Y then thread will measure throughput
-					as soon as it detects that another thread has finished 
-					</P>
+					-- if Y then thread will measure throughput as soon as it
+					detects that another thread has finished.  Default: N</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--remote-pgm-dir
 					</B>– don't need to specify this unless the smallfile software
 					lives in a different directory on the target hosts and the
 					test-driver host. 
 					</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--pause
-					</B>-- integer (microseconds), default 0, if non-zero each
-					thread will delay for this many microseconds before starting
-					next file 
-					</P>
+					</B>-- integer (microseconds) each thread will wait before
+					starting next file.  Default: 0</P>
 				</UL>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
 				</P>
@@ -286,9 +280,9 @@
 				example, if you want to run <STRONG>smallfile_cli.py</STRONG> on
 				1 host with 8 threads each creating 2 GB of 1-MB files, you can
 				use these options:</P>
-				<PRE CLASS="western" STYLE="margin-bottom: 0.2in; border: none; padding: 0in"><STRONG> </STRONG><STRONG><FONT SIZE=3># python smallfile_cli.py --operation create --threads 8 --file-size 1024 --files 2097 --top /mnt/gfs/smf</FONT></STRONG></PRE><P STYLE="margin-bottom: 0in; border: none; padding: 0in">
+				<PRE CLASS="western" STYLE="margin-bottom: 0.2in; border: none; padding: 0in"><STRONG> </STRONG><STRONG><FONT SIZE=3># python smallfile_cli.py --operation create --threads 8 --file-size 1024 --files 2048 --top /mnt/gfs/smf</FONT></STRONG></PRE><P STYLE="margin-bottom: 0in; border: none; padding: 0in">
 				To run a 4-host test doing same thing:</P>
-				<PRE CLASS="western" STYLE="border: none; padding: 0in"><STRONG> </STRONG><STRONG><FONT SIZE=3># python smallfile_cli.py --operation create --threads 8 --file-size 1024 --files 2097 --top /mnt/gfs/smf \</FONT></STRONG>
+				<PRE CLASS="western" STYLE="border: none; padding: 0in"><STRONG> </STRONG><STRONG><FONT SIZE=3># python smallfile_cli.py --operation create --threads 8 --file-size 1024 --files 2048 --top /mnt/gfs/smf \</FONT></STRONG>
 <STRONG>     </STRONG><STRONG><FONT SIZE=3>--host-set host1,host2,host3,host4</FONT></STRONG> </PRE><P STYLE="margin-bottom: 0in; border: none; padding: 0in">
 				Errors encountered by worker threads will be saved in
 				<B>/var/tmp/invoke-N.log</B> where <B>N</B> is the thread number.
@@ -389,7 +383,7 @@
 				useful for testing NFS, etc.</P>
 				<P>Note that the test harness does not have to scan the
 				directories to figure out which files to read or write – it
-				simply generates the filename sequence itself.  If you want to
+				simply generates the filename sequence itself. If you want to
 				test directory scanning speed, use <B>readdir</B> or <B>ls-l</B>
 				operations. 
 				</P>
@@ -445,10 +439,10 @@
 				approximate that behavior. If you specify </FONT>
 				</P>
 				<P STYLE="margin-left: 0.79in; margin-bottom: 0.2in">–<FONT FACE="Courier 10 Pitch"><FONT SIZE=2 STYLE="font-size: 11pt">file-size-distribution
-				</FONT></FONT><FONT FACE="Courier 10 Pitch"><FONT SIZE=2 STYLE="font-size: 11pt"><B>exponential</B></FONT></FONT><FONT FACE="Courier 10 Pitch"><FONT SIZE=2 STYLE="font-size: 11pt">
-				–file-size </FONT></FONT><FONT FACE="Courier 10 Pitch"><FONT SIZE=2 STYLE="font-size: 11pt"><B>S</B></FONT></FONT><FONT FACE="Courier 10 Pitch"><FONT SIZE=2 STYLE="font-size: 11pt">
-				</FONT></FONT>
-				</P>
+				</FONT></FONT><FONT FACE="Courier 10 Pitch"><FONT SIZE=2 STYLE="font-size: 11pt"><B>exponential</B></FONT></FONT>
+				–<FONT FACE="Courier 10 Pitch"><FONT SIZE=2 STYLE="font-size: 11pt">file-size
+				</FONT></FONT><FONT FACE="Courier 10 Pitch"><FONT SIZE=2 STYLE="font-size: 11pt"><B>S</B></FONT></FONT>
+								</P>
 				<P STYLE="margin-bottom: 0.2in"><FONT SIZE=2 STYLE="font-size: 11pt">The
 				meaning of the –<B>file-size</B> parameter changes to the
 				<I>maximum</I> file size (<B>S</B> KB), and the mean file size
