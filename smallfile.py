@@ -156,7 +156,7 @@ class smf_invocation:
         top = os.path.join(self.tmp_dir, 'smf')
         self.set_top([top])
         self.starting_gate = None     # file that tells thread when to start running
-        self.record_sz_kb = 8         # record size in KB
+        self.record_sz_kb = 0         # record size in KB, 0 means default to file size
         self.total_sz_kb = 64         # total data read/written in KB
         self.filesize_distr = self.filesize_distr_fixed  # original behavior, all files have same size
         self.files_per_dir = 1000       # determines how many directories to use

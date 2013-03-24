@@ -96,7 +96,6 @@ def parse():
   inv.files_per_dir = 200
   inv.dirs_per_dir = 20
   inv.log_to_stderr = False
-  inv.opname = 'create'
   inv.pause_between_files = 0
   inv.verify_read = True
   inv.stonewall = True
