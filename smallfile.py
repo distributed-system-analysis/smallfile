@@ -152,18 +152,18 @@ class smf_invocation:
         # operation types
         self.is_shared_dir = False    # True if all threads share same directory
         self.opname = "cleanup"       # what kind of file access, default is an idempotent operation
-        self.iterations = 1           # how many files to access
+        self.iterations = 200           # how many files to access
         top = os.path.join(self.tmp_dir, 'smf')
         self.set_top([top])
         self.starting_gate = None     # file that tells thread when to start running
         self.record_sz_kb = 0         # record size in KB, 0 means default to file size
         self.total_sz_kb = 64         # total data read/written in KB
         self.filesize_distr = self.filesize_distr_fixed  # original behavior, all files have same size
-        self.files_per_dir = 1000       # determines how many directories to use
-        self.dirs_per_dir = 100         # fanout if multiple levels of directories are needed, 
+        self.files_per_dir = 100       # determines how many directories to use
+        self.dirs_per_dir = 10         # fanout if multiple levels of directories are needed, 
         self.xattr_size = 128         # size of extended attribute to read/write
-        self.xattr_count = 1          # number of extended attribute to read/write
-        self.files_between_checks = 8 # number of files between stonewalling check
+        self.xattr_count = 2          # number of extended attribute to read/write
+        self.files_between_checks = 20 # number of files between stonewalling check
         self.prefix = ""              # prepend this to file name
         self.suffix = ""              # append this to file name
         self.hash_to_dir = False      # controls whether directories are accessed sequentially or randomly
