@@ -416,7 +416,7 @@ class smf_invocation:
             while not os.path.exists(self.starting_gate):
                 if os.path.exists(self.abort_fn()): raise Exception("thread " + str(self.tid) + " saw abort flag")
                 # wait a little longer so that other clients have time to see that gate exists
-                time.sleep(2.0)
+                time.sleep(1.0)
 
     # record info needed to compute test statistics 
 
@@ -1281,7 +1281,6 @@ class Test(unittest.TestCase):
               break
             time.sleep(1)
         if not threads_ready: raise Exception("threads did not show up within %d seconds"%thread_ready_timeout)
-        time.sleep(1)
         f = open(sgate_file, "w")
         f.close()
         for t in threadList: 
