@@ -121,7 +121,7 @@ for j in `seq 1 $expect_ct` ; do
   assertok $?
 done
 
-pass1="$s --files 1000 --files-per-dir 20 --dirs-per-dir 3 --threads 4 --file-size 4 --record-size 16 --file-size 32  --response-times N --pause 1000"
+pass1="$s --files 100 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --response-times N --pause 1000"
 
 allops="cleanup create append read readdir ls-l chmod stat setxattr getxattr symlink mkdir rmdir rename delete-renamed swift-put swift-get cleanup"
 
