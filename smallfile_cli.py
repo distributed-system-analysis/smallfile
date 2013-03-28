@@ -109,7 +109,6 @@ def run_workload():
         pickle_fn = gen_host_result_filename(master_invoke, n)
         ensure_deleted(pickle_fn)
         ssh_thread_list.append(ssh_thread.ssh_thread(n, this_remote_cmd))
-    time.sleep(2) # give other clients time to see changes
 
     # start them, pacing starts so that we don't get ssh errors
 
@@ -124,7 +123,7 @@ def run_workload():
     hosts_ready = False  # set scope outside while loop
     last_host_seen=-1
     sec = 0
-    sec_delta = 1
+    sec_delta = 0.5
     while sec < host_startup_timeout:
       hosts_ready = True
       for j in range(last_host_seen+1, len(prm_host_set)-1):
@@ -174,7 +173,7 @@ def run_workload():
         if t.status != OK: 
           all_ok = False
           print 'ERROR: ssh thread for host %s completed with status %d'%(t.remote_host, t.status)
-    time.sleep(5) # give response files time to propagate to this host
+    time.sleep(2) # give response files time to propagate to this host
 
     # attempt to aggregate results by reading pickle files
     # containing smf_invocation instances with counters and times that we need
@@ -296,7 +295,6 @@ def run_workload():
     ensure_dir_exists( master_invoke.network_dir )
   for t in thread_list:
     ensure_deleted(t.invoke.gen_thread_ready_fname(t.invoke.tid))
-  time.sleep(1)
 
   for t in thread_list:
     t.start()
@@ -307,7 +305,7 @@ def run_workload():
 
   threads_ready = False  # really just to set scope of variable
   k=0
-  for sec in range(0, startup_timeout):
+  for sec in range(0, startup_timeout*2):
     threads_ready = True
     for t in thread_list:
         fn = t.invoke.gen_thread_ready_fname(t.invoke.tid)
@@ -327,7 +325,6 @@ def run_workload():
 
   with open(my_host_invoke.gen_host_ready_fname(), "w+") as f:
     f.close()
-  time.sleep(1)
 
   sg = my_host_invoke.starting_gate
   if not prm_slave:
@@ -342,10 +339,10 @@ def run_workload():
   
   if prm_slave:
     if prm_host_set == None: prm_host_set = [ host ]
-    for sec in range(0, host_startup_timeout):
+    for sec in range(0, host_startup_timeout*2):
       if os.path.exists(sg):
         break
-      time.sleep(1)
+      time.sleep(0.5)
     if not os.path.exists(sg):
       abort_test(my_host_invoke.abort_fn(), thread_list)
       raise Exception('starting signal not seen within %d seconds'%host_startup_timeout)
@@ -425,9 +422,9 @@ def run_workload():
         invok_list.append(t.invoke)
     pickle.dump(invok_list, result_file)
     result_file.flush()
-    time.sleep(2)
     os.fsync(result_file.fileno())  # have to do this or reader may not see data
     result_file.close()
+    time.sleep(1.2)
 
   sys.exit(exit_status)
 
