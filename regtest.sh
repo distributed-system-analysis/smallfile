@@ -41,6 +41,11 @@ echo "running invoke_process.py unit test"
 python invoke_process.py
 assertok $?
 
+# run drop_buffer_cache.py unit test
+echo "running drop_buffer_cache.py unit test"
+python drop_buffer_cache.py
+assertok $?
+
 # test parsing
 
 echo "testing parsing"
@@ -121,7 +126,7 @@ for j in `seq 1 $expect_ct` ; do
   assertok $?
 done
 
-pass1="$s --files 100 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --response-times N --pause 1000"
+pass1="$s --files 100 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --response-times N --pause 1000 --xattr-count 9 --xattr-size 253"
 
 allops="cleanup create append read readdir ls-l chmod stat setxattr getxattr symlink mkdir rmdir rename delete-renamed swift-put swift-get cleanup"
 
