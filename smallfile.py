@@ -44,6 +44,14 @@ try:
 except ImportError as e:
   pass
 
+fadvise_installed = False
+try:
+  import drop_buffer_cache
+  fadvise_installed = True
+except ImportError as e:
+  pass
+
+
 # Windows 2008 server seemed to have this environment variable, didn't check if it's universal
 
 is_windows_os = False
@@ -161,12 +169,13 @@ class smf_invocation:
         self.filesize_distr = self.filesize_distr_fixed  # original behavior, all files have same size
         self.files_per_dir = 100       # determines how many directories to use
         self.dirs_per_dir = 10         # fanout if multiple levels of directories are needed, 
-        self.xattr_size = 128         # size of extended attribute to read/write
-        self.xattr_count = 2          # number of extended attribute to read/write
+        self.xattr_size = 0           # size of extended attribute to read/write
+        self.xattr_count = 0          # number of extended attribute to read/write
         self.files_between_checks = 20 # number of files between stonewalling check
         self.prefix = ""              # prepend this to file name
         self.suffix = ""              # append this to file name
         self.hash_to_dir = False      # controls whether directories are accessed sequentially or randomly
+        self.fsync = False            # controls whether an fsync is issued after a file is modified (write or setxattr)
         self.stonewall = True         # if so, end test as soon as any thread finishes
         self.finish_all_rq = True     # if so, finish remaining requests after test ends
         self.measure_rsptimes = False # if so, append operation response times to .rsptimes
@@ -210,6 +219,7 @@ class smf_invocation:
         new.prefix = s.prefix
         new.suffix = s.suffix
         new.hash_to_dir = s.hash_to_dir
+        new.fsync = s.fsync
         new.stonewall = s.stonewall
         new.finish_all_rq = s.finish_all_rq
         new.measure_rsptimes = s.measure_rsptimes
@@ -516,18 +526,26 @@ class smf_invocation:
     # allocate buffer of correct size
 
     def prepare_buf(self):
-        if self.record_sz_kb * 1024 > smf_invocation.biggest_buf_size:
-          raise Exception('biggest supported record size is %d bytes'%smf_invocation.biggest_buf_size)
+        total_space = self.record_sz_kb
         if self.record_sz_kb == 0:
-            rsz = self.total_sz_kb * self.random_size_limit * 1024
-        else:
-            rsz = self.record_sz_kb * 1024
-        if rsz > self.biggest_buf_size:
-            raise Exception('record size too big for buffer')
+            if self.filesize_distr != self.filesize_distr_fixed:
+                total_space = self.total_sz_kb * self.random_size_limit  # 
+            else:
+                total_space = self.total_sz_kb
+        total_space *= self.BYTES_PER_KB
+
+        # make sure that pre-allocated pre-initialized buffer space is enough to support xattr ops
+
+        total_xattr_space = self.xattr_size + self.xattr_count   # use +, not *, see way buffers are used
+        if total_xattr_space > total_space: total_space = total_xattr_space
+
         unique_offset = hash(self.tid)%128 + self.filenum  # FIXME: think harder about this
-        assert unique_offset + rsz < len(self.biggest_buf) # so next array access is valid
-        self.buf = self.biggest_buf[ unique_offset : rsz + unique_offset ]
-        assert len(self.buf) == rsz
+
+        if total_space + unique_offset > smf_invocation.biggest_buf_size:
+          raise Exception('biggest supported buffer size is %d bytes'%smf_invocation.biggest_buf_size)
+
+        self.buf = self.biggest_buf[ unique_offset : total_space + unique_offset ]
+        # assert len(self.buf) == total_space
         
     # make all subdirectories needed for test in advance, don't include in measurement
     # use set to avoid duplicating operations on directories
@@ -600,7 +618,9 @@ class smf_invocation:
                 self.rq += 1
                 remaining_kb -= (rszbytes/self.BYTES_PER_KB)
             finally:
-              if fd >= 0: os.close(fd)
+              if fd >= 0: 
+                if self.fsync: os.fsync(fd)
+                os.close(fd)
             self.op_endtime(self.opname)
 
     def do_mkdir(self):
@@ -650,13 +670,13 @@ class smf_invocation:
     def do_getxattr(self):
         if xattr_not_installed:
             raise Exception('xattr module not present, getxattr and setxattr operations will not work')
+
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
             self.op_starttime()
             self.prepare_buf()
-            xa = xattr.xattr(fn)
             for j in range(0, self.xattr_count):
-              v = xa.get('user.smallfile-%d'%j)
+              v = xattr.get(fn, 'user.smallfile-%d'%j)
               if self.buf[j:self.xattr_size+j] != v:
                 raise MFRdWrExc('getxattr: value contents wrong', self.filenum, j, len(v))
             self.op_endtime(self.opname)
@@ -664,13 +684,17 @@ class smf_invocation:
     def do_setxattr(self):
         if xattr_not_installed:
             raise Exception('xattr module not present, getxattr and setxattr operations will not work')
+
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
-            self.op_starttime()
             self.prepare_buf()
-            xa = xattr.xattr(fn)
+            self.op_starttime()
+            fd = os.open(fn, os.O_WRONLY)
             for j in range(0, self.xattr_count):
-              xa.set('user.smallfile-%d'%j, self.buf[j:self.xattr_size+j])
+              # make sure each xattr has a unique value
+              xattr.set(fd, 'user.smallfile-%d'%j, self.buf[j:self.xattr_size+j])
+            if self.fsync: os.fsync(fd)  # fsync also flushes extended attribute values and metadata
+            os.close(fd)
             self.op_endtime(self.opname)
 
     def do_append(self):
@@ -698,7 +722,9 @@ class smf_invocation:
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, written)
                 remaining_kb -= (rszbytes/self.BYTES_PER_KB)
             finally:
-              if fd >= 0: os.close(fd)
+              if fd >= 0: 
+                if self.fsync: os.fsync(fd)
+                os.close(fd)
             self.op_endtime(self.opname)
                 
     def do_read(self):
@@ -792,8 +818,11 @@ class smf_invocation:
     # this operation tries to emulate a OpenStack Swift GET request behavior
 
     def do_swift_get(self):
+        if xattr_not_installed:
+            raise Exception('xattr module not present, getxattr and setxattr operations will not work')
+
         while self.do_another_file():
-          fn = self.mk_file_nm(self.dest_dirs)
+          fn = self.mk_file_nm(self.src_dirs)
           self.log.debug('swift_get fn %s '%fn)
           next_fsz = self.get_next_file_size()
           self.op_starttime()
@@ -803,7 +832,8 @@ class smf_invocation:
           remaining_kb = next_fsz
           self.prepare_buf()
           remaining_kb = next_fsz
-          while remaining_kb > 0:
+          try:
+            while remaining_kb > 0:
                 next_kb = min(rszkb, remaining_kb)
                 rszbytes = next_kb * self.BYTES_PER_KB
                 self.log.debug('swift_get fd %d next_fsz %u remain %u rszbytes %u '%(fd, next_fsz, remaining_kb, rszbytes))
@@ -818,29 +848,32 @@ class smf_invocation:
                     #print 'bytesread: ' + bytesread
                     raise MFRdWrExc('read: buffer contents wrong', self.filenum, self.rq, len(bytesread))
                 remaining_kb -= rszkb
-          os.close(fd)
-          self.op_endtime(self.opname)
-
-          self.op_starttime()
-          xa = xattr.xattr(fn)
-          for j in range(0, self.xattr_count):
+            for j in range(0, self.xattr_count):
               try: 
-                v = xa.get('user.smallfile-all-%d'%j)
+                v = xattr.get(fd, 'user.smallfile-all-%d'%j)
               except IOError as e:
                 if e.errno != errno.ENODATA: raise e
-          self.op_endtime('swift-get-xattr')
+          finally:
+            os.close(fd)
+          self.op_endtime(self.opname)
 
     # this operation type tries to emulate what a Swift PUT request does
 
     def do_swift_put(self):
+        if xattr_not_installed:
+            raise Exception('xattr module not present, getxattr and setxattr operations will not work')
+
         while self.do_another_file():
-            fn = self.mk_file_nm(self.src_dirs)
+            fn = self.mk_file_nm(self.src_dirs) + '.tmp'
             topdir = self.top_dirs[0]
             self.op_starttime()
             next_fsz = self.get_next_file_size()
             self.prepare_buf()
             try:
               fd = os.open(fn, os.O_WRONLY|os.O_CREAT)
+              os.fchmod(fd, 0667)
+              fszbytes = next_fsz * self.BYTES_PER_KB
+              os.ftruncate(fd, fszbytes)
               rszkb = self.record_sz_kb
               if rszkb == 0: rszkb = next_fsz
               remaining_kb = next_fsz
@@ -857,48 +890,27 @@ class smf_invocation:
                     self.log.error('written byte count %u not correct byte count %u'%(written, rszbytes))
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, written)
                 remaining_kb -= rszkb
+              for j in range(0, self.xattr_count):
+                  try: 
+                    v = xattr.get(fd, 'user.smallfile-all-%d'%j)
+                  except IOError as e:
+                    if e.errno != errno.ENODATA: raise e
+            except Exception as e:
+              ensure_deleted(fn)
+              print 'exception on %s'%fn
             finally:
-              os.fsync(fd)
+              for j in range(0, self.xattr_count):
+                  xattr.set(fd, 'user.smallfile-all-%d'%j, self.buf[j:self.xattr_size+j])
+              if self.fsync: os.fsync(fd)  # want to flush both data and metadata with one fsync
+              if fadvise_installed:
+                 drop_buffer_cache.drop_buffer_cache(fd, 0, fszbytes)  # we assume here data will not be read anytime soon
               os.close(fd)
             self.op_endtime('create')
 
             self.op_starttime()
-            xa = xattr.xattr(fn)
-            for j in range(0, self.xattr_count):
-              try: 
-                v = xa.get('user.smallfile-all-%d'%j)
-              except IOError as e:
-                if e.errno != errno.ENODATA: raise e
-            self.op_endtime('getxattr')
-
-            self.op_starttime()
-            xa = xattr.xattr(fn)
-            for j in range(0, self.xattr_count):
-              xa.set('user.smallfile-all-%d'%j, self.buf[j:self.xattr_size+j])
-            self.op_endtime('setxattr')
-
-            self.op_starttime()
-            fn2 = self.mk_file_nm(self.dest_dirs)
+            fn2 = self.mk_file_nm(self.src_dirs)
             os.rename(fn, fn2)
             self.op_endtime('rename')
-
-            self.op_starttime()
-            os.chmod(fn2, 0667)
-            self.op_endtime('chmod')
-
-            xa = xattr.xattr(topdir)
-            for j in range(0, self.xattr_count):
-              try: 
-                v = xa.get('user.smallfile-all-%d'%j)
-              except IOError as e:
-                if e.errno != errno.ENODATA: raise e
-            self.op_endtime('getxattr')
-
-            self.op_starttime()
-            xa = xattr.xattr(topdir)
-            for j in range(0, self.xattr_count):
-              xa.set('user.smallfile-all-%d'%j, self.buf[j:self.xattr_size+j])
-            self.op_endtime('setxattr')
 
     # unlike other ops, cleanup must always finish regardless of other threads
 
@@ -1051,7 +1063,7 @@ class Test(unittest.TestCase):
         self.cleanup_files()
         self.runTest("create")
         self.assertTrue(exists(self.invok.mk_file_nm(self.invok.src_dirs)))
-        assert (os.path.getsize(self.invok.mk_file_nm(self.invok.src_dirs)) == self.invok.total_sz_kb * 1024)
+        assert (os.path.getsize(self.invok.mk_file_nm(self.invok.src_dirs)) == self.invok.total_sz_kb * self.invok.BYTES_PER_KB)
 
     def test1_recreate_src_dest_dirs(self):
         for s in self.invok.src_dirs:
@@ -1118,6 +1130,9 @@ class Test(unittest.TestCase):
         if not xattr_not_installed:
           self.cleanup_files()
           self.mk_files()
+          self.fsync = True
+          self.xattr_size = 256
+          self.xattr_count = 10
           self.runTest("setxattr")
           self.runTest("getxattr")
 
@@ -1198,6 +1213,8 @@ class Test(unittest.TestCase):
         self.invok.invocations=10
         self.invok.record_sz_kb = 5
         self.invok.total_sz_kb = 64
+        self.xattr_size = 128
+        self.xattr_count = 2
         self.invok.filesize_distr = self.invok.filesize_distr_random_exponential
         self.runTest("swift-put")
 
@@ -1206,6 +1223,8 @@ class Test(unittest.TestCase):
         self.invok.invocations=10
         self.invok.record_sz_kb = 5
         self.invok.total_sz_kb = 64
+        self.xattr_size = 128
+        self.xattr_count = 2
         self.invok.filesize_distr = self.invok.filesize_distr_random_exponential
         self.runTest("swift-get")
         self.cleanup_files()
