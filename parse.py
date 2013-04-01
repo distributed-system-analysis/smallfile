@@ -44,6 +44,7 @@ def usage(msg):  # call if CLI syntax error or invalid parameter
     print '  --file-size non-negative-integer-KB              (default: %d)'%dflts.total_sz_kb
     print '  --prefix alphanumeric-string'
     print '  --suffix alphanumeric-string'
+    print '  --fsync Y|N                                      (default: %s)'%bool2YN(dflts.fsync)
     print '  --finish Y|N                                     (default: %s)'%bool2YN(dflts.finish_all_rq)
     print '  --verify-read Y|N                                (default: %s)'%bool2YN(dflts.verify_read)
     print '  --response-times Y|N                             (default: %s)'%bool2YN(dflts.measure_rsptimes)
@@ -163,6 +164,7 @@ def parse():
         inv.pause_between_files = int(val)
     elif prm == 'stonewall': inv.stonewall = str2bool(val, rawprm)
     elif prm == 'finish': inv.finish_all_rq = str2bool(val, rawprm)
+    elif prm == 'fsync': inv.fsync = str2bool(val, rawprm)
     elif prm == 'permute-host-dirs': 
         prm_permute_host_dirs = str2bool(val, rawprm)
         pass_on_prm = ''
@@ -239,6 +241,7 @@ def parse():
              ('filename prefix', inv.prefix), \
              ('filename suffix', inv.suffix), \
              ('hash file number into dir.?', bool2YN(inv.hash_to_dir)), \
+             ('fsync after modify?', bool2YN(inv.fsync)), \
              ('pause between files (microsec)', '%d'%inv.pause_between_files), \
              ('finish all requests?', '%s'%bool2YN(inv.finish_all_rq)), \
              ('stonewall?', '%s'%bool2YN(inv.stonewall)), \
@@ -246,7 +249,7 @@ def parse():
              ('verify read?', '%s'%bool2YN(inv.verify_read)), \
              ('verbose?', inv.verbose), \
              ('log to stderr?', inv.log_to_stderr) ]
-  if (not smallfile.xattr_not_installed) and (inv.opname == 'setxattr' or inv.opname == 'getxattr'):
+  if (not smallfile.xattr_not_installed):
     prm_list.extend( [ ('ext.attr.size', '%d'%inv.xattr_size), ('ext.attr.count', '%d'%inv.xattr_count) ] )
   if prm_host_set:
     prm_list.extend( [ \
