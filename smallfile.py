@@ -51,6 +51,12 @@ try:
 except ImportError as e:
   pass
 
+fallocate_installed = False
+try:
+  import fallocate  # not yet in python os module
+  fallocate_installed = True
+except ImportError as e:
+  pass
 
 # Windows 2008 server seemed to have this environment variable, didn't check if it's universal
 
@@ -860,20 +866,23 @@ class smf_invocation:
     # this operation type tries to emulate what a Swift PUT request does
 
     def do_swift_put(self):
-        if xattr_not_installed:
-            raise Exception('xattr module not present, getxattr and setxattr operations will not work')
+        if xattr_not_installed or (not fallocate_installed) or (not fadvise_installed):
+            raise Exception('one of necessary modules not present or not working')
 
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs) + '.tmp'
             topdir = self.top_dirs[0]
-            self.op_starttime()
             next_fsz = self.get_next_file_size()
             self.prepare_buf()
+            self.op_starttime()
             try:
               fd = os.open(fn, os.O_WRONLY|os.O_CREAT)
               os.fchmod(fd, 0667)
               fszbytes = next_fsz * self.BYTES_PER_KB
-              os.ftruncate(fd, fszbytes)
+              #os.ftruncate(fd, fszbytes)
+              #ret = fallocate.fallocate(fd, 0, 0, fszbytes)
+              #if ret != self.OK:
+              #  raise Exception('fallocate call failed with return %d'%ret)
               rszkb = self.record_sz_kb
               if rszkb == 0: rszkb = next_fsz
               remaining_kb = next_fsz
@@ -895,22 +904,28 @@ class smf_invocation:
                     v = xattr.get(fd, 'user.smallfile-all-%d'%j)
                   except IOError as e:
                     if e.errno != errno.ENODATA: raise e
-            except Exception as e:
-              ensure_deleted(fn)
-              print 'exception on %s'%fn
-            finally:
               for j in range(0, self.xattr_count):
                   xattr.set(fd, 'user.smallfile-all-%d'%j, self.buf[j:self.xattr_size+j])
+              # alternative to ftruncate/fallocate is close then open to prevent preallocation
+              # since in theory close wipes out the preallocation and 
+              # fsync on re-opened file can then proceed without a problem
+              os.close(fd)
+              fd = os.open(fn, os.O_WRONLY)
+              #fd2 = os.open(fn, os.O_WRONLY)
+              #os.close(fd2)
               if self.fsync: os.fsync(fd)  # want to flush both data and metadata with one fsync
               if fadvise_installed:
                  drop_buffer_cache.drop_buffer_cache(fd, 0, fszbytes)  # we assume here data will not be read anytime soon
+              fn2 = self.mk_file_nm(self.src_dirs)
+              os.rename(fn, fn2)
+            except Exception as e:
+              ensure_deleted(fn)
+              print 'exception on %s'%fn
+              raise e
+            finally:
               os.close(fd)
-            self.op_endtime('create')
+            self.op_endtime('swift-put')
 
-            self.op_starttime()
-            fn2 = self.mk_file_nm(self.src_dirs)
-            os.rename(fn, fn2)
-            self.op_endtime('rename')
 
     # unlike other ops, cleanup must always finish regardless of other threads
 
@@ -1213,8 +1228,9 @@ class Test(unittest.TestCase):
         self.invok.invocations=10
         self.invok.record_sz_kb = 5
         self.invok.total_sz_kb = 64
-        self.xattr_size = 128
-        self.xattr_count = 2
+        self.invok.xattr_size = 128
+        self.invok.xattr_count = 2
+        self.invok.fsync = True
         self.invok.filesize_distr = self.invok.filesize_distr_random_exponential
         self.runTest("swift-put")
 
@@ -1223,8 +1239,8 @@ class Test(unittest.TestCase):
         self.invok.invocations=10
         self.invok.record_sz_kb = 5
         self.invok.total_sz_kb = 64
-        self.xattr_size = 128
-        self.xattr_count = 2
+        self.invok.xattr_size = 128
+        self.invok.xattr_count = 2
         self.invok.filesize_distr = self.invok.filesize_distr_random_exponential
         self.runTest("swift-get")
         self.cleanup_files()
