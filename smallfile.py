@@ -86,7 +86,10 @@ def ensure_deleted(fn):
 
 def ensure_dir_exists( dirpath ):
     if not os.path.exists(dirpath):
-        ensure_dir_exists(os.path.dirname(dirpath))
+        parent_path = os.path.dirname(dirpath)
+        if parent_path == dirpath:
+            raise Exception('ensure_dir_exists: cannot obtain parent path of non-existent path: ' + dirpath)
+        ensure_dir_exists(parent_path)
         try:
             os.mkdir(dirpath)
         except os.error, e:
@@ -126,7 +129,6 @@ loggers = {}  # so we only instantiate logger for a given thread name once
 class smf_invocation:
     workloads = None  # will be filled in at bottom of class when all per-workload-type do_ functions are defined
     rename_suffix = ".rnm"
-    separator = os.sep  # makes it portable to Windows
     all_op_names = [ "create", "delete", "append", "read", "readdir", "rename", "delete-renamed", "cleanup", "symlink", "mkdir", "rmdir", "stat", "chmod", "setxattr", "getxattr", "swift-get", "swift-put", "ls-l" ]
     OK = 0
     NOTOK = 1
@@ -326,8 +328,7 @@ class smf_invocation:
           if self.log_to_stderr:
             h = logging.StreamHandler()
           else:
-            logfilename_base = self.tmp_dir + os.sep + "invoke_logs"
-            h = logging.FileHandler(logfilename_base + "-" + self.tid + ".log")
+            h = logging.FileHandler(self.log_fn())
           formatter = logging.Formatter(self.tid + " %(asctime)s - %(levelname)s - %(message)s")
           h.setFormatter(formatter)
           self.log.addHandler(h)
@@ -370,20 +371,29 @@ class smf_invocation:
     # (i.e. it is ready to immediately begin generating workload)
 
     def gen_thread_ready_fname(self, tid, hostname=None):
-        return self.tmp_dir + os.sep + "thread_ready." + short_hostname(hostname) + "_" + tid + ".tmp"
+        return os.path.join(self.tmp_dir, "thread_ready." + short_hostname(hostname) + "_" + tid + ".tmp")
 
-    # each host uses this to signal that it is at the starting gate
-    # (i.e. it is ready to immediately begin generating workload)
+    # each host uses this to signal that it is ready to immediately begin generating workload
+    # each host places this file in a directory shared by all hosts to indicate that this host is ready
 
     def gen_host_ready_fname(self, hostname=None):
         if not hostname: hostname = self.onhost
-        return self.network_dir + os.sep + "host_ready." + hostname + ".tmp"
+        return os.path.join(self.network_dir, "host_ready." + hostname + ".tmp")
+
+    # abort file tells other threads not to start test because something has already gone wrong
 
     def abort_fn(self):
-        return self.network_dir + os.sep + 'abort.tmp'
+        return os.path.join(self.network_dir, 'abort.tmp')
+
+    # stonewall file stops test measurement (does not stop worker thread unless --finish N is used)
 
     def stonewall_fn(self):
-        return self.network_dir + os.sep + 'stonewall.tmp'
+        return os.path.join(self.network_dir, 'stonewall.tmp')
+
+    # log file for this worker thread goes here
+
+    def log_fn(self):
+        return os.path.join(self.tmp_dir, 'invoke_logs-%s.log'%self.tid)
 
     # we use the seed function to control per-thread random sequence
     # we want seed to be saved so that operations subsequent to initial create will know
@@ -482,7 +492,7 @@ class smf_invocation:
         path = ''
         while dir_num > 1:
                 dir_num_at_level = dir_num % self.dirs_per_dir
-                path = ('d_%03d/'%dir_num_at_level) + path
+                path = os.path.join('d_%03d'%dir_num_at_level, path)
                 dir_num = dir_num / self.dirs_per_dir
         return path
 
@@ -492,7 +502,7 @@ class smf_invocation:
         while dir_num > 1:
                 # try using floating point fraction to generate a uniform random distribution on directories
                 dir_num_hash = (dir_num * self.some_prime) % self.dirs_per_dir
-                path = 'h_%03d/'%dir_num_hash + path
+                path = os.path.join('h_%03d'%dir_num_hash, path)
                 #print file_num, dirs_in_tree, f, fract, next_dir_num, hashed_path
                 #print file_num, dir_num_hash, path
                 dir_num /= self.dirs_per_dir
@@ -634,16 +644,12 @@ class smf_invocation:
             dir = self.mk_file_nm(self.src_dirs) + '.d'
             self.op_starttime()
             os.mkdir(dir)
-            f = dir + os.sep + 'not-empty-directory'
-            #os.close(os.opden(f, os.O_CREAT|os.O_EXCL|os.O_WRONLY))
             self.op_endtime(self.opname)
 
     def do_rmdir(self):
         while self.do_another_file():
             dir = self.mk_file_nm(self.src_dirs) + '.d'
-            f = dir + os.sep + 'not-empty-directory'
             self.op_starttime()
-            #os.unlink(f)
             os.rmdir(dir)
             self.op_endtime(self.opname)
             
@@ -948,8 +954,6 @@ class smf_invocation:
             ensure_deleted(fn)
             dir = basenm + '.d'
             if os.path.exists(dir):
-              fn = dir + os.sep + 'not-empty-directory'
-              ensure_deleted(fn)
               os.rmdir(dir)
         self.clean_all_subdirs()
         self.stonewall = save_stonewall
@@ -1058,7 +1062,8 @@ class Test(unittest.TestCase):
         os.rmdir(topdir)
         
     def chk_status(self):
-        assert self.invok.status == ok
+        if self.invok.status != ok:
+            raise Exception('test failed, check log file %s'%self.invok.log_fn())
 
     def runTest(self, opName):
         self.invok.opname = opName
@@ -1090,7 +1095,7 @@ class Test(unittest.TestCase):
      
     def test_a_MkFn(self):
         fn = self.invok.mk_file_nm(self.invok.src_dirs)
-        expectedFn = self.invok.src_dirs[0] + os.sep + self.invok.prefix + "_" + short_hostname(None) + '_' + self.invok.tid + "_" + str(self.invok.filenum) + "_" + self.invok.suffix
+        expectedFn = os.path.join(self.invok.src_dirs[0], self.invok.prefix + "_" + short_hostname(None) + '_' + self.invok.tid + "_" + str(self.invok.filenum) + "_" + self.invok.suffix)
         self.assertTrue( fn == expectedFn )
         f = open(fn, "w+", 0666)
         f.close()
@@ -1224,6 +1229,7 @@ class Test(unittest.TestCase):
         self.runTest("read")
 
     def test_i1_do_swift_put(self):
+        if xattr_not_installed: return
         self.cleanup_files()
         self.invok.invocations=10
         self.invok.record_sz_kb = 5
@@ -1236,6 +1242,7 @@ class Test(unittest.TestCase):
 
     # inherits files from the i1_do_swift_put test
     def test_i2_do_swift_get(self):
+        if xattr_not_installed: return
         self.invok.invocations=10
         self.invok.record_sz_kb = 5
         self.invok.total_sz_kb = 64
@@ -1249,10 +1256,10 @@ class Test(unittest.TestCase):
         self.invok.files_per_dir = 20
         self.invok.dirs_per_dir = 3
         d = self.invok.mk_dir_name(29*self.invok.files_per_dir)
-        self.assertTrue(d == 'd_000%sd_000%sd_002%s'%(os.sep, os.sep, os.sep))
+        self.assertTrue(d == os.path.join(os.path.join('d_000','d_000'), 'd_002') + os.sep)
         self.invok.dirs_per_dir = 7
         d = self.invok.mk_dir_name(320*self.invok.files_per_dir)
-        self.assertTrue(d == 'd_006%sd_003%sd_005%s'%(os.sep, os.sep, os.sep))
+        self.assertTrue(d == os.path.join(os.path.join('d_006','d_003'), 'd_005') + os.sep)
 
     def test_j1_deep_tree(self):
         self.invok.total_sz_kb = 0
