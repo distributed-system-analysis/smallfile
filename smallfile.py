@@ -881,6 +881,7 @@ class smf_invocation:
             next_fsz = self.get_next_file_size()
             self.prepare_buf()
             self.op_starttime()
+            fd = -1  # so we know to not close it if file never got opened
             try:
               fd = os.open(fn, os.O_WRONLY|os.O_CREAT)
               os.fchmod(fd, 0667)
@@ -912,16 +913,20 @@ class smf_invocation:
                     if e.errno != errno.ENODATA: raise e
               for j in range(0, self.xattr_count):
                   xattr.set(fd, 'user.smallfile-all-%d'%j, self.buf[j:self.xattr_size+j])
+
               # alternative to ftruncate/fallocate is close then open to prevent preallocation
               # since in theory close wipes out the preallocation and 
               # fsync on re-opened file can then proceed without a problem
-              os.close(fd)
-              fd = os.open(fn, os.O_WRONLY)
+              #os.close(fd)
+              #fd = os.open(fn, os.O_WRONLY)
+
+              # another alternative that solves fragmentation problem
               #fd2 = os.open(fn, os.O_WRONLY)
               #os.close(fd2)
               if self.fsync: os.fsync(fd)  # want to flush both data and metadata with one fsync
               if fadvise_installed:
-                 drop_buffer_cache.drop_buffer_cache(fd, 0, fszbytes)  # we assume here data will not be read anytime soon
+                 # we assume here that data will not be read anytime soon
+                 drop_buffer_cache.drop_buffer_cache(fd, 0, fszbytes)  
               fn2 = self.mk_file_nm(self.src_dirs)
               os.rename(fn, fn2)
             except Exception as e:
@@ -929,7 +934,7 @@ class smf_invocation:
               print 'exception on %s'%fn
               raise e
             finally:
-              os.close(fd)
+              if fd > -1: os.close(fd)
             self.op_endtime('swift-put')
 
 
