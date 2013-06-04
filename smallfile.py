@@ -363,6 +363,7 @@ class smf_invocation:
             start_time_str = '%9.6f'%(start_time - self.start_time)
             rsp_time_str = '%9.6f'%rsp_time
             f.write( '%8s, %9.6f, %9.6f\n'%(opname, (start_time - self.start_time),rsp_time))
+        os.fsync(f.fileno()) # particularly for NFS this is needed
         f.close()
 
     # determine if test interval is over for this thread
