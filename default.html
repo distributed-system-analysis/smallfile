@@ -3,11 +3,11 @@
 <HEAD>
 	<META HTTP-EQUIV="CONTENT-TYPE" CONTENT="text/html; charset=utf-8">
 	<TITLE>smallfile distributed I/O benchmark | Red Hat Intranet</TITLE>
-	<META NAME="GENERATOR" CONTENT="LibreOffice 3.5  (Linux)">
+	<META NAME="GENERATOR" CONTENT="LibreOffice 4.0.3.3 (Linux)">
 	<META NAME="AUTHOR" CONTENT="anonymous">
 	<META NAME="CREATED" CONTENT="0;0">
 	<META NAME="CHANGEDBY" CONTENT="Ben England">
-	<META NAME="CHANGED" CONTENT="20130324;17155100">
+	<META NAME="CHANGED" CONTENT="20130604;9024400">
 	<META NAME="category-departments" CONTENT="Engineering">
 	<META NAME="category-keywords" CONTENT="filesystem">
 	<META NAME="category-offices" CONTENT="Westford, MA">
@@ -19,9 +19,14 @@
 	<!--
 		@page { margin: 0.79in }
 		P { color: #000000; font-family: "Liberation Serif", "Times New Roman", serif; font-size: 11pt; line-height: 138% }
-		H1 { margin-top: 0.1in; margin-bottom: 0in; border: none; padding: 0in; color: #000000; font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif; font-size: 22pt }
+		H1 { margin-top: 0.1in; margin-bottom: 0in; border: none; padding: 0in; color: #000000 }
+		H1.western { font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif; font-size: 22pt }
+		H1.cjk { font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif }
+		H1.ctl { font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif }
 		H2 { margin-top: 0.1in; margin-bottom: 0in; border: none; padding: 0in; color: #000000; font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif; font-size: 10pt; font-weight: normal; line-height: 130% }
-		H1.with-tabs { font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif; font-size: 22pt }
+		H1.with-tabs-western { font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif; font-size: 22pt }
+		H1.with-tabs-cjk { font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif }
+		H1.with-tabs-ctl { font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif }
 		PRE { color: #000000 }
 		PRE.cjk { font-family: "WenQuanYi Zen Hei", monospace }
 		PRE.ctl { font-family: "Lohit Devanagari", monospace }
@@ -51,7 +56,7 @@
 			<P><BR><BR>
 			</P>
 			<DIV ID="tabs-wrapper" DIR="LTR">
-				<H1 CLASS="with-tabs" STYLE="margin-top: 0in; margin-bottom: 0.2in; border: none; padding: 0in">
+				<H1 CLASS="with-tabs-western" STYLE="margin-top: 0in; margin-bottom: 0.2in; border: none; padding: 0in">
 				smallfile distributed I/O benchmark</H1>
 			</DIV>
 			<DIV ID="node-71422" DIR="LTR">
@@ -104,7 +109,8 @@
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">For a
 				multi-host test, ALL hosts <EM>must provide access to the same
 				shared directory</EM> with pathname.</P>
-				<H1 STYLE="margin-top: 0in; margin-bottom: 0.2in">Restrictions</H1>
+				<H1 CLASS="western" STYLE="margin-top: 0in; margin-bottom: 0.2in">
+				Restrictions</H1>
 				<UL>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">untested
 					on python 3, probably doesn't run yet (exception syntax) 
@@ -124,7 +130,8 @@
 					not support HTTP access 
 					</P>
 				</UL>
-				<H1 STYLE="margin-top: 0in; margin-bottom: 0.2in">How to run</H1>
+				<H1 CLASS="western" STYLE="margin-top: 0in; margin-bottom: 0.2in">
+				How to run</H1>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">You
 				must have password-less ssh access between the test driver node
 				and the workload generator hosts if you want to run a distributed
@@ -209,12 +216,12 @@
 					no reads or writes are performed. 
 					</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">-<B>-file-size-distribution</B>
-					– only supported value today is <B>exponential.  </B><SPAN STYLE="font-weight: normal">Default:
-					</SPAN> fixed file size.</P>
+					– only supported value today is <B>exponential. </B><SPAN STYLE="font-weight: normal">Default:
+					</SPAN>fixed file size.</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--record-size</B>
 					-- record size in KB, how much data is transferred in a single
 					read or write system call.&nbsp; If 0 then it is set to the file
-					size.  Default: 0</P>
+					size. Default: 0</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--top</B>
 					-- top-level directory, all file accesses are done inside this
 					directory tree. If you wish to use multiple mountpoints,provide
@@ -222,9 +229,9 @@
 					whitespace).</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--host-set</B>
 					-- comma-separated set of hosts used for this test, no domain
-					names allowed.  Default: non-distributed test.</P>
+					names allowed. Default: non-distributed test.</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--files-per-dir</B>
-					-- maximum number of files contained in any one directory. 
+					-- maximum number of files contained in any one directory.
 					Default: 200</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--dirs-per-dir</B>
 					-- maximum number of subdirectories contained in any one
@@ -232,18 +239,18 @@
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--hash-into-dirs</B>
 					– if Y then assign next file to a directory using a hash
 					function, otherwise assign next –files-per-dir files to next
-					directory.  Default: N</P>
+					directory. Default: N</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--permute-host-dirs</B>
-					–  if Y then have each host process a different subdirectory
+					– if Y then have each host process a different subdirectory
 					tree than it otherwise would (see below for directory tree
-					structure).  Default: N</P>
+					structure). Default: N</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">-<B>-same-dir</B>
-					-- if Y then threads will share a single directory.  Default: N</P>
+					-- if Y then threads will share a single directory. Default: N</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--network-sync-dir</B>
 					– don't need to specify unless you run a multi-host test and
-					the <B>–top</B> parameter points to a non-shared directory
-					(see discussion below).  Default: <B>network_shared</B>
-					subdirectory under <B>–top</B> dir.</P>
+					the –<B>top</B> parameter points to a non-shared directory
+					(see discussion below). Default: <B>network_shared</B>
+					subdirectory under –<B>top</B> dir.</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--xattr-size</B>
 					-- size of extended attribute value in bytes (names begin with
 					'user.smallfile-') 
@@ -261,10 +268,10 @@
 					</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--finish</B>
 					-- if Y, thread will complete all requested file operations even
-					if measurement has finished.  Default: Y</P>
+					if measurement has finished. Default: Y</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--stonewall</B>
 					-- if Y then thread will measure throughput as soon as it
-					detects that another thread has finished.  Default: N</P>
+					detects that another thread has finished. Default: N</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--remote-pgm-dir
 					</B>– don't need to specify this unless the smallfile software
 					lives in a different directory on the target hosts and the
@@ -272,7 +279,7 @@
 					</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--pause
 					</B>-- integer (microseconds) each thread will wait before
-					starting next file.  Default: 0</P>
+					starting next file. Default: 0</P>
 				</UL>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
 				</P>
@@ -329,9 +336,31 @@
 				</SPAN><SPAN STYLE="font-variant: normal"><SPAN STYLE="font-style: normal">parameter.</SPAN></SPAN></P>
 				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><BR><BR>
 				</H2>
-				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in; border: none; padding: 0in">
-				<FONT SIZE=4 STYLE="font-size: 16pt">Use of --pause in
-				multi-thread tests</FONT></H2>
+				<P STYLE="margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Use
+				with distributed filesystems</FONT></P>
+				<P STYLE="margin-bottom: 0.2in">Some distributed filesystems,
+				such as NFS and Gluster, have relaxed, eventual-consistency
+				caching of directories; this will cause problems for smallfile's
+				network_shared directory.  To work around this problem, you can
+				use a separate NFS mountpoint exported from a Linux NFS server,
+				mounted with the option actimeo=1 (to limit duration of time NFS
+				will cache directory entries and metadata).  You then reference
+				this mountpoint using the <B>–network-sync-dir</B> option of
+				smallfile.    For example:</P>
+				<P STYLE="margin-bottom: 0.2in"><BR><BR>
+				</P>
+				<P STYLE="margin-left: 0.49in; margin-bottom: 0in"><FONT SIZE=3>#
+				<B>mount -t nfs -o actimeo=1</B>
+				<I>your-linux-server</I>:/<I>your/nfs/export</I> <B>/mnt/nfs</B></FONT></P>
+				<P STYLE="margin-left: 0.49in; margin-bottom: 0in"><FONT SIZE=3>#
+				<B>./smallfile_cli.py –top</B> <I>/your/distributed/filesystem</I>
+				<B>–network-sync-dir /mnt/nfs/smf-shared </B></FONT>
+				</P>
+				<H2 STYLE="margin-left: 0.49in; margin-top: 0in; border: none; padding: 0in">
+				<BR>
+				</H2>
+				<H2 STYLE="margin-top: 0in; border: none; padding: 0in"><FONT SIZE=4 STYLE="font-size: 16pt">Use
+				of --pause in multi-thread tests</FONT></H2>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">In some
 				filesystems, the first thread that starts running will be
 				operating at memory speed (example: NFS writes) and can easily
@@ -359,26 +388,27 @@
 				that the directories needed by that test already exist (there is
 				a specific operation type for testing performance of subdirectory
 				creation and deletion). If the top directory (specified by –top
-				parameter) is T, then the top per-thread directory is T/host/dTT
-				where TT is a 2-digit thread number and “host” is the
-				hostname. If the test is not a distributed test, then it's just
-				whatever host the benchmark command was issued on, otherwise it
-				is each of the hosts specified by the –host-set parameter. The
-				first F files (where F is the value of the –files-per-dir)
-				parameter are placed in this top per-thread directory. If the
-				test uses more than F files/thread, then at least one
-				subdirectory from the first level of subdirectories must be used;
-				these subdirectories have the path T/host/dTT/dNNN where NNN is
-				the subdirectory number. Suppose the value of the parameter
-				–subdirs-per-dir is D. Then there are at most D subdirectories
-				of the top per-thread directory. If the test requires more than
-				D(F+1) files per thread, then a second level of subdirectories
-				will have to be created, with pathnames like T/host/dTT/dNNN/dMMM
-				. This process of adding subdirectories continues in this fashion
-				until there are sufficient subdirectories to hold all the files.
-				The purpose of this approach is to simulate a mixture of
-				directories and files, and to not require the user to specify how
-				many levels of directories are required.</P>
+				parameter) is <B>D</B>, then the top per-thread directory is
+				<B>D</B>/host/d<B>TT</B> where <B>TT</B> is a 2-digit thread
+				number and “host” is the hostname. If the test is not a
+				distributed test, then it's just whatever host the benchmark
+				command was issued on, otherwise it is each of the hosts
+				specified by the –host-set parameter. The first F files (where
+				F is the value of the –files-per-dir) parameter are placed in
+				this top per-thread directory. If the test uses more than F
+				files/thread, then at least one subdirectory from the first level
+				of subdirectories must be used; these subdirectories have the
+				path T/host/dTT/dNNN where NNN is the subdirectory number.
+				Suppose the value of the parameter –subdirs-per-dir is D. Then
+				there are at most D subdirectories of the top per-thread
+				directory. If the test requires more than D(F+1) files per
+				thread, then a second level of subdirectories will have to be
+				created, with pathnames like T/host/dTT/dNNN/dMMM . This process
+				of adding subdirectories continues in this fashion until there
+				are sufficient subdirectories to hold all the files. The purpose
+				of this approach is to simulate a mixture of directories and
+				files, and to not require the user to specify how many levels of
+				directories are required.</P>
 				<P>The use of multiple mountpoints is supported. This features is
 				useful for testing NFS, etc.</P>
 				<P>Note that the test harness does not have to scan the
@@ -389,8 +419,6 @@
 				</P>
 				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Sharing
 				directories across threads</FONT></H2>
-				<P><BR><BR>
-				</P>
 				<P>Some applications require that many threads, possibly spread
 				across many host machines, need to share a set of directories.
 				The <B>--same-dir</B> parameter makes it possible for the
@@ -477,7 +505,8 @@
 				files used should be roughly 8 times the number of servers.&nbsp;
 				Use of many separate files ensures that this cache eviction data
 				is spread across all servers approximately equally.<STRONG>&nbsp;</STRONG></P>
-				<H1 STYLE="margin-top: 0in; margin-bottom: 0.2in">Results</H1>
+				<H1 CLASS="western" STYLE="margin-top: 0in; margin-bottom: 0.2in">
+				Results</H1>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">All
 				tests display a &quot;files/sec&quot; result.&nbsp; If the test
 				performs reads or writes, then a &quot;MB/sec&quot; data transfer
@@ -508,7 +537,8 @@
 				a format<BR>that can be loaded into any spreadsheet application,
 				such as Excel, and<BR>graphed.&nbsp; An x-y scatterplot can be
 				useful to see changes over time in response time.</P>
-				<H1 STYLE="margin-top: 0in; margin-bottom: 0.2in">Background</H1>
+				<H1 CLASS="western" STYLE="margin-top: 0in; margin-bottom: 0.2in">
+				Background</H1>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">There
 				are many existing performance test benchmarks. I have tried just
 				about all the ones that I've heard of. Here are the ones I have
@@ -555,8 +585,8 @@
 					</P>
 				</UL>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">&nbsp;</P>
-				<H1 STYLE="margin-top: 0in; margin-bottom: 0.2in">Design
-				principles</H1>
+				<H1 CLASS="western" STYLE="margin-top: 0in; margin-bottom: 0.2in">
+				Design principles</H1>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">A
 				cluster-aware test tool has to:</P>
 				<UL>
@@ -688,11 +718,13 @@
 				&quot;pickle&quot; files to serialize the state of these
 				per-thread objects containing details of each thread's progress
 				during the test.&nbsp; The pickle files are stored in the shared
-				synchronization directory. This restriction could be lifted if it
-				was important enough but that's how it works today.<SCRIPT SRC="default_files/wysiwyg_002.js"></SCRIPT><SCRIPT>
+				synchronization directory. 
+				<SCRIPT SRC="default_files/wysiwyg_002.js"></SCRIPT>
+				<SCRIPT>
 <!--//--><![CDATA[//><!--
 var _paq = _paq || [];(function(){var u=(("https:" == document.location.protocol) ? "https://metrics.corp.redhat.com/" : "https://metrics.corp.redhat.com/");_paq.push(["setSiteId", 1]);_paq.push(["setTrackerUrl", u+"piwik.php"]);_paq.push(["setDocumentTitle", "Home/smallfile+distributed+I%2FO+benchmark"]);_paq.push(["trackPageView"]);_paq.push(["enableLinkTracking"]);var d=document,g=d.createElement("script"),s=d.getElementsByTagName("script")[0];g.type="text/javascript";g.defer=true;g.async=true;g.src=u+"piwik.js";s.parentNode.insertBefore(g,s);})();
 //--><!]]>
+
 </SCRIPT></P>
 			</DIV>
 		</DIV>
