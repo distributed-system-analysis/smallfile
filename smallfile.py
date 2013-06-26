@@ -14,6 +14,10 @@ Created on Apr 22, 2009
 #    CLI and GUI interfaces to same code
 #
 # to run just one of unit tests do python -m unittest smallfile.Test.your-unit-test
+# "unittest" regression test API has changed, unittest2 is there for backwards compatibility
+# so it now uses unittest2, but it isn't installed by default so we have to conditionalize its use
+# we only need it installed where we want to run regression test this way
+# on Fedora: # yum install python-unittest2
 
 import os
 import os.path
@@ -23,7 +27,6 @@ import glob
 import string
 import time
 import exceptions
-import unittest
 import random
 import logging
 from logging import ERROR
@@ -55,6 +58,13 @@ fallocate_installed = False
 try:
   import fallocate  # not yet in python os module
   fallocate_installed = True
+except ImportError as e:
+  pass
+
+unittest2_installed = False
+try:
+  import unittest2
+  unittest2_installed = True
 except ImportError as e:
   pass
 
@@ -99,17 +109,8 @@ def ensure_dir_exists( dirpath ):
         if not os.path.isdir(dirpath):
             raise Exception("%s already exists and is not a directory!"%dirpath)
 
-# if this routine is passed an IP addr, it just accepts the whole thing
-# if it is passed a name of some sort, it only takes the short name and omits the DNS domain
-
-def short_hostname(h):
+def get_hostname(h):
   if h == None: h = socket.gethostname()
-  # if this is an IP address, don't split it
-  first_token = h.split('.')[0]
-  try:
-    addr_octet = int(first_token)
-  except ValueError as e:
-    return first_token
   return h
 
 # return the IP address of a hostname
@@ -190,7 +191,7 @@ class smf_invocation:
         self.verify_read = True       # if so, compare read data to what was written
         self.pause_between_files = 0  # how many microsec to sleep between each file
         self.pause_sec = 0.0          # same as pause_between_files but in floating-point seconds
-        self.onhost = short_hostname(None) # record which host the invocation ran on
+        self.onhost = get_hostname(None) # record which host the invocation ran on
         self.tid = ""                 # thread ID 
         self.log_to_stderr = False    # set to true for debugging to screen
         self.verbose = False          # set this to true for debugging
@@ -355,7 +356,7 @@ class smf_invocation:
     # save response times seen by this thread
 
     def save_rsptimes(self):
-        fname = 'rsptimes_'+str(self.tid)+'_'+short_hostname(None)+'_'+self.opname+'_'+str(self.start_time)+'.csv'
+        fname = 'rsptimes_'+str(self.tid)+'_'+get_hostname(None)+'_'+self.opname+'_'+str(self.start_time)+'.csv'
         rsptime_fname = os.path.join(self.network_dir, fname)
         f = open(rsptime_fname, "w")
         for (opname, start_time, rsp_time) in self.rsptimes:
@@ -372,7 +373,7 @@ class smf_invocation:
     # (i.e. it is ready to immediately begin generating workload)
 
     def gen_thread_ready_fname(self, tid, hostname=None):
-        return os.path.join(self.tmp_dir, "thread_ready." + short_hostname(hostname) + "_" + tid + ".tmp")
+        return os.path.join(self.tmp_dir, "thread_ready." + get_hostname(hostname) + "_" + tid + ".tmp")
 
     # each host uses this to signal that it is ready to immediately begin generating workload
     # each host places this file in a directory shared by all hosts to indicate that this host is ready
@@ -454,7 +455,7 @@ class smf_invocation:
         if self.filenum >= self.iterations:
          try:
             with open(self.stonewall_fn(), "w") as f: 
-                self.log.info('stonewall file written by thread %s on host %s'%(self.tid, short_hostname(None)))
+                self.log.info('stonewall file written by thread %s on host %s'%(self.tid, get_hostname(None)))
                 f.close()
          except IOError as e:
             err = e.errno
@@ -569,16 +570,16 @@ class smf_invocation:
     
     def make_all_subdirs(self):
         if (self.tid != '00') and self.is_shared_dir: return
-        dirset=set([])
+        dirset=set()
         for tree in [ self.src_dirs, self.dest_dirs ]:
           for j in range(0, self.iterations+1):
             fpath = self.mk_file_nm(tree, j)
             dpath = os.path.dirname(fpath)
             dirset.add(dpath)
-        for dpath in dirset:
-            if not exists(dpath): 
+        for unique_dpath in dirset:
+            if not exists(unique_dpath): 
               try:
-                os.makedirs(dpath, 0777)
+                os.makedirs(unique_dpath, 0777)
               except OSError as e:
                 if not ((e.errno == errno.EEXIST) and self.is_shared_dir):
                   raise e
@@ -587,22 +588,24 @@ class smf_invocation:
 
     def clean_all_subdirs(self):
         if (self.tid != '00') and self.is_shared_dir: return
+        dirset=set()
         for tree in [ self.src_dirs, self.dest_dirs ]:
-         for t in tree:
-          subdirs = (self.iterations/self.files_per_dir) + 1
-          for j in range(0, subdirs):
-            fpath = self.mk_file_nm(t, filenum=j*self.files_per_dir)
+          for j in range(0, self.iterations+1):
+            fpath = self.mk_file_nm(tree, j)
             dpath = os.path.dirname(fpath)
-            while len(dpath) > len(t) + 1:
-                if not exists(dpath):
-                        dpath = os.path.dirname(dpath)
-                elif os.listdir(dpath) == []:
+            dirset.add(dpath)
+        for unique_dpath in dirset:
+            while len(unique_dpath) > 10:  # FIXME: arbitrary, but don't try to delete directories at very top
+                if not exists(unique_dpath):
+                        unique_dpath = os.path.dirname(unique_dpath)
+                        continue
+                elif os.listdir(unique_dpath) == []:
                         try:
-                          os.rmdir(dpath)
+                          os.rmdir(unique_dpath)
                         except OSError as e:
                           self.log.error('deleting directory dpath: %s'%e)
                           if (e.errno != errno.ENOENT) and not self.is_shared_dir: raise e
-                        dpath = os.path.dirname(dpath)
+                        unique_dpath = os.path.dirname(unique_dpath)
                 else:
                         break
 
@@ -878,7 +881,6 @@ class smf_invocation:
 
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs) + '.tmp'
-            topdir = self.top_dirs[0]
             next_fsz = self.get_next_file_size()
             self.prepare_buf()
             self.op_starttime()
@@ -1044,10 +1046,11 @@ class TestThread(threading.Thread):
 # below are unit tests for smf_invocation
 # including multi-threaded test
 # this should be designed to run without any user intervention
-# to run just one of these tests do python -m unittest smallfile.Test.your-unit-test
+# to run just one of these tests do python -m unittest2 smallfile.Test.your-unit-test
 
 ok=0
-class Test(unittest.TestCase):
+if unittest2_installed:
+ class Test(unittest2.TestCase):
     def setUp(self):
         self.invok = smf_invocation()
         self.invok.opname = "create"
@@ -1101,7 +1104,7 @@ class Test(unittest.TestCase):
      
     def test_a_MkFn(self):
         fn = self.invok.mk_file_nm(self.invok.src_dirs)
-        expectedFn = os.path.join(self.invok.src_dirs[0], self.invok.prefix + "_" + short_hostname(None) + '_' + self.invok.tid + "_" + str(self.invok.filenum) + "_" + self.invok.suffix)
+        expectedFn = os.path.join(self.invok.src_dirs[0], self.invok.prefix + "_" + get_hostname(None) + '_' + self.invok.tid + "_" + str(self.invok.filenum) + "_" + self.invok.suffix)
         self.assertTrue( fn == expectedFn )
         f = open(fn, "w+", 0666)
         f.close()
@@ -1340,4 +1343,4 @@ class Test(unittest.TestCase):
 # so you can just do "python smallfile.py" to test it
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest2.main()

@@ -10,7 +10,7 @@ import os
 import smallfile
 from smallfile import smf_invocation
 
-version = '1.9.12'
+version = '1.9.15'
 
 # convert boolean value into 'Y' or 'N'
 
@@ -185,7 +185,7 @@ def parse():
     elif prm == 'slave': prm_slave = str2bool(val, rawprm)
     # --ashost should not be used by end-user
     elif prm == 'as-host': 
-        inv.onhost = smallfile.short_hostname(val)
+        inv.onhost = smallfile.get_hostname(val)
     else: usage('unrecognized parameter name')
 
     pass_on_prm_list += ' ' + pass_on_prm  # parameter options that workload generators will need

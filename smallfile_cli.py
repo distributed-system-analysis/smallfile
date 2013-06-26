@@ -21,7 +21,7 @@ import os
 import os.path
 import errno
 import smallfile
-from smallfile import smf_invocation, ensure_deleted, ensure_dir_exists, short_hostname, hostaddr
+from smallfile import smf_invocation, ensure_deleted, ensure_dir_exists, get_hostname, hostaddr
 import invoke_process
 import threading
 import time
@@ -74,6 +74,7 @@ def run_workload():
   (prm_host_set, prm_thread_count, master_invoke, remote_cmd, prm_slave, prm_permute_host_dirs) = parse.parse()
   starting_gate = master_invoke.starting_gate
   verbose = master_invoke.verbose
+  host = master_invoke.onhost
 
   # calculate timeouts to allow for initialization delays while directory tree is created
 
@@ -93,8 +94,14 @@ def run_workload():
 
     if os.path.exists( master_invoke.network_dir ): 
       shutil.rmtree( master_invoke.network_dir )
-      time.sleep(2)
+      time.sleep(2.1)
+      os.mkdir(master_invoke.network_dir)
     ensure_dir_exists( master_invoke.network_dir )
+    for dlist in [ master_invoke.src_dirs, master_invoke.dest_dirs ]:
+      for d in dlist:
+         ensure_dir_exists(d)
+    os.listdir(master_invoke.network_dir)
+    time.sleep(1.1)
     remote_cmd += ' --slave Y '
     ssh_thread_list = []
     host_ct = len(prm_host_set)
@@ -125,6 +132,7 @@ def run_workload():
     sec = 0
     sec_delta = 0.5
     while sec < host_startup_timeout:
+      os.listdir(master_invoke.network_dir)
       hosts_ready = True
       for j in range(last_host_seen+1, len(prm_host_set)-1):
         h=prm_host_set[j]
@@ -263,8 +271,21 @@ def run_workload():
   # if --host-set option is not used, then 
   # this is all that gets run
 
-  if (not prm_slave) and os.path.exists( master_invoke.network_dir ): 
-      shutil.rmtree( master_invoke.network_dir )
+  if not prm_slave:
+      if os.path.exists( master_invoke.network_dir ):
+          shutil.rmtree( master_invoke.network_dir )
+          if verbose: print host + ' deleted ' + master_invoke.network_dir
+      os.makedirs(master_invoke.network_dir, 0777)
+      for dlist in [ master_invoke.src_dirs, master_invoke.dest_dirs ]:
+          for d in dlist:
+              if not os.path.exists(d): os.makedirs(d, 0777)
+  else:
+      time.sleep(1.1)
+  os.listdir(master_invoke.network_dir)
+  for dlist in [ master_invoke.src_dirs, master_invoke.dest_dirs ]:
+    for d in dlist:
+        os.listdir(d)
+        if verbose: print host + ' saw ' + d
 
   # for each thread set up smf_invocation instance,
   # create a thread instance, and delete the thread-ready file 
@@ -284,18 +305,12 @@ def run_workload():
 
   starting_gate = thread_list[0].invoke.starting_gate
   my_host_invoke = thread_list[0].invoke
-  host = short_hostname(my_host_invoke.onhost)
 
   # start threads, wait for them to reach starting gate
   # to do this, look for thread-ready files 
 
-  if not prm_slave:
-    if os.path.exists( master_invoke.network_dir ): 
-      shutil.rmtree( master_invoke.network_dir )
-    ensure_dir_exists( master_invoke.network_dir )
   for t in thread_list:
     ensure_deleted(t.invoke.gen_thread_ready_fname(t.invoke.tid))
-
   for t in thread_list:
     t.start()
   if verbose: print "started %d worker threads on host %s"%(len(thread_list),host)
