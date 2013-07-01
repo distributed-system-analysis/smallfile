@@ -79,9 +79,9 @@ def run_workload():
   # calculate timeouts to allow for initialization delays while directory tree is created
 
   startup_timeout = 20
-  dirs = master_invoke.iterations / master_invoke.files_per_dir
+  dirs = master_invoke.iterations * prm_thread_count / master_invoke.files_per_dir
   if dirs > 20:
-    dir_creation_timeout = dirs / 10
+    dir_creation_timeout = dirs / 5 
     if verbose: print 'extending initialization timeout by %d seconds for directory creation'%dir_creation_timeout
     startup_timeout += dir_creation_timeout
   host_startup_timeout = startup_timeout + 10
@@ -128,10 +128,12 @@ def run_workload():
     # FIXME: for very large host sets, timeout only if no host responds within X seconds
   
     hosts_ready = False  # set scope outside while loop
+    abortfn = master_invoke.abort_fn()
     last_host_seen=-1
     sec = 0
     sec_delta = 0.5
-    while sec < host_startup_timeout:
+    try:
+     while sec < host_startup_timeout:
       os.listdir(master_invoke.network_dir)
       hosts_ready = True
       for j in range(last_host_seen+1, len(prm_host_set)-1):
@@ -150,9 +152,12 @@ def run_workload():
       sec += sec_delta
       sec_delta += 1
       print 'last_host_seen=%d sec=%d'%(last_host_seen,sec)
+    except KeyboardInterrupt, e:
+     print 'saw SIGINT signal, aborting test'
+     hosts_ready = False
     if not hosts_ready:
-      abortfn = master_invoke.abort_fn()
-      open(abortfn, "w")
+      with open(abortfn, "w") as f:
+        f.close()
       raise Exception('hosts did not reach starting gate within %d seconds'%host_startup_timeout)
 
     # ask all hosts to start the test

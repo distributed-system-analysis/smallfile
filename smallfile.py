@@ -569,6 +569,7 @@ class smf_invocation:
     # use set to avoid duplicating operations on directories
     
     def make_all_subdirs(self):
+        abort_filename = self.abort_fn()
         if (self.tid != '00') and self.is_shared_dir: return
         dirset=set()
         for tree in [ self.src_dirs, self.dest_dirs ]:
@@ -577,6 +578,7 @@ class smf_invocation:
             dpath = os.path.dirname(fpath)
             dirset.add(dpath)
         for unique_dpath in dirset:
+            if exists(abort_filename): break
             if not exists(unique_dpath): 
               try:
                 os.makedirs(unique_dpath, 0777)
