@@ -5,7 +5,7 @@ localhost_name="$1"
 if [ -z "$localhost_name" ] ; then localhost_name="`hostname -s`" ; fi
 
 testdir='/var/tmp/smfregtest'
-
+nfsdir=/var/tmp/smfnfs
 OK=0
 NOTOK=1
 
@@ -45,6 +45,16 @@ assertok $?
 echo "running drop_buffer_cache.py unit test"
 python drop_buffer_cache.py
 assertok $?
+
+# set up NFS mountpoint
+
+grep $nfsdir /proc/mounts
+if [ $? != $OK ] ; then
+  mkdir -pv $nfsdir
+  rm -rf $testdir
+  mkdir -p $testdir
+  sudo mount -v -t nfs -o actimeo=1 $localhost_name:$nfsdir $test
+fi
 
 # test parsing
 
@@ -89,7 +99,7 @@ assertfail $?
 # run a command with all CLI options and verify that they were successfully parsed
 
 cleanup
-$s --verify-read N --response-times Y --finish N --stonewall N --permute-host-dirs Y --top $testdir --same-dir Y --operation cleanup --threads 5 --files 20 --files-per-dir 5 --dirs-per-dir 3 --record-size 6 --file-size 30 --file-size-distribution exponential --prefix a --suffix b --hash-into-dirs Y --pause 5 --host-set $localhost_name | tee $f
+$s --verify-read N --response-times Y --finish N --stonewall N --permute-host-dirs Y --top $nfsdir/smf --same-dir Y --operation cleanup --threads 5 --files 20 --files-per-dir 5 --dirs-per-dir 3 --record-size 6 --file-size 30 --file-size-distribution exponential --prefix a --suffix b --hash-into-dirs Y --pause 5 --host-set $localhost_name | tee $f
 assertok $?
 expect_strs=( 'verify read? : N' \
         "hosts in test : \['$localhost_name'\]" \
@@ -109,7 +119,7 @@ expect_strs=( 'verify read? : N' \
         'finish all requests? : N' \
         'threads share directories? : Y' \
         'pause between files (microsec) : 5' \
-        "top test directory(s) : \['$testdir'\]" \
+        "top test directory(s) : \['$nfsdir/smf'\]" \
         'operation : cleanup' \
         'threads : 5' \
         'files/thread : 20' \
@@ -133,7 +143,7 @@ allops="cleanup create append read readdir ls-l chmod stat setxattr getxattr sym
 echo "******** testing non-distributed operations"
 for op in $allops ; do
   rm -rf /var/tmp/invoke*.log
-  $pass1 --operation $op
+  $pass1 --top $testdir --operation $op
   assertok $?
 done
 
@@ -141,9 +151,13 @@ echo "******** testing distributed operations"
 pass1="$pass1 --host-set $localhost_name"
 for op in $allops ; do
   rm -rf /var/tmp/invoke*.log
-  $pass1 --operation $op
+  $pass1 --top $nfsdir/smf --operation $op
   assertok $?
 done
 
+grep $nfsdir /proc/mounts
+if [ $? == $OK ] ; then
+  sudo umount -v $nfsdir
+fi
 rm -rf $testdir
 

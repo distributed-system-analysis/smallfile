@@ -10,7 +10,7 @@ import os
 import smallfile
 from smallfile import smf_invocation
 
-version = '1.9.15'
+version = '1.9.16'
 
 # convert boolean value into 'Y' or 'N'
 

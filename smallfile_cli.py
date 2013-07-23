@@ -104,7 +104,7 @@ def run_workload():
     for dlist in [ master_invoke.src_dirs, master_invoke.dest_dirs ]:
       for d in dlist:
          ensure_dir_exists(d)
-    os.listdir(master_invoke.network_dir)
+    os.listdir(master_invoke.network_dir)  # workaround to attempt to force synchronization
     time.sleep(1.1)
     remote_cmd += ' --slave Y '
     ssh_thread_list = []
@@ -137,6 +137,7 @@ def run_workload():
     sec = 0
     sec_delta = 0.5
     try:
+     # FIXME: make timeout criteria be that new new hosts seen in X seconds
      while sec < host_startup_timeout:
       os.listdir(master_invoke.network_dir)
       hosts_ready = True
@@ -166,9 +167,6 @@ def run_workload():
 
     # ask all hosts to start the test
     # this is like firing the gun at the track meet
-    # threads will wait 3 sec after starting gate is opened before 
-    # we really apply workload.  This ensures that heavy workload
-    # doesn't block some hosts from seeing the starting flag
 
     try:
       sync_files.write_sync_file(starting_gate, 'hi')
@@ -296,7 +294,7 @@ def run_workload():
     f.close()
 
   sg = my_host_invoke.starting_gate
-  if not prm_slave:
+  if not prm_slave: # special case of no --host-set parameter
     sync_files.write_sync_file(sg, 'hi there')
 
   # wait for starting_gate file to be created by test driver
@@ -331,11 +329,6 @@ def run_workload():
   exit_status = OK
   if not prm_slave:
     try: 
-      total_files = 0.0
-      total_records = 0.0
-      max_elapsed_time = 0.0
-      threads_failed_to_start = 0
-      worst_status = 'ok'
       # FIXME: code to aggregate results from list of invoke objects can be shared by multi-host and single-host cases
       invoke_list = map( lambda(t) : t.invoke, thread_list )
       output_results.output_results( invoke_list, [ 'localhost' ], prm_thread_count, pct_files_min )
@@ -345,7 +338,7 @@ def run_workload():
 
 
   else:
-    # if this is a multi-host test 
+    # if we are participating in a multi-host test 
     # then write out this host's result in pickle format so test driver can pick up result
 
     result_filename = gen_host_result_filename(master_invoke)
@@ -354,7 +347,7 @@ def run_workload():
         invok_list.append(t.invoke)
     if verbose: print 'saving result to filename %s'%result_filename
     sync_files.write_pickle(result_filename, invok_list)
-    time.sleep(1.2)
+    time.sleep(1.2) # for benefit of NFS with actimeo=1
 
   sys.exit(exit_status)
 
