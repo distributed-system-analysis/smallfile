@@ -608,6 +608,8 @@ class smf_invocation:
                           self.log.error('deleting directory dpath: %s'%e)
                           if (e.errno != errno.ENOENT) and not self.is_shared_dir: raise e
                         unique_dpath = os.path.dirname(unique_dpath)
+                        if len(unique_dpath) < self.src_dirs[0]:
+                                break
                 else:
                         break
 

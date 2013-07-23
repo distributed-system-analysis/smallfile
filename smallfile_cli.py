@@ -20,19 +20,23 @@ import sys
 import os
 import os.path
 import errno
-import smallfile
-from smallfile import smf_invocation, ensure_deleted, ensure_dir_exists, get_hostname, hostaddr
-import invoke_process
 import threading
 import time
 import socket
 import string
 import parse
 import pickle
-import ssh_thread
 import math
 import random
 import shutil
+
+# smallfile modules
+import ssh_thread
+import smallfile
+from smallfile import smf_invocation, ensure_deleted, ensure_dir_exists, get_hostname, hostaddr
+import invoke_process
+import sync_files
+import output_results
 
 class SMFResultException(Exception):
   def __init__(self, msg):
@@ -167,16 +171,10 @@ def run_workload():
     # doesn't block some hosts from seeing the starting flag
 
     try:
-      if not os.path.exists(starting_gate): 
-        with open(starting_gate, "w") as f:
-          f.write('hi')
-          f.flush()
-          fd = f.fileno()
-          os.fsync(fd)
-          f.close()
-        print 'starting gate file %s created by host %s'%(starting_gate, master_invoke.onhost)
+      sync_files.write_sync_file(starting_gate, 'hi')
+      if verbose: print 'starting gate file %s created'%starting_gate
     except IOError, e:
-        print 'error writing starting gate: %s'%os.strerror(e.errno)
+      print 'error writing starting gate: %s'%os.strerror(e.errno)
 
     # wait for them to finish
 
@@ -192,9 +190,6 @@ def run_workload():
     # containing smf_invocation instances with counters and times that we need
 
     try:
-      total_files = 0.0
-      total_records = 0.0
-      max_elapsed_time = 0.0
       invoke_list = []
       for h in prm_host_set:  # for each host in test
 
@@ -205,68 +200,22 @@ def run_workload():
         if verbose: print 'reading pickle file: %s'%pickle_fn
         host_invoke_list = []
         try:
-                pickle_file = open(pickle_fn, "r")
-                host_invoke_list = pickle.load(pickle_file)
-                pickle_file.close()
+                with open(pickle_fn, "r") as pickle_file:
+                  host_invoke_list = pickle.load(pickle_file)
                 if verbose: print ' read %d invoke objects'%len(host_invoke_list)
                 invoke_list.extend(host_invoke_list)
                 ensure_deleted(pickle_fn)
         except IOError as e:
                 if e.errno != errno.ENOENT: raise e
                 print '  pickle file %s not found'%pickle_fn
-      #print 'invoke_list: %s'%invoke_list
 
-      if len(invoke_list) < 1:
-        raise SMFResultException('no pickled invokes read, so no results')
-      my_host_invoke = invoke_list[0]  # pick a representative one
-      for invk in invoke_list:  # for each parallel smf_invocation
-
-        # add up work that it did
-        # and determine time interval over which test ran
-
-        assert isinstance(invk, smallfile.smf_invocation)
-        status = 'ok'
-        if invk.status != OK: status = 'ERR: ' + os.strerror(invk.status)
-        print "host = %s, thread = %s, elapsed sec. = %f, total files = %d, total_records = %d, status = %s"%\
-            (invk.onhost, invk.tid, invk.elapsed_time, invk.filenum_final, invk.rq_final, status)
-        total_files += invk.filenum_final
-        total_records += invk.rq_final
-        max_elapsed_time = max(max_elapsed_time, invk.elapsed_time)
-
-      print 'total threads = %d'%len(invoke_list)
-      print 'total files = %d'%total_files
-      rszkb = my_host_invoke.record_sz_kb
-      if rszkb == 0: rszkb = my_host_invoke.total_sz_kb
-      if total_records > 0:
-        total_data_gb = total_records * rszkb * 1.0 / KB_PER_GB
-        print 'total data = %9.3f GB'%total_data_gb
-      if len(invoke_list) < len(prm_host_set) * prm_thread_count:
-        print 'WARNING: failed to get some responses from per-client workload generators'
-      max_files = my_host_invoke.iterations * len(invoke_list)
-      pct_files = 100.0 * total_files / max_files
-      print '%6.2f%% of requested files processed, minimum is %6.2f'%(pct_files, pct_files_min)
-      if (status != 'ok'):
-                raise SMFResultException('at least one thread encountered error, test may be incomplete')
-      if (max_elapsed_time > 0.001):  # can't compute rates unless test ran for a while
-
-        files_per_sec = total_files / max_elapsed_time
-        print "%f files/sec"%files_per_sec
-        if total_records > 0: 
-          iops = total_records / max_elapsed_time
-          print "%f IOPS"%iops
-          mb_per_sec = iops * rszkb / 1024.0
-          print "%f sec elapsed time, %f MB/sec"%(max_elapsed_time, mb_per_sec)
-      if (status == 'ok') and (pct_files < pct_files_min):
-                raise SMFResultException('not enough total files processed, change test parameters')
+      output_results.output_results(invoke_list, prm_host_set, prm_thread_count,pct_files_min)
 
     except IOError, e:
         print 'host %s filename %s: %s'%(h, pickle_fn, str(e))
         all_ok = False
     except KeyboardInterrupt, e:
         print 'control-C signal seen (SIGINT)'
-        all_ok = False
-    except SMFResultException, e:
-        print 'exception: '+str(e)
         all_ok = False
     if not all_ok: 
         sys.exit(NOTOK)
@@ -348,11 +297,7 @@ def run_workload():
 
   sg = my_host_invoke.starting_gate
   if not prm_slave:
-    with open(sg, "w") as sgf: 
-      sgf.write('hi there')
-      sgf.flush()
-      os.fsync(sgf.fileno())
-      sgf.close()
+    sync_files.write_sync_file(sg, 'hi there')
 
   # wait for starting_gate file to be created by test driver
   # every second we resume scan from last host file not found
@@ -392,38 +337,8 @@ def run_workload():
       threads_failed_to_start = 0
       worst_status = 'ok'
       # FIXME: code to aggregate results from list of invoke objects can be shared by multi-host and single-host cases
-      for t in thread_list:
-        status = "ok"
-        if t.invoke.status != OK: status = os.strerror(t.invoke.status)
-        if worst_status == 'ok' and status != 'ok': worst_status = status
-        print "host = %s, thread = %s, elapsed time = %f, total files = %d, total_records = %d, status = %s"%\
-              (host, t.invoke.tid, t.invoke.elapsed_time, t.invoke.filenum_final, t.invoke.rq_final, status)
-        if t.invoke.filenum_final < 1:  threads_failed_to_start += 1
-        total_files += t.invoke.filenum_final
-        total_records += t.invoke.rq_final
-        max_elapsed_time = max(max_elapsed_time, t.invoke.elapsed_time)
-
-      print "elapsed time = %f, total files = %d, total_records = %d"\
-                  %(max_elapsed_time, total_files, total_records)
-      if threads_failed_to_start:
-        raise SMFResultException('at least %d threads did not start'%threads_failed_to_start)
-      max_files = my_host_invoke.iterations * len(thread_list)
-      pct_files = 100.0 * total_files / max_files
-      print '%6.2f%% of requested files processed, minimum is %6.2f'%(pct_files, pct_files_min)
-      if worst_status != 'ok':
-                raise SMFResultException('at least one thread encountered error, test may be invalid')
-      if pct_files < pct_files_min:
-                raise SMFResultException('not enough total files processed, change test parameters')
-      if (max_elapsed_time > 0):
-        files_per_sec = total_files / max_elapsed_time
-        print "%d sec elapsed time, %f files/sec"%(max_elapsed_time, files_per_sec)
-        if total_records > 0: 
-            iops = total_records / max_elapsed_time
-            print "%f IOPS"%iops
-            rszkb = my_host_invoke.record_sz_kb
-            if rszkb == 0: rszkb = my_host_invoke.total_sz_kb
-            mb_per_sec = iops * rszkb / 1024.0
-            if mb_per_sec > 0: print "%f MB/sec"%mb_per_sec
+      invoke_list = map( lambda(t) : t.invoke, thread_list )
+      output_results.output_results( invoke_list, [ 'localhost' ], prm_thread_count, pct_files_min )
     except SMFResultException as e:
         print 'ERROR: ' + str(e)
         exit_status = NOTOK
@@ -434,16 +349,11 @@ def run_workload():
     # then write out this host's result in pickle format so test driver can pick up result
 
     result_filename = gen_host_result_filename(master_invoke)
-    if verbose: print 'saving result to filename %s'%result_filename
-    ensure_deleted(result_filename)
-    result_file = open(result_filename, 'w')
     invok_list = []
     for t in thread_list:
         invok_list.append(t.invoke)
-    pickle.dump(invok_list, result_file)
-    result_file.flush()
-    os.fsync(result_file.fileno())  # have to do this or reader may not see data
-    result_file.close()
+    if verbose: print 'saving result to filename %s'%result_filename
+    sync_files.write_pickle(result_filename, invok_list)
     time.sleep(1.2)
 
   sys.exit(exit_status)
