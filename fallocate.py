@@ -25,7 +25,7 @@ def load_libc_function(func_name):
     libc = ctypes.CDLL(ctypes.util.find_library('c'))
     return getattr(libc, func_name)
   except AttributeError:
-    print "Unable to locate %s in libc.  Leaving as a no-op."% func_name
+    #print "Unable to locate %s in libc.  Leaving as a no-op."% func_name
     return None
 
 # do this at module load time 
