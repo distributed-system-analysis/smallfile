@@ -6,7 +6,7 @@ def write_sync_file(fpath, contents):
       sgf.write(contents)
       sgf.flush()
       os.fsync(sgf.fileno())
-      sgf.close()
+      # file should close when you exit with block
 
 def write_pickle(fpath, obj):
     with open(fpath, 'w') as result_file:
