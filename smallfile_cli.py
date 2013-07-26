@@ -98,14 +98,14 @@ def run_workload():
 
     if os.path.exists( master_invoke.network_dir ): 
       shutil.rmtree( master_invoke.network_dir )
-      time.sleep(2.1)
+      time.sleep(2.1) # hack to ensure that all remote clients can see that directory has been recreated
       os.mkdir(master_invoke.network_dir)
     ensure_dir_exists( master_invoke.network_dir )
     for dlist in [ master_invoke.src_dirs, master_invoke.dest_dirs ]:
       for d in dlist:
          ensure_dir_exists(d)
     os.listdir(master_invoke.network_dir)  # workaround to attempt to force synchronization
-    time.sleep(1.1)
+    time.sleep(1.1) # hack to let NFS mount option actimeo=1 have its effect
     remote_cmd += ' --slave Y '
     ssh_thread_list = []
     host_ct = len(prm_host_set)
@@ -182,7 +182,6 @@ def run_workload():
         if t.status != OK: 
           all_ok = False
           print 'ERROR: ssh thread for host %s completed with status %d'%(t.remote_host, t.status)
-    time.sleep(2) # give response files time to propagate to this host
 
     # attempt to aggregate results by reading pickle files
     # containing smf_invocation instances with counters and times that we need
@@ -198,6 +197,7 @@ def run_workload():
         if verbose: print 'reading pickle file: %s'%pickle_fn
         host_invoke_list = []
         try:
+                if not os.path.exists(pickle_fn): time.sleep(1.2)
                 with open(pickle_fn, "r") as pickle_file:
                   host_invoke_list = pickle.load(pickle_file)
                 if verbose: print ' read %d invoke objects'%len(host_invoke_list)
@@ -295,7 +295,11 @@ def run_workload():
 
   sg = my_host_invoke.starting_gate
   if not prm_slave: # special case of no --host-set parameter
-    sync_files.write_sync_file(sg, 'hi there')
+    try:
+      sync_files.write_sync_file(sg, 'hi there')
+      if verbose: print 'wrote starting gate file'
+    except IOError, e:
+      print 'error writing starting gate for threads: %s'%str(e)
 
   # wait for starting_gate file to be created by test driver
   # every second we resume scan from last host file not found
