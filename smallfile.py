@@ -37,6 +37,12 @@ import threading
 import socket
 import errno
 
+
+OK = 0  # system call return code for success
+NOTOK = 1
+KB_PER_GB = (1<<20)
+pct_files_min = 90  # minimum percentage of files considered acceptable for a test run
+
 # unfortunately python 2.x does not come with extended attribute module, so we have to install it,
 # but we can at least throw an exception saying what's wrong
 
@@ -82,6 +88,14 @@ class MFRdWrExc(Exception):
     def __str__(self):
         return "file " + str(self.filenum) + " request " + str(self.rqnum) + " byte count " + str(self.bytesrtnd) + ' ' + self.opname
 
+class SMFResultException(Exception):
+  def __init__(self, msg):
+    Exception.__init__(self)
+    self.msg = msg
+
+  def __str__(self):
+    return self.msg
+
 # avoid exception if file we wish to delete is not there
 
 def ensure_deleted(fn):
@@ -91,6 +105,19 @@ def ensure_deleted(fn):
       # could be race condition with other client processes/hosts
       if os.path.exists(fn): # if was race condition, file will no longer be there
          raise Exception("exception while ensuring %s deleted: %s"%(fn, str(e)))
+
+# just create an empty file
+# leave exception handling to caller
+
+def touch(fn):
+    with open(fn, "w") as f: pass
+
+# abort routine just cleans up threads
+
+def abort_test(abort_fn, thread_list):
+    touch(abort_fn)
+    for t in thread_list:
+        t.terminate()
 
 # create directory if it's not already there
 
@@ -358,14 +385,13 @@ class smf_invocation:
     def save_rsptimes(self):
         fname = 'rsptimes_'+str(self.tid)+'_'+get_hostname(None)+'_'+self.opname+'_'+str(self.start_time)+'.csv'
         rsptime_fname = os.path.join(self.network_dir, fname)
-        f = open(rsptime_fname, "w")
-        for (opname, start_time, rsp_time) in self.rsptimes:
+        with open(rsptime_fname, "w") as f:
+          for (opname, start_time, rsp_time) in self.rsptimes:
             # time granularity is microseconds, accuracy is probably less than that
             start_time_str = '%9.6f'%(start_time - self.start_time)
             rsp_time_str = '%9.6f'%rsp_time
             f.write( '%8s, %9.6f, %9.6f\n'%(opname, (start_time - self.start_time),rsp_time))
-        os.fsync(f.fileno()) # particularly for NFS this is needed
-        f.close()
+          os.fsync(f.fileno()) # particularly for NFS this is needed
 
     # determine if test interval is over for this thread
 
@@ -396,6 +422,12 @@ class smf_invocation:
 
     def log_fn(self):
         return os.path.join(self.tmp_dir, 'invoke_logs-%s.log'%self.tid)
+
+    # file for result stored as pickled python object
+
+    def host_result_filename(self, result_host=None):
+      if result_host == None: result_host = self.onhost
+      return os.path.join(self.network_dir, result_host + '_result.pickle')
 
     # we use the seed function to control per-thread random sequence
     # we want seed to be saved so that operations subsequent to initial create will know
@@ -439,8 +471,7 @@ class smf_invocation:
         if self.starting_gate:
             gateReady = self.gen_thread_ready_fname(self.tid)
             #print 'thread at gate, file ' + gateReady
-            with open(gateReady, "w") as f: 
-              f.close()
+            touch(gateReady)
             while not os.path.exists(self.starting_gate):
                 if os.path.exists(self.abort_fn()): raise Exception("thread " + str(self.tid) + " saw abort flag")
                 # wait a little longer so that other clients have time to see that gate exists
@@ -454,9 +485,8 @@ class smf_invocation:
         self.end_time = time.time()
         if self.filenum >= self.iterations:
          try:
-            with open(self.stonewall_fn(), "w") as f: 
-                self.log.info('stonewall file written by thread %s on host %s'%(self.tid, get_hostname(None)))
-                f.close()
+            touch(self.stonewall_fn())
+            self.log.info('stonewall file written by thread %s on host %s'%(self.tid, get_hostname(None)))
          except IOError as e:
             err = e.errno
             if err != errno.EEXIST: 
@@ -1336,8 +1366,7 @@ if unittest2_installed:
               break
             time.sleep(1)
         if not threads_ready: raise Exception("threads did not show up within %d seconds"%thread_ready_timeout)
-        f = open(sgate_file, "w")
-        f.close()
+        touch(sgate_file)
         for t in threadList: 
             t.join()
             if t.isAlive(): raise Exception("thread join timeout:" + str(t))
