@@ -1,6 +1,7 @@
 import os
 import smallfile
-from smallfile_cli import SMFResultException, KB_PER_GB
+from smallfile import SMFResultException, KB_PER_GB
+
 
 def output_results(invoke_list, prm_host_set, prm_thread_count, pct_files_min):
       if len(invoke_list) < 1:
