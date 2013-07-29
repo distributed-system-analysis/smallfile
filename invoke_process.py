@@ -8,10 +8,9 @@ See Appendix on this page for instructions pertaining to license.
 import multiprocessing
 import unittest
 import smallfile
+from smallfile import OK
 import os
 import time
-
-OK = 0  # system call return code for success
 
 # this class is used to launch multiple threads with smf_invocation instances
 # we do this because we can use > 1 core this way, with 
@@ -99,8 +98,7 @@ class Test(unittest.TestCase):
             time.sleep(1)
         if not threads_ready: raise Exception("threads did not show up within %d seconds"%thread_ready_timeout)
         time.sleep(1)
-        f = open(sgate_file, "w")
-        f.close()
+        smallfile.touch(sgate_file)
         for t in threadList: 
             rtnd_invok = t.receiver.recv()
             t.join()
