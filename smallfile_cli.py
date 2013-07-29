@@ -34,29 +34,15 @@ import shutil
 import ssh_thread
 import smallfile
 from smallfile import smf_invocation, ensure_deleted, ensure_dir_exists, get_hostname, hostaddr
+from smallfile import OK, NOTOK, SMFResultException
 import invoke_process
 import sync_files
+from sync_files import create_top_dirs
 import output_results
 
-class SMFResultException(Exception):
-  def __init__(self, msg):
-    Exception.__init__(self)
-    self.msg = msg
-
-  def __str__(self):
-    return self.msg
-
-
-OK = 0  # system call return code for success
-NOTOK = 1
-KB_PER_GB = (1<<20)
 # FIXME: should be monitoring progress, not total elapsed time
 min_files_per_sec = 15 
 pct_files_min = 70  # minimum percentage of files for valid test
-
-def gen_host_result_filename(master_invoke, result_host=None):
-  if result_host == None: result_host = master_invoke.onhost
-  return os.path.join(master_invoke.network_dir, result_host + '_result.pickle')
 
 # abort routine just cleans up threads
 
@@ -89,23 +75,15 @@ def run_workload():
     if verbose: print 'extending initialization timeout by %d seconds for directory creation'%dir_creation_timeout
     startup_timeout += dir_creation_timeout
   host_startup_timeout = startup_timeout + 10
+
   # for multi-host test
 
   if prm_host_set and not prm_slave:
     host_startup_timeout += len(prm_host_set)/30
+    create_top_dirs(master_invoke, True)
 
-    # construct list of ssh threads to invoke in parallel
+    # construct list of remote host threads
 
-    if os.path.exists( master_invoke.network_dir ): 
-      shutil.rmtree( master_invoke.network_dir )
-      time.sleep(2.1) # hack to ensure that all remote clients can see that directory has been recreated
-      os.mkdir(master_invoke.network_dir)
-    ensure_dir_exists( master_invoke.network_dir )
-    for dlist in [ master_invoke.src_dirs, master_invoke.dest_dirs ]:
-      for d in dlist:
-         ensure_dir_exists(d)
-    os.listdir(master_invoke.network_dir)  # workaround to attempt to force synchronization
-    time.sleep(1.1) # hack to let NFS mount option actimeo=1 have its effect
     remote_cmd += ' --slave Y '
     ssh_thread_list = []
     host_ct = len(prm_host_set)
@@ -117,7 +95,7 @@ def run_workload():
 	else:
 	  this_remote_cmd += ' --as-host %s'%n
         if verbose: print this_remote_cmd
-        pickle_fn = gen_host_result_filename(master_invoke, n)
+        pickle_fn = master_invoke.host_result_filename(n)
         ensure_deleted(pickle_fn)
         ssh_thread_list.append(ssh_thread.ssh_thread(n, this_remote_cmd))
 
@@ -193,7 +171,7 @@ def run_workload():
         # read results for each thread run in that host
         # from python pickle of the list of smf_invocation objects
 
-        pickle_fn = gen_host_result_filename(master_invoke, h)
+        pickle_fn = master_invoke.host_result_filename(h)
         if verbose: print 'reading pickle file: %s'%pickle_fn
         host_invoke_list = []
         try:
@@ -224,16 +202,10 @@ def run_workload():
   # this is all that gets run
 
   if not prm_slave:
-      if os.path.exists( master_invoke.network_dir ):
-          shutil.rmtree( master_invoke.network_dir )
-          if verbose: print host + ' deleted ' + master_invoke.network_dir
-      os.makedirs(master_invoke.network_dir, 0777)
-      for dlist in [ master_invoke.src_dirs, master_invoke.dest_dirs ]:
-          for d in dlist:
-              if not os.path.exists(d): os.makedirs(d, 0777)
+      create_top_dirs(master_invoke, False)
   else:
       time.sleep(1.1)
-  os.listdir(master_invoke.network_dir)
+      os.listdir(master_invoke.network_dir)
   for dlist in [ master_invoke.src_dirs, master_invoke.dest_dirs ]:
     for d in dlist:
         os.listdir(d)
@@ -345,7 +317,7 @@ def run_workload():
     # if we are participating in a multi-host test 
     # then write out this host's result in pickle format so test driver can pick up result
 
-    result_filename = gen_host_result_filename(master_invoke)
+    result_filename = master_invoke.host_result_filename()
     invok_list = []
     for t in thread_list:
         invok_list.append(t.invoke)
