@@ -809,15 +809,28 @@ class smf_invocation:
         if self.hash_to_dir:
                 raise Exception("cannot do readdir test with --hash-into-dirs option")
         prev_dir = ''
+        dir_map = {}
+        file_count = 0
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
             dir = os.path.dirname(fn)
             if dir != prev_dir: 
+                if file_count != len(dir_map):
+                    raise MFRdWrExc('readdir: not all files in directory %s were found'%prev_dir, self.filenum, self.rq, 0)
                 self.op_starttime()
                 dir_contents = os.listdir(dir)
                 self.op_endtime(self.opname)
                 prev_dir = dir
-
+                dir_map = {}
+                for listdir_filename in dir_contents: 
+                  if not listdir_filename[0] == 'd': 
+                    dir_map[listdir_filename] = True  # only include files not directories
+                file_count = 0
+            if not fn.startswith('d'): 
+              file_count += 1 # only count files, not directories
+            if not dir_map.has_key(os.path.basename(fn)):
+                raise MFRdWrExc('readdir: file missing from directory %s', self.filenum, self.rq, 0)
+            
     # this operation simulates a user doing "ls -lR" on a big directory tree
     # eventually we'll be able to use readdirplus() system call?
 
