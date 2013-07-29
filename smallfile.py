@@ -829,7 +829,7 @@ class smf_invocation:
             if not fn.startswith('d'): 
               file_count += 1 # only count files, not directories
             if not dir_map.has_key(os.path.basename(fn)):
-                raise MFRdWrExc('readdir: file missing from directory %s', self.filenum, self.rq, 0)
+                raise MFRdWrExc('readdir: file missing from directory %s'%prev_dir, self.filenum, self.rq, 0)
             
     # this operation simulates a user doing "ls -lR" on a big directory tree
     # eventually we'll be able to use readdirplus() system call?
