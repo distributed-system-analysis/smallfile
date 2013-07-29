@@ -6,7 +6,7 @@
 localhost_name="$1"
 if [ -z "$localhost_name" ] ; then localhost_name="localhost" ; fi
 
-testdir='$TMPDIR/smfregtest'
+testdir="$TMPDIR/smfregtest"
 if [ "$TMPDIR" = "" ] ; then
   testdir='/var/tmp/smfregtest'
 fi
