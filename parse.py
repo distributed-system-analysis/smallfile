@@ -9,8 +9,9 @@ import sys
 import os
 import smallfile
 from smallfile import smf_invocation
+import smf_test_params
 
-version = '1.9.17'
+version = '2.0'
 
 # convert boolean value into 'Y' or 'N'
 
@@ -100,8 +101,8 @@ def parse():
   prm_slave = False
   prm_permute_host_dirs = False
   prm_remote_pgm_dir = None
+  prm_top_dirs = None
   prm_network_sync_dir = None
-  prm_top_dir = None
 
   # parse command line
 
@@ -158,7 +159,7 @@ def parse():
             usage('unrecognized operation name: %s'%val)
         inv.opname = val
     elif prm == 'top': 
-        prm_top_dir = val.split(',')
+        prm_top_dirs = val.split(',')
     elif prm == 'pause': 
         chkPositiveInt(val, rawprm)
         inv.pause_between_files = int(val)
@@ -198,18 +199,20 @@ def parse():
   if (inv.record_sz_kb != 0) and ((inv.total_sz_kb % inv.record_sz_kb) != 0):
     usage('file size must be multiple of record size if record size is non-zero')
 
-  if prm_top_dir: 
-    for d in prm_top_dir:
+  if prm_top_dirs: 
+    for d in prm_top_dirs:
       if len(d) < 6:
         usage('directory less than 6 characters, cannot use top of filesystem, too dangerous')
-  if prm_top_dir:
-    inv.set_top(prm_top_dir)
+  if prm_top_dirs:
+    inv.set_top(prm_top_dirs)
   else:
-    prm_top_dir = inv.top_dirs
+    prm_top_dirs = inv.top_dirs
   if prm_network_sync_dir:
     if not prm_host_set and not prm_slave:
       usage('you do not need to specify a network thread synchronization directory unless you use multiple hosts')
     inv.network_dir = prm_network_sync_dir
+  else:
+    prm_network_sync_dir = inv.network_dir
   if prm_remote_pgm_dir:
     if not prm_host_set and not prm_slave:
       usage('you do not need to specify a remote program directory unless you use multiple hosts')
@@ -228,7 +231,7 @@ def parse():
 
   prm_list = [ \
              ('hosts in test', '%s'%prm_host_set), \
-             ('top test directory(s)', str(prm_top_dir)), \
+             ('top test directory(s)', str(prm_top_dirs)), \
              ('operation', inv.opname), \
              ('files/thread', '%d'%inv.iterations), \
              ('threads', '%d'%prm_thread_count), \
@@ -267,5 +270,7 @@ def parse():
   remote_cmd = prm_remote_pgm_dir + os.sep + 'smallfile_cli.py ' + pass_on_prm_list
 
   # "inv" contains all per-thread parameters
-  return (prm_host_set, prm_thread_count, inv, remote_cmd, prm_slave, prm_permute_host_dirs)
-
+  params = smf_test_params.smf_test_params(prm_host_set, prm_thread_count, inv, prm_remote_pgm_dir, prm_top_dirs, \
+                                           prm_network_sync_dir, prm_slave, prm_permute_host_dirs)
+  #print params
+  return params
