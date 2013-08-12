@@ -52,7 +52,6 @@ def deltree(dir_tree):
             for d in subdirs: os.rmdir(os.path.join(dir,d))
         os.rmdir(dir_tree)
         
-ok=0
 class Test(unittest.TestCase):
     def setUp(self):
         self.invok = smallfile.smf_invocation()
