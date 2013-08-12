@@ -72,7 +72,7 @@ try:
   import unittest2
   unittest2_installed = True
 except ImportError as e:
-  pass
+  import unittest
 
 # Windows 2008 server seemed to have this environment variable, didn't check if it's universal
 
@@ -115,7 +115,8 @@ def touch(fn):
 # abort routine just cleans up threads
 
 def abort_test(abort_fn, thread_list):
-    touch(abort_fn)
+    if not os.path.exists(abort_fn): 
+        touch(abort_fn)
     for t in thread_list:
         t.terminate()
 
@@ -399,7 +400,7 @@ class smf_invocation:
     # (i.e. it is ready to immediately begin generating workload)
 
     def gen_thread_ready_fname(self, tid, hostname=None):
-        return os.path.join(self.tmp_dir, "thread_ready." + get_hostname(hostname) + "_" + tid + ".tmp")
+        return os.path.join(self.tmp_dir, "thread_ready." + tid + ".tmp")
 
     # each host uses this to signal that it is ready to immediately begin generating workload
     # each host places this file in a directory shared by all hosts to indicate that this host is ready
@@ -567,7 +568,7 @@ class smf_invocation:
         # for successive files use same directory when possible
 
         path = os.path.join(tree, dirpath)
-        path += self.prefix + "_" + self.onhost + "_" + self.tid + "_" + str(filenum) + "_" + self.suffix
+        path += self.prefix + "_" + self.tid + "_" + str(filenum) + "_" + self.suffix
         #print 'next path: %s'%path
         return path
 
@@ -1097,7 +1098,11 @@ class TestThread(threading.Thread):
 
 ok=0
 if unittest2_installed:
- class Test(unittest2.TestCase):
+ unittest_class = unittest2.TestCase
+else:
+ unittest_class = unittest.TestCase
+
+class Test(unittest_class):
     def setUp(self):
         self.invok = smf_invocation()
         self.invok.opname = "create"
@@ -1151,7 +1156,7 @@ if unittest2_installed:
      
     def test_a_MkFn(self):
         fn = self.invok.mk_file_nm(self.invok.src_dirs)
-        expectedFn = os.path.join(self.invok.src_dirs[0], self.invok.prefix + "_" + get_hostname(None) + '_' + self.invok.tid + "_" + str(self.invok.filenum) + "_" + self.invok.suffix)
+        expectedFn = os.path.join(self.invok.src_dirs[0], self.invok.prefix + "_" + self.invok.tid + "_" + str(self.invok.filenum) + "_" + self.invok.suffix)
         self.assertTrue( fn == expectedFn )
         f = open(fn, "w+", 0666)
         f.close()
@@ -1389,4 +1394,5 @@ if unittest2_installed:
 # so you can just do "python smallfile.py" to test it
 
 if __name__ == "__main__":
-    unittest2.main()
+    if unittest2_installed: unittest2.main()
+    else: unittest.main()
