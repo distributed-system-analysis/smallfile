@@ -1,0 +1,35 @@
+# this class represents the entire set of test parameters
+
+# calculate timeouts to allow for initialization delays while directory tree is created
+
+def calc_startup_timeout(prm):
+  return startup_timeout
+
+class smf_test_params:
+  def __init__(self, prm_host_set, prm_thread_count, master_invoke, remote_pgm_dir, top_dirs, network_sync_dir, prm_slave, prm_permute_host_dirs):
+    self.as_host = None   # 
+    self.host_set = prm_host_set
+    self.thread_count = prm_thread_count
+    self.master_invoke = master_invoke
+    self.remote_pgm_dir = remote_pgm_dir
+    self.master_invoke.set_top( top_dirs )
+    if network_sync_dir: self.master_invoke.network_dir = network_sync_dir
+    self.is_slave = prm_slave
+    self.permute_host_dirs = prm_permute_host_dirs
+
+    # calculate timeouts 
+
+    self.startup_timeout = 20
+    dirs = self.master_invoke.iterations * self.thread_count / self.master_invoke.files_per_dir
+    if dirs > 20:
+      self.startup_timeout += (dirs / 5)
+    self.host_startup_timeout = self.startup_timeout
+    if self.host_set:
+      self.host_startup_timeout += (10 + len(self.host_set)/30)
+
+  def __str__(self):
+    return "smf_test_params: as_host=%s host_set=%s thread_count=%d remote_pgm_dir=%s slave=%s permute_host_dirs=%s startup_timeout=%d host_startup_timeout=%d smf_invoke=%s "%\
+      (str(self.as_host), str(self.host_set), self.thread_count, self.remote_pgm_dir, \
+       str(self.is_slave), str(self.permute_host_dirs), self.startup_timeout, self.host_startup_timeout, \
+       str(self.master_invoke))
+
