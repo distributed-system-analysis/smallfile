@@ -21,7 +21,7 @@ Created on Apr 22, 2009
 
 import os
 import os.path
-from os.path import exists
+from os.path import exists, join
 import sys
 import glob
 import string
@@ -117,8 +117,6 @@ def touch(fn):
 def abort_test(abort_fn, thread_list):
     if not os.path.exists(abort_fn): 
         touch(abort_fn)
-    for t in thread_list:
-        t.terminate()
 
 # create directory if it's not already there
 
@@ -198,7 +196,7 @@ class smf_invocation:
         self.is_shared_dir = False    # True if all threads share same directory
         self.opname = "cleanup"       # what kind of file access, default is an idempotent operation
         self.iterations = 200           # how many files to access
-        top = os.path.join(self.tmp_dir, 'smf')
+        top = join(self.tmp_dir, 'smf')
         self.set_top([top])
         self.starting_gate = None     # file that tells thread when to start running
         self.record_sz_kb = 0         # record size in KB, 0 means default to file size
@@ -318,7 +316,7 @@ class smf_invocation:
 
     def reset(self):
         # results returned in variables below
-        self.filenum = 0    # how many files have been accessed so far
+        self.filenum = -1    # how many files have been accessed so far
         self.filenum_final = 0 # how many files accessed when test ended
         self.rq = 0         # how many reads/writes have been attempted so far
         self.rq_final = 0  # how many reads/writes completed when test ended
@@ -338,9 +336,9 @@ class smf_invocation:
 
     def set_top(self, top_dirs, network_dir=None):
         self.top_dirs = top_dirs                                    # directories that contain all files used in test
-        self.src_dirs = [ os.path.join(d, "file_srcdir") for d in top_dirs ]   # where to create files in
-        self.dest_dirs = [ os.path.join(d, "file_dstdir") for d in top_dirs ]   # where to rename files to
-        self.network_dir = os.path.join(top_dirs[0], "network_shared") # directory for synchronization files shared across hosts
+        self.src_dirs = [ join(d, "file_srcdir") for d in top_dirs ]   # where to create files in
+        self.dest_dirs = [ join(d, "file_dstdir") for d in top_dirs ]   # where to rename files to
+        self.network_dir = join(top_dirs[0], "network_shared") # directory for synchronization files shared across hosts
         if network_dir: self.network_dir = network_dir
 
     # create per-thread log file
@@ -385,7 +383,7 @@ class smf_invocation:
 
     def save_rsptimes(self):
         fname = 'rsptimes_'+str(self.tid)+'_'+get_hostname(None)+'_'+self.opname+'_'+str(self.start_time)+'.csv'
-        rsptime_fname = os.path.join(self.network_dir, fname)
+        rsptime_fname = join(self.network_dir, fname)
         with open(rsptime_fname, "w") as f:
           for (opname, start_time, rsp_time) in self.rsptimes:
             # time granularity is microseconds, accuracy is probably less than that
@@ -400,35 +398,35 @@ class smf_invocation:
     # (i.e. it is ready to immediately begin generating workload)
 
     def gen_thread_ready_fname(self, tid, hostname=None):
-        return os.path.join(self.tmp_dir, "thread_ready." + tid + ".tmp")
+        return join(self.tmp_dir, "thread_ready." + tid + ".tmp")
 
     # each host uses this to signal that it is ready to immediately begin generating workload
     # each host places this file in a directory shared by all hosts to indicate that this host is ready
 
     def gen_host_ready_fname(self, hostname=None):
         if not hostname: hostname = self.onhost
-        return os.path.join(self.network_dir, "host_ready." + hostname + ".tmp")
+        return join(self.network_dir, "host_ready." + hostname + ".tmp")
 
     # abort file tells other threads not to start test because something has already gone wrong
 
     def abort_fn(self):
-        return os.path.join(self.network_dir, 'abort.tmp')
+        return join(self.network_dir, 'abort.tmp')
 
     # stonewall file stops test measurement (does not stop worker thread unless --finish N is used)
 
     def stonewall_fn(self):
-        return os.path.join(self.network_dir, 'stonewall.tmp')
+        return join(self.network_dir, 'stonewall.tmp')
 
     # log file for this worker thread goes here
 
     def log_fn(self):
-        return os.path.join(self.tmp_dir, 'invoke_logs-%s.log'%self.tid)
+        return join(self.tmp_dir, 'invoke_logs-%s.log'%self.tid)
 
     # file for result stored as pickled python object
 
     def host_result_filename(self, result_host=None):
       if result_host == None: result_host = self.onhost
-      return os.path.join(self.network_dir, result_host + '_result.pickle')
+      return join(self.network_dir, result_host + '_result.pickle')
 
     # we use the seed function to control per-thread random sequence
     # we want seed to be saved so that operations subsequent to initial create will know
@@ -476,7 +474,7 @@ class smf_invocation:
             while not os.path.exists(self.starting_gate):
                 if os.path.exists(self.abort_fn()): raise Exception("thread " + str(self.tid) + " saw abort flag")
                 # wait a little longer so that other clients have time to see that gate exists
-                time.sleep(1.0)
+                time.sleep(0.3)
 
     # record info needed to compute test statistics 
 
@@ -519,15 +517,38 @@ class smf_invocation:
 
     # in this method of directory selection, as filenum increments upwards, 
     # we place F = files_per_dir files into directory, then next F files into directory D+1, etc.
+    # we generate directory pathnames like radix-D numbers 
+    # where D is subdirectories per directory
+    # see URL http://gmplib.org/manual/Binary-to-Radix.html#Binary-to-Radix 
+    # this algorithm should take O(log(F))
 
-    def mk_seq_dir_name(self, file_num):
-        dir_num = file_num / self.files_per_dir
-        path = ''
-        while dir_num > 1:
-                dir_num_at_level = dir_num % self.dirs_per_dir
-                path = os.path.join('d_%03d'%dir_num_at_level, path)
-                dir_num = dir_num / self.dirs_per_dir
-        return path
+    def mk_seq_dir_name( self, file_num ):
+       dir_in = file_num / self.files_per_dir
+
+       # generate powers of self.files_per_dir not greater than dir_in
+
+       level_dirs = []
+       dirs_for_this_level = self.dirs_per_dir
+       while dirs_for_this_level <= dir_in:
+           level_dirs.append(dirs_for_this_level)
+           dirs_for_this_level *= self.dirs_per_dir
+
+       # generate each "digit" in radix-D number as result of quotients 
+       # from dividing remainder by next lower power of D (think of base 10)
+
+       levels = len(level_dirs)
+       level = levels - 1
+       path = ''
+       while level > -1:
+           dirs_in_level = level_dirs[level]
+           #print 'dirs_per_level=%d'%dirs_in_level
+           quotient = dir_in / dirs_in_level
+           dir_in = dir_in - (quotient * dirs_in_level)
+           path = join(path, 'd_%03d'%quotient)
+           level -= 1
+       path = join(path, 'd_%03d'%dir_in)
+       return path
+
 
     def mk_hashed_dir_name(self, file_num):
         path = ''
@@ -535,7 +556,7 @@ class smf_invocation:
         while dir_num > 1:
                 # try using floating point fraction to generate a uniform random distribution on directories
                 dir_num_hash = (dir_num * self.some_prime) % self.dirs_per_dir
-                path = os.path.join('h_%03d'%dir_num_hash, path)
+                path = join('h_%03d'%dir_num_hash, path)
                 #print file_num, dirs_in_tree, f, fract, next_dir_num, hashed_path
                 #print file_num, dir_num_hash, path
                 dir_num /= self.dirs_per_dir
@@ -561,15 +582,14 @@ class smf_invocation:
     def mk_file_nm(self, base_dirs, filenum=-1):
         if filenum == -1: filenum = self.filenum
 
-        dirpath = self.mk_dir_name(filenum)
+        dirpath = join('thrd_'+self.tid, self.mk_dir_name(filenum))
         tree = self.select_tree(base_dirs, filenum)
 
         # implement directory tree fitting files as high in the tree as possible
-        # for successive files use same directory when possible
 
-        path = os.path.join(tree, dirpath)
-        path += self.prefix + "_" + self.tid + "_" + str(filenum) + "_" + self.suffix
-        #print 'next path: %s'%path
+        path = join(tree, dirpath)
+        filenm = self.prefix + "_" + self.tid + "_" + str(filenum) + "_" + self.suffix
+        path = join(path, filenm)
         return path
 
     # allocate buffer of correct size
@@ -628,18 +648,21 @@ class smf_invocation:
             dpath = os.path.dirname(fpath)
             dirset.add(dpath)
         for unique_dpath in dirset:
+            #print 'start cleaning dir '+unique_dpath
             while len(unique_dpath) > 10:  # FIXME: arbitrary, but don't try to delete directories at very top
                 if not exists(unique_dpath):
+                        #print 'already removed ' + unique_dpath
                         unique_dpath = os.path.dirname(unique_dpath)
                         continue
                 elif os.listdir(unique_dpath) == []:
                         try:
+                          #print 'removing dir '+unique_dpath
                           os.rmdir(unique_dpath)
                         except OSError as e:
                           self.log.error('deleting directory dpath: %s'%e)
                           if (e.errno != errno.ENOENT) and not self.is_shared_dir: raise e
                         unique_dpath = os.path.dirname(unique_dpath)
-                        if len(unique_dpath) < self.src_dirs[0]:
+                        if len(unique_dpath) < len(self.src_dirs[0]):
                                 break
                 else:
                         break
@@ -1106,7 +1129,9 @@ class Test(unittest_class):
     def setUp(self):
         self.invok = smf_invocation()
         self.invok.opname = "create"
-        self.invok.iterations = 10
+        self.invok.iterations = 50
+        self.invok.files_per_dir = 5
+        self.invok.dirs_per_dir = 2
         self.invok.verbose = True
         self.invok.prefix = "p"
         self.invok.suffix = "s"
@@ -1118,8 +1143,8 @@ class Test(unittest_class):
         if not os.path.exists(topdir): return
         if not os.path.isdir(topdir): return
         for (dir, subdirs, files) in os.walk(topdir, topdown=False):
-            for f in files: os.unlink(os.path.join(dir,f))
-            for d in subdirs: os.rmdir(os.path.join(dir,d))
+            for f in files: os.unlink(join(dir,f))
+            for d in subdirs: os.rmdir(join(dir,d))
         os.rmdir(topdir)
         
     def chk_status(self):
@@ -1134,8 +1159,13 @@ class Test(unittest_class):
     def checkDirEmpty(self, emptyDir):
         self.assertTrue(os.listdir(emptyDir) == [])
 
+    def lastFileNameInTest(self, tree):
+        return self.invok.mk_file_nm(tree, self.invok.filenum - 1)
+
     def checkDirListEmpty(self, emptyDirList):
-        for d in emptyDirList: self.assertTrue(os.listdir(d) == [])
+        for d in emptyDirList: 
+          if exists(d):
+            assert(os.listdir(d) == [])
 
     def cleanup_files(self):
         self.runTest("cleanup")
@@ -1143,8 +1173,8 @@ class Test(unittest_class):
     def mk_files(self):
         self.cleanup_files()
         self.runTest("create")
-        self.assertTrue(exists(self.invok.mk_file_nm(self.invok.src_dirs)))
-        assert (os.path.getsize(self.invok.mk_file_nm(self.invok.src_dirs)) == self.invok.total_sz_kb * self.invok.BYTES_PER_KB)
+        self.assertTrue(exists(self.lastFileNameInTest(self.invok.src_dirs)))
+        assert (os.path.getsize(self.lastFileNameInTest(self.invok.src_dirs)) == self.invok.total_sz_kb * self.invok.BYTES_PER_KB)
 
     def test1_recreate_src_dest_dirs(self):
         for s in self.invok.src_dirs:
@@ -1155,37 +1185,44 @@ class Test(unittest_class):
           os.mkdir(s)
      
     def test_a_MkFn(self):
-        fn = self.invok.mk_file_nm(self.invok.src_dirs)
-        expectedFn = os.path.join(self.invok.src_dirs[0], self.invok.prefix + "_" + self.invok.tid + "_" + str(self.invok.filenum) + "_" + self.invok.suffix)
+        fn = self.invok.mk_file_nm(self.invok.src_dirs, 0)
+
+        thrd_nm = 'thrd_'+self.invok.tid
+        expectedFn = join( \
+                       join(self.invok.src_dirs[0], join(thrd_nm, 'd_000')), \
+                       self.invok.prefix + "_" + self.invok.tid + "_0_" + self.invok.suffix)
+        print fn, expectedFn
         self.assertTrue( fn == expectedFn )
-        f = open(fn, "w+", 0666)
-        f.close()
-        assert(os.path.getsize(fn) == 0)
+        self.mk_files()
+        assert exists(fn)
         os.unlink(fn)
+        self.assertTrue( not exists(fn) )
     
     def test_b_Cleanup(self):
         self.cleanup_files()
         
     def test_c_Create(self):
         self.mk_files()  # depends on cleanup_files
+        fn = self.lastFileNameInTest(self.invok.src_dirs)
+        assert exists(fn) 
 
     def test_c1_Mkdir(self):
         self.cleanup_files()
         self.runTest("mkdir")
-        self.assertTrue(exists(self.invok.mk_file_nm(self.invok.src_dirs)+'.d'))
+        self.assertTrue(exists(self.lastFileNameInTest(self.invok.src_dirs)+'.d'))
 
     def test_c2_Rmdir(self):
         self.cleanup_files()
         self.runTest("mkdir")
         self.runTest("rmdir")
-        self.assertTrue(not exists(self.invok.mk_file_nm(self.invok.src_dirs)+'.d'))
+        self.assertTrue(not exists(self.lastFileNameInTest(self.invok.src_dirs)+'.d'))
 
     def test_c3_Symlink(self):
         if is_windows_os: return
         self.cleanup_files()
         self.mk_files()
         self.runTest("symlink")
-        self.assertTrue(exists(self.invok.mk_file_nm(self.invok.dest_dirs)+'.s'))
+        self.assertTrue(exists(self.lastFileNameInTest(self.invok.dest_dirs)+'.s'))
 
     def test_c4_Stat(self):
         self.cleanup_files()
@@ -1221,6 +1258,7 @@ class Test(unittest_class):
         self.invok.measure_rsptimes = True
         self.mk_files()
         self.runTest("delete")
+        self.invok.clean_all_subdirs()
         self.checkDirListEmpty(self.invok.src_dirs)
         
     def test_e_Rename(self):
@@ -1229,12 +1267,15 @@ class Test(unittest_class):
         self.runTest("rename")
         fn = self.invok.mk_file_nm(self.invok.dest_dirs)
         self.assertTrue(exists(fn))
+        self.invok.clean_all_subdirs() # won't delete any files or directories that contain them
         self.checkDirListEmpty(self.invok.src_dirs)
 
     def test_f_DeleteRenamed(self):
         self.mk_files()
         self.runTest("rename")
         self.runTest("delete-renamed")
+        self.invok.clean_all_subdirs() # won't delete any files or directories that contain them
+        self.checkDirListEmpty(self.invok.src_dirs)
         self.checkDirListEmpty(self.invok.dest_dirs)
 
     def test_g_Append(self):
@@ -1242,7 +1283,7 @@ class Test(unittest_class):
         orig_kb = self.invok.total_sz_kb
         self.invok.total_sz_kb *= 2
         self.runTest("append")
-        fn = self.invok.mk_file_nm(self.invok.src_dirs)
+        fn = self.lastFileNameInTest(self.invok.src_dirs)
         st = os.stat(fn)
         self.assertTrue(st.st_size == (3 * orig_kb * self.invok.BYTES_PER_KB))
         
@@ -1254,7 +1295,7 @@ class Test(unittest_class):
     def test_h2_read_bad_data(self):
         self.mk_files()
         self.invok.verify_read = True
-        fn = self.invok.mk_file_nm(self.invok.src_dirs)
+        fn = self.lastFileNameInTest(self.invok.src_dirs)
         fd = os.open(fn, os.O_WRONLY)
         os.lseek(fd, 5, os.SEEK_SET)
         os.write(fd, '!')
@@ -1317,10 +1358,12 @@ class Test(unittest_class):
         self.invok.files_per_dir = 20
         self.invok.dirs_per_dir = 3
         d = self.invok.mk_dir_name(29*self.invok.files_per_dir)
-        self.assertTrue(d == os.path.join(os.path.join('d_000','d_000'), 'd_002') + os.sep)
+        expected = join('d_001',join('d_000', join('d_000', 'd_002')))
+        self.assertTrue(d == expected)
         self.invok.dirs_per_dir = 7
         d = self.invok.mk_dir_name(320*self.invok.files_per_dir)
-        self.assertTrue(d == os.path.join(os.path.join('d_006','d_003'), 'd_005') + os.sep)
+        expected = join(join('d_006','d_003'), 'd_005')
+        self.assertTrue(d == expected)
 
     def test_j1_deep_tree(self):
         self.invok.total_sz_kb = 0
@@ -1331,7 +1374,7 @@ class Test(unittest_class):
         self.invok.prefix = ''
         self.invok.suffix = 'deep'
         self.mk_files()
-        self.assertTrue(exists(self.invok.mk_file_nm(self.invok.src_dirs,self.invok.iterations-1)))
+        self.assertTrue(exists(self.lastFileNameInTest(self.invok.src_dirs)))
         self.cleanup_files()
  
     def test_j2_deep_hashed_tree(self):
@@ -1343,16 +1386,18 @@ class Test(unittest_class):
         self.invok.iterations = 500 
         self.hash_to_dir = True
         self.mk_files()
-        self.assertTrue(exists(self.invok.mk_file_nm(self.invok.src_dirs,self.invok.iterations-1)))
+        self.assertTrue(exists(self.lastFileNameInTest(self.invok.src_dirs)))
         self.cleanup_files()
 
-    def test_multithr_stonewall(self):
+    def test_z_multithr_stonewall(self):
         self.invok.stonewall = True
         self.invok.finish = True
         self.invok.prefix = "thr_"
         self.invok.suffix = "foo"
-        self.invok.iterations=10
-        sgate_file = os.path.join(self.invok.network_dir, "starting_gate.tmp")
+        self.invok.iterations=400
+        self.invok.files_per_dir = 10
+        self.invok.dirs_per_dir = 3
+        sgate_file = join(self.invok.network_dir, "starting_gate.tmp")
         self.invok.starting_gate = sgate_file
         thread_ready_timeout = 4
         thread_count = 4
@@ -1371,7 +1416,8 @@ class Test(unittest_class):
             threadList.append(TestThread(s, s.prefix + s.tid))
         for t in threadList: 
             t.start()
-        threads_ready = True
+        time.sleep(0.3)
+        threads_ready = True # define scope outside loop
         for i in range(0, thread_ready_timeout):
             threads_ready = True
             for s in invokeList:
@@ -1382,8 +1428,12 @@ class Test(unittest_class):
                   break
             if threads_ready: 
               break
-            time.sleep(1)
-        if not threads_ready: raise Exception("threads did not show up within %d seconds"%thread_ready_timeout)
+            time.sleep(1.1)
+        if not threads_ready: 
+            abort_test(self.invok.abort_fn(), threadList)
+            for t in threadList: 
+              t.join(1.1)
+            raise Exception("threads did not show up within %d seconds"%thread_ready_timeout)
         touch(sgate_file)
         for t in threadList: 
             t.join()
