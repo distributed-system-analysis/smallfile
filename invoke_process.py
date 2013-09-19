@@ -60,6 +60,8 @@ class Test(unittest.TestCase):
         self.invok.verbose = True
         self.invok.tid = "regtest"
         self.invok.start_log()
+        deltree(self.invok.src_dirs[0])
+        os.makedirs(self.invok.src_dirs[0], 0644)
 
     def test_multiproc_stonewall(self):
         self.invok.log.info('starting stonewall test')
@@ -104,8 +106,7 @@ class Test(unittest.TestCase):
             t.join()
             self.invok.log.info(str(rtnd_invok))
             if rtnd_invok.status != ok:
-                raise Exception("subprocess failure: " + str(t))
-
+                raise Exception("subprocess failure for %s invocation %s: " %(str(t), str(rtnd_invok)))
 
 # so you can just do "python invoke_process.py" to test it
 
