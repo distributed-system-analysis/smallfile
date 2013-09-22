@@ -2,9 +2,6 @@
 
 # calculate timeouts to allow for initialization delays while directory tree is created
 
-def calc_startup_timeout(prm):
-  return startup_timeout
-
 class smf_test_params:
   def __init__(self, prm_host_set, prm_thread_count, master_invoke, remote_pgm_dir, top_dirs, network_sync_dir, prm_slave, prm_permute_host_dirs):
     self.as_host = None   # 
