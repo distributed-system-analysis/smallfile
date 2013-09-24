@@ -1,6 +1,7 @@
 import ctypes
 import ctypes.util
 import os
+import sys
 
 # Drop 'buffer' cache for the given range of the given file.
 
@@ -38,7 +39,12 @@ def drop_buffer_cache(fd, offset, length):
 
 if __name__ == "__main__":
   fd = os.open('/tmp/foo', os.O_WRONLY|os.O_CREAT)
-  ret = os.write(fd, 'hi there')
+  if sys.version.startswith('3'):
+    ret = os.write(fd, bytes('hi there', 'UTF-8'))
+  elif sys.version.startswith('2'):
+    ret = os.write(fd, 'hi there')
+  else:
+    raise Exception('unrecognized python version %s'%sys.version)
   assert(ret == 8)
   drop_buffer_cache(fd, 0, 8)
   os.close(fd)
