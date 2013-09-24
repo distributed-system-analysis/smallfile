@@ -16,13 +16,12 @@ class smf_test_params:
 
     # calculate timeouts 
 
-    self.startup_timeout = 20
-    dirs = self.master_invoke.iterations * self.thread_count / self.master_invoke.files_per_dir
-    if dirs > 20:
-      self.startup_timeout += (dirs / 5)
+    self.startup_timeout = 5
+    dirs = self.master_invoke.iterations * self.thread_count // self.master_invoke.files_per_dir
+    self.startup_timeout += (dirs // 5)
     self.host_startup_timeout = self.startup_timeout
     if self.host_set:
-      self.host_startup_timeout += (10 + len(self.host_set)/30)
+      self.host_startup_timeout += (5 + dirs*len(self.host_set)//5)
 
   def __str__(self):
     return "smf_test_params: as_host=%s host_set=%s thread_count=%d remote_pgm_dir=%s slave=%s permute_host_dirs=%s startup_timeout=%d host_startup_timeout=%d smf_invoke=%s "%\
