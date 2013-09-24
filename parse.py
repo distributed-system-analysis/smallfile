@@ -25,33 +25,33 @@ def usage(msg):  # call if CLI syntax error or invalid parameter
       opnames += op + '|'
     opnames = opnames[:-1]
     dflts = smf_invocation()
-    print
-    print 'ERROR: ' + msg
-    print 'usage: smallfile_cli.py '
-    print opnames
-    print '  --top top-dir | top-dir1,top-dir2,...,top-dirN   (default: %s)'%smf_invocation.tmp_dir
-    print '  --host-set h1,h2,...,hN'
-    print '  --network-sync-dir directory-path                (default: %s/network_shared)'%smf_invocation.tmp_dir
-    print '  --files positive-integer                         (default: %d)'%dflts.iterations
-    print '  --files-per-dir positive-integer                 (default: %d)'%dflts.files_per_dir
-    print '  --dirs-per-dir positive-integer                  (default: %d)'%dflts.dirs_per_dir
-    print '  --threads positive-integer                       (default: %d)'%2
-    print '  --record-size non-negative-integer-KB            (default: %d)'%dflts.record_sz_kb
-    print '  --xattr-size non-negative-integer-bytes          (default: %d)'%dflts.xattr_size
-    print '  --xattr-count non-negative-integer-bytes         (default: %d)'%dflts.xattr_count
-    print '  --file-size-distribution exponential             (default: fixed-size)'
-    print '  --permute-host-dirs Y|N                          (default: N)'
-    print '  --hash-into-dirs Y|N                             (default: %s)'%bool2YN(dflts.hash_to_dir)
-    print '  --file-size non-negative-integer-KB              (default: %d)'%dflts.total_sz_kb
-    print '  --prefix alphanumeric-string'
-    print '  --suffix alphanumeric-string'
-    print '  --fsync Y|N                                      (default: %s)'%bool2YN(dflts.fsync)
-    print '  --finish Y|N                                     (default: %s)'%bool2YN(dflts.finish_all_rq)
-    print '  --verify-read Y|N                                (default: %s)'%bool2YN(dflts.verify_read)
-    print '  --response-times Y|N                             (default: %s)'%bool2YN(dflts.measure_rsptimes)
-    print '  --same-dir Y|N                                   (default: %s)'%bool2YN(dflts.is_shared_dir)
-    print '  --pause microsec                                 (default: %d)'%dflts.pause_between_files
-    print '  --remote-pgm-dir directory-pathname              (default: %s)'%os.getcwd()
+    print()
+    print('ERROR: ' + msg)
+    print('usage: smallfile_cli.py ')
+    print(opnames)
+    print('  --top top-dir | top-dir1,top-dir2,...,top-dirN   (default: %s)'%smf_invocation.tmp_dir)
+    print('  --host-set h1,h2,...,hN')
+    print('  --network-sync-dir directory-path                (default: %s/network_shared)'%smf_invocation.tmp_dir)
+    print('  --files positive-integer                         (default: %d)'%dflts.iterations)
+    print('  --files-per-dir positive-integer                 (default: %d)'%dflts.files_per_dir)
+    print('  --dirs-per-dir positive-integer                  (default: %d)'%dflts.dirs_per_dir)
+    print('  --threads positive-integer                       (default: %d)'%2)
+    print('  --record-size non-negative-integer-KB            (default: %d)'%dflts.record_sz_kb)
+    print('  --xattr-size non-negative-integer-bytes          (default: %d)'%dflts.xattr_size)
+    print('  --xattr-count non-negative-integer-bytes         (default: %d)'%dflts.xattr_count)
+    print('  --file-size-distribution exponential             (default: fixed-size)')
+    print('  --permute-host-dirs Y|N                          (default: N)')
+    print('  --hash-into-dirs Y|N                             (default: %s)'%bool2YN(dflts.hash_to_dir))
+    print('  --file-size non-negative-integer-KB              (default: %d)'%dflts.total_sz_kb)
+    print('  --prefix alphanumeric-string')
+    print('  --suffix alphanumeric-string')
+    print('  --fsync Y|N                                      (default: %s)'%bool2YN(dflts.fsync))
+    print('  --finish Y|N                                     (default: %s)'%bool2YN(dflts.finish_all_rq))
+    print('  --verify-read Y|N                                (default: %s)'%bool2YN(dflts.verify_read))
+    print('  --response-times Y|N                             (default: %s)'%bool2YN(dflts.measure_rsptimes))
+    print('  --same-dir Y|N                                   (default: %s)'%bool2YN(dflts.is_shared_dir))
+    print('  --pause microsec                                 (default: %d)'%dflts.pause_between_files)
+    print('  --remote-pgm-dir directory-pathname              (default: %s)'%os.getcwd())
     sys.exit(1)
 
 # convert boolean command line parameter value into True/False 
@@ -66,7 +66,7 @@ def str2bool(val, prmname):
 def chkNonNegInt(intval, prm):
     try:
         v = int(intval)
-    except ValueError, e:
+    except ValueError as e:
         usage('parameter "%s" must be an integer'%prm)
     if v < 0: 
         usage('integer parameter "%s" must be non-negative'%prm)
@@ -110,7 +110,7 @@ def parse():
 
   pass_on_prm_list = ''  # parameters passed to remote hosts if needed
   if argc == 1:
-      print '\nfor additional help add the parameter "--help" to the command\n'
+      print('\nfor additional help add the parameter "--help" to the command\n')
   j=1
   while j < argc:
     rawprm = sys.argv[j]
@@ -261,9 +261,9 @@ def parse():
     if prm_network_sync_dir: prm_list.append( ('network thread sync. dir.', prm_network_sync_dir) )
 
   if not prm_slave:
-    print 'smallfile version %s'%version
+    print('smallfile version %s'%version)
     for (prm_name, prm_value) in prm_list:
-      print '%40s : %s'%(prm_name, prm_value)
+      print('%40s : %s'%(prm_name, prm_value))
 
   # construct command to run remote slave process using CLI parameters, we have them all here
   if not prm_remote_pgm_dir: prm_remote_pgm_dir = os.getcwd()

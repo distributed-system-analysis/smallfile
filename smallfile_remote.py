@@ -49,7 +49,7 @@ def run_workload():
   # each remote instance will wait until all instances have reached starting gate
    
   params = parse_slave.parse()
-  if params.master_invoke.verbose: print 'slave params: %s'%str(params)
+  if params.master_invoke.verbose: print('slave params: %s'%str(params))
   return multi_thread_workload.run_multi_thread_workload(params)
 
 # for future windows compatibility, all global code (not contained in a class or subroutine)

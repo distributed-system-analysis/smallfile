@@ -30,8 +30,8 @@ class subprocess(multiprocessing.Process):
           self.invoke.do_workload()
           self.invoke.log.debug('exiting subprocess and returning invoke '+ str(self.invoke))
         except Exception as e:
-          print 'Exception seen in thread %s host %s (tail %s) '%\
-                        (self.invoke.tid, self.invoke.onhost, self.invoke.log_fn())
+          print('Exception seen in thread %s host %s (tail %s) '%\
+                        (self.invoke.tid, self.invoke.onhost, self.invoke.log_fn()))
           self.invoke.log.error(str(e))
           self.status = self.invoke.NOTOK
         finally:
@@ -61,7 +61,7 @@ class Test(unittest.TestCase):
         self.invok.tid = "regtest"
         self.invok.start_log()
         deltree(self.invok.src_dirs[0])
-        os.makedirs(self.invok.src_dirs[0], 0644)
+        os.makedirs(self.invok.src_dirs[0], 0o644)
 
     def test_multiproc_stonewall(self):
         self.invok.log.info('starting stonewall test')
