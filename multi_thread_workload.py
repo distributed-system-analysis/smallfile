@@ -46,7 +46,7 @@ def run_multi_thread_workload(prm):
     for dlist in [ master_invoke.src_dirs, master_invoke.dest_dirs ]:
       for d in dlist:
           os.listdir(d) # hack to ensure that 
-          if verbose: print host + ' saw ' + d
+          if verbose: print(host + ' saw ' + d)
 
   # for each thread set up smf_invocation instance,
   # create a thread instance, and delete the thread-ready file 
@@ -62,7 +62,7 @@ def run_multi_thread_workload(prm):
     ensure_deleted(t.invoke.gen_thread_ready_fname(t.invoke.tid))
   for t in thread_list:
     t.start()
-  if verbose: print "started %d worker threads on host %s"%(len(thread_list),host)
+  if verbose: print("started %d worker threads on host %s"%(len(thread_list),host))
 
   # wait for all threads to reach the starting gate
   # this makes it more likely that they will start simultaneously
@@ -79,6 +79,7 @@ def run_multi_thread_workload(prm):
             break
     if threads_ready: break
     if os.path.exists(abort_fname): break
+    if verbose: print('threads not ready...')
     time.sleep(0.5)
 
   # if all threads didn't make it to the starting gate
@@ -91,20 +92,21 @@ def run_multi_thread_workload(prm):
 
   if prm_slave:
     host_ready_fn = my_host_invoke.gen_host_ready_fname()
-    if my_host_invoke.verbose: print 'host %s creating ready file %s'%(my_host_invoke.onhost, host_ready_fn)
+    if my_host_invoke.verbose: print('host %s creating ready file %s'%(my_host_invoke.onhost, host_ready_fn))
     smallfile.touch(host_ready_fn)
 
   sg = my_host_invoke.starting_gate
   if not prm_slave: # special case of no --host-set parameter
     try:
       sync_files.write_sync_file(sg, 'hi there')
-      if verbose: print 'wrote starting gate file'
-    except IOError, e:
-      print 'error writing starting gate for threads: %s'%str(e)
+      if verbose: print('wrote starting gate file')
+    except IOError as e:
+      print('error writing starting gate for threads: %s'%str(e))
 
   # wait for starting_gate file to be created by test driver
   # every second we resume scan from last host file not found
   
+  if verbose: print('awaiting '+sg)
   if prm_slave:
     for sec in range(0, prm.host_startup_timeout*2):
       if os.path.exists(sg):
@@ -113,7 +115,7 @@ def run_multi_thread_workload(prm):
     if not os.path.exists(sg):
       abort_test(my_host_invoke.abort_fn(), thread_list)
       raise Exception('starting signal not seen within %d seconds'%prm.host_startup_timeout)
-  if verbose: print "starting test on host " + host + " in 2 seconds"
+  if verbose: print("starting test on host " + host + " in 2 seconds")
   time.sleep(2 + random.random())  
 
   # FIXME: don't timeout the test, 
@@ -124,7 +126,7 @@ def run_multi_thread_workload(prm):
   # wait for all threads on this host to finish
 
   for t in thread_list: 
-    if verbose: print 'waiting for thread %s'%t.invoke.tid
+    if verbose: print('waiting for thread %s'%t.invoke.tid)
     t.invoke = t.receiver.recv()  # must do this to get results from sub-process
     t.join()
 
@@ -134,10 +136,10 @@ def run_multi_thread_workload(prm):
   if not prm_slave:
     try: 
       # FIXME: code to aggregate results from list of invoke objects can be shared by multi-host and single-host cases
-      invoke_list = map( lambda(t) : t.invoke, thread_list )
+      invoke_list = [t.invoke for t in thread_list]
       output_results.output_results( invoke_list, [ 'localhost' ], prm.thread_count, smallfile.pct_files_min )
     except SMFResultException as e:
-        print 'ERROR: ' + str(e)
+        print('ERROR: ' + str(e))
         exit_status = NOTOK
 
 
@@ -146,10 +148,12 @@ def run_multi_thread_workload(prm):
     # then write out this host's result in pickle format so test driver can pick up result
 
     result_filename = master_invoke.host_result_filename(prm.as_host)
-    invok_list = []
-    for t in thread_list:
-        invok_list.append(t.invoke)
-    if verbose: print 'saving result to filename %s'%result_filename
+    if verbose: print('writing invokes to: ' + result_filename)
+    invok_list = [ t.invoke for t in thread_list ]
+    if verbose: print('saving result to filename %s'%result_filename)
+    for ivk in invok_list:
+        ivk.buf = None 
+        ivk.biggest_buf = None
     sync_files.write_pickle(result_filename, invok_list)
     time.sleep(1.2) # for benefit of NFS with actimeo=1
 
