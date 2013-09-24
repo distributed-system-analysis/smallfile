@@ -15,9 +15,9 @@ import smf_test_params
 # convert boolean value into 'Y' or 'N'
 
 def usage(msg):  # call if CLI syntax error or invalid parameter
-    print ''
-    print 'ERROR: ' + msg
-    print 'usage: smallfile_remote.py [ --network-sync-dir path ] --as-host hostname '
+    print('')
+    print('ERROR: ' + msg)
+    print('usage: smallfile_remote.py [ --network-sync-dir path ] --as-host hostname ')
     sys.exit(1)
 
 # parse command line and return tuple containing:
@@ -30,7 +30,7 @@ def parse():
 
   argc = len(sys.argv)
   if argc == 1:
-      print '\nfor additional help add the parameter "--help" to the command\n'
+      print('\nfor additional help add the parameter "--help" to the command\n')
   j=1
   while j < argc:
     rawprm = sys.argv[j]
@@ -53,7 +53,9 @@ def parse():
   param_pickle_fname = os.path.join(prm_network_sync_dir, 'param.pickle')
   if not os.path.exists(param_pickle_fname):
      time.sleep(1.1)
-  with open(os.path.join(prm_network_sync_dir, 'param.pickle'), "r") as pickled_params:
+  pickle_fn = os.path.join(prm_network_sync_dir, 'param.pickle')
+  #print(pickle_fn)
+  with open(pickle_fn, 'rb') as pickled_params:
     params = pickle.load(pickled_params)
   params.is_slave = True
   params.as_host = prm_as_host
