@@ -26,7 +26,6 @@ import sys
 import glob
 import string
 import time
-import exceptions
 import random
 import logging
 from logging import ERROR
@@ -101,7 +100,7 @@ class SMFResultException(Exception):
 def ensure_deleted(fn):
     try:
       if os.path.lexists(fn): os.unlink(fn)
-    except Exception, e:
+    except Exception as e:
       # could be race condition with other client processes/hosts
       if os.path.exists(fn): # if was race condition, file will no longer be there
          raise Exception("exception while ensuring %s deleted: %s"%(fn, str(e)))
@@ -128,7 +127,7 @@ def ensure_dir_exists( dirpath ):
         ensure_dir_exists(parent_path)
         try:
             os.mkdir(dirpath)
-        except os.error, e:
+        except os.error as e:
             if e.errno != errno.EEXIST: # workaround for filesystem bug
                 raise e
     else:
@@ -146,11 +145,20 @@ def hostaddr(h):
   else: a = socket.gethostbyname(h)
   return a
 
+
+if sys.version < '3':
+  import codecs
+  def binary_buf_str( b ):
+    return codecs.unicode_escape_decode(b)[0]
+else:
+  def binary_buf_str( b ):
+    if isinstance(b, str): return bytes(b).decode('UTF-8', 'backslashreplace')
+    else: return b.decode('UTF-8', 'backslashreplace')
+      
 # parameters for test stored here
 # initialize with default values
 # FIXME: do we need a copy constructor?
 
-invocation_count = 0
 loggers = {}  # so we only instantiate logger for a given thread name once
 
 class smf_invocation:
@@ -172,21 +180,10 @@ class smf_invocation:
 
     # build largest supported buffer, and fill it full of random hex digits, then
     # just use a substring of it below
-    biggest_buf = ''
     biggest_buf_size_bits = 24
-    random_seg_size_bits = 10
+    #random_seg_size_bits = 10
+    random_seg_size_bits = 5
     biggest_buf_size = 1 << biggest_buf_size_bits
-
-    hexdigits='0123456789ABCDEF'
-    bigprime=9533
-    bigprime2_squared = 34613*34613
-    for k in range(1<<random_seg_size_bits):
-        biggest_buf += hexdigits[bigprime & 0xf]
-        bigprime *= bigprime
-        bigprime %= bigprime2_squared  # prevent integer overflow 
-    for j in range(0,biggest_buf_size_bits+1-random_seg_size_bits):
-        biggest_buf += biggest_buf[:]
-    assert len(biggest_buf) == (1<<(biggest_buf_size_bits+1))
 
     # constructor sets up initial, default values for test parameters
 
@@ -224,16 +221,14 @@ class smf_invocation:
          # for internal use only
         self.log_level = logging.INFO
         self.log = None               # use python log module, it is thread safe
-        self.buf = ""                 # buffer for reads and writes will be here
+        self.buf = None               # buffer for reads and writes will be here
+        self.biggest_buf = None       # generate from here on writes, compare to here on reads
         self.randstate = random.Random()
         self.reset()
-        invocation_count += 1    # FIXME: not thread-safe
-        self.invocation_id = invocation_count - 1 # used to generate unique write/read contents per file
 
     # copy constructor
 
     def clone(smf_instance):
-        global invocation_count
         s = smf_instance
         new = smf_invocation()
         new.opname = s.opname
@@ -308,7 +303,6 @@ class smf_invocation:
         s += " abort=" + str(self.abort)
         s += " log_to_stderr=" + str(self.log_to_stderr)
         s += " verbose=" + str(self.verbose)
-        s += ' invk_id=%d'%self.invocation_id
         return s
 
     # if you want to use the same instance for multiple tests
@@ -457,7 +451,8 @@ class smf_invocation:
       else:
         self.log.debug('fixed file size %d KB'%next_size)
       return next_size
-      
+
+
     # tell test driver that we're at the starting gate
     # this is a 2 phase process
     # first wait for each thread on this host to reach starting gate
@@ -542,7 +537,7 @@ class smf_invocation:
        while level > -1:
            dirs_in_level = level_dirs[level]
            #print 'dirs_per_level=%d'%dirs_in_level
-           quotient = dir_in / dirs_in_level
+           quotient = dir_in // dirs_in_level
            dir_in = dir_in - (quotient * dirs_in_level)
            path = join(path, 'd_%03d'%quotient)
            level -= 1
@@ -592,7 +587,23 @@ class smf_invocation:
         path = join(path, filenm)
         return path
 
-    # allocate buffer of correct size
+    # generate buffer contents, use these on writes and compare against them for reads
+    # where random data is used, 
+    # we generate a random byte sequence of 2^random_seg_size_bits in length
+    # and then repeat the sequence until we get to size 2^biggest_buf_size_bits in length
+
+    def create_biggest_buf(self, contents_random):
+      if contents_random:
+        biggest_buf = bytearray([ self.randstate.randrange(0,127) for k in range(0,(1<<self.random_seg_size_bits)) ])
+      else:
+        biggest_buf = bytearray([ (k%128) for k in range(0,(1<<self.random_seg_size_bits)) ])
+      #print('%d %s'%(len(biggest_buf), biggest_buf))
+      for j in range(0,self.biggest_buf_size_bits+1-self.random_seg_size_bits):
+        biggest_buf.extend(biggest_buf[:])
+      assert len(biggest_buf) == (1<<(self.biggest_buf_size_bits+1))
+      return biggest_buf
+      
+    # allocate buffer of correct size with offset based on filenum, tid, etc.
 
     def prepare_buf(self):
         total_space = self.record_sz_kb
@@ -632,7 +643,7 @@ class smf_invocation:
             if exists(abort_filename): break
             if not exists(unique_dpath): 
               try:
-                os.makedirs(unique_dpath, 0777)
+                os.makedirs(unique_dpath, 0o777)
               except OSError as e:
                 if not ((e.errno == errno.EEXIST) and self.is_shared_dir):
                   raise e
@@ -654,18 +665,17 @@ class smf_invocation:
                         #print 'already removed ' + unique_dpath
                         unique_dpath = os.path.dirname(unique_dpath)
                         continue
-                elif os.listdir(unique_dpath) == []:
+                else:
                         try:
                           #print 'removing dir '+unique_dpath
                           os.rmdir(unique_dpath)
                         except OSError as e:
                           self.log.error('deleting directory dpath: %s'%e)
+                          if (e.errno == errno.ENOTEMPTY): break
                           if (e.errno != errno.ENOENT) and not self.is_shared_dir: raise e
                         unique_dpath = os.path.dirname(unique_dpath)
-                        if len(unique_dpath) < len(self.src_dirs[0]):
+                        if len(unique_dpath) <= len(self.src_dirs[0]):
                                 break
-                else:
-                        break
 
     # operation-specific test code goes in do_<opname>()
         
@@ -734,7 +744,7 @@ class smf_invocation:
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
             self.op_starttime()
-            os.chmod(fn, 0646)
+            os.chmod(fn, 0o646)
             self.op_endtime(self.opname)
 
     # we use "prefix" parameter to provide a list of characters 
@@ -750,7 +760,7 @@ class smf_invocation:
             self.op_starttime()
             self.prepare_buf()
             for j in range(0, self.xattr_count):
-              v = xattr.get(fn, 'user.smallfile-%d'%j)
+              v = xattr.getxattr(fn, 'user.smallfile-%d'%j)
               if self.buf[j:self.xattr_size+j] != v:
                 raise MFRdWrExc('getxattr: value contents wrong', self.filenum, j, len(v))
             self.op_endtime(self.opname)
@@ -766,7 +776,7 @@ class smf_invocation:
             fd = os.open(fn, os.O_WRONLY)
             for j in range(0, self.xattr_count):
               # make sure each xattr has a unique value
-              xattr.set(fd, 'user.smallfile-%d'%j, self.buf[j:self.xattr_size+j])
+              xattr.setxattr(fd, 'user.smallfile-%d'%j, binary_buf_str(self.buf[j:self.xattr_size+j]))
             if self.fsync: os.fsync(fd)  # fsync also flushes extended attribute values and metadata
             os.close(fd)
             self.op_endtime(self.opname)
@@ -852,7 +862,7 @@ class smf_invocation:
                 file_count = 0
             if not fn.startswith('d'): 
               file_count += 1 # only count files, not directories
-            if not dir_map.has_key(os.path.basename(fn)):
+            if os.path.basename(fn) not in dir_map:
                 raise MFRdWrExc('readdir: file missing from directory %s'%prev_dir, self.filenum, self.rq, 0)
             
     # this operation simulates a user doing "ls -lR" on a big directory tree
@@ -931,13 +941,13 @@ class smf_invocation:
                 if self.verify_read:
                   self.log.debug('swift_get bytesread %u'%len(bytesread))
                   if self.buf[0:rszbytes] != bytesread:
-                    #print 'self.buf: ' + self.buf[0:rszbytes]
-                    #print 'bytesread: ' + bytesread
+                    self.log.debug( 'expected buf: ' + binary_buf_str(self.buf[0:rszbytes]))
+                    self.log.debug('saw buf: ' + binary_buf_str(bytesread))
                     raise MFRdWrExc('read: buffer contents wrong', self.filenum, self.rq, len(bytesread))
                 remaining_kb -= rszkb
             for j in range(0, self.xattr_count):
               try: 
-                v = xattr.get(fd, 'user.smallfile-all-%d'%j)
+                v = xattr.getxattr(fd, 'user.smallfile-all-%d'%j)
               except IOError as e:
                 if e.errno != errno.ENODATA: raise e
           finally:
@@ -953,12 +963,14 @@ class smf_invocation:
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs) + '.tmp'
             next_fsz = self.get_next_file_size()
+            #print(next_fsz)
             self.prepare_buf()
             self.op_starttime()
             fd = -1  # so we know to not close it if file never got opened
             try:
+              #print(fn)
               fd = os.open(fn, os.O_WRONLY|os.O_CREAT)
-              os.fchmod(fd, 0667)
+              os.fchmod(fd, 0o667)
               fszbytes = next_fsz * self.BYTES_PER_KB
               #os.ftruncate(fd, fszbytes)
               #ret = fallocate.fallocate(fd, 0, 0, fszbytes)
@@ -971,22 +983,29 @@ class smf_invocation:
                 self.rq += 1
                 if remaining_kb < rszkb: rszkb = remaining_kb
                 rszbytes = rszkb * self.BYTES_PER_KB
-                if rszkb != len(self.buf):
-                  #print 'swift put self.buf: ' + self.buf[0:rszbytes]
+                self.log.debug('reading %d bytes'%rszbytes)
+                if rszbytes != len(self.buf):
+                  self.log.debug( 'swift put self.buf: ' + binary_buf_str(self.buf[0:rszbytes]))
                   written = os.write(fd, self.buf[0:rszbytes])
                 else:
-                  written = os.write(fd, self.buf)
+                  self.log.debug( 'swift put entire self.buf: ' + binary_buf_str(self.buf[0:rszbytes]))
+                  written = os.write(fd, self.buf[:])
                 if written != rszbytes:
                     self.log.error('written byte count %u not correct byte count %u'%(written, rszbytes))
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, written)
                 remaining_kb -= rszkb
               for j in range(0, self.xattr_count):
                   try: 
-                    v = xattr.get(fd, 'user.smallfile-all-%d'%j)
+                    xattr_nm = 'user.smallfile-all-%d'%j
+                    v = xattr.getxattr(fd, xattr_nm)
+                    self.log.debug('xattr ' + xattr_nm + ' = ' + binary_buf_str(v))
                   except IOError as e:
                     if e.errno != errno.ENODATA: raise e
               for j in range(0, self.xattr_count):
-                  xattr.set(fd, 'user.smallfile-all-%d'%j, self.buf[j:self.xattr_size+j])
+                  xattr_nm = 'user.smallfile-all-%d'%j
+                  v = binary_buf_str(self.buf[j:self.xattr_size+j])
+                  xattr.setxattr(fd, xattr_nm, v)
+                  self.log.debug('xattr ' + xattr_nm + ' set to ' + v)
 
               # alternative to ftruncate/fallocate is close then open to prevent preallocation
               # since in theory close wipes out the preallocation and 
@@ -1005,7 +1024,7 @@ class smf_invocation:
               os.rename(fn, fn2)
             except Exception as e:
               ensure_deleted(fn)
-              print 'exception on %s'%fn
+              if verbose: print('exception on %s'%fn)
               raise e
             finally:
               if fd > -1: os.close(fd)
@@ -1045,8 +1064,9 @@ class smf_invocation:
         self.log.info('do_workload: ' + str(self))
         ensure_dir_exists(self.network_dir)
         self.make_all_subdirs()
-        self.prepare_buf()
         self.init_random_seed()
+        self.biggest_buf = self.create_biggest_buf(False)
+        self.prepare_buf()
         if self.total_sz_kb > 0:
             self.files_between_checks = max(10, self.max_files_between_checks - (self.total_sz_kb/100))
         try:
@@ -1060,10 +1080,10 @@ class smf_invocation:
               raise Exception('invalid workload type ' + o)
             func(self) # call the do_ function for that workload type
             self.status = ok
-        except KeyboardInterrupt, e:
+        except KeyboardInterrupt as e:
             self.log.error( "control-C or equivalent signal received, ending test" )
             self.status = ok
-        except OSError, e:
+        except OSError as e:
             self.status = e.errno
             self.log.exception(e)
         if self.measure_rsptimes: self.save_rsptimes()
@@ -1111,7 +1131,7 @@ class TestThread(threading.Thread):
     def run(self):
         try:
             self.invocation.do_workload()
-        except Exception,e:
+        except Exception as e:
             self.invocation.log.error( str(e) )
 
 # below are unit tests for smf_invocation
@@ -1191,7 +1211,7 @@ class Test(unittest_class):
         expectedFn = join( \
                        join(self.invok.src_dirs[0], join(thrd_nm, 'd_000')), \
                        self.invok.prefix + "_" + self.invok.tid + "_0_" + self.invok.suffix)
-        print fn, expectedFn
+        #print(fn, expectedFn)
         self.assertTrue( fn == expectedFn )
         self.mk_files()
         assert exists(fn)
@@ -1298,7 +1318,7 @@ class Test(unittest_class):
         fn = self.lastFileNameInTest(self.invok.src_dirs)
         fd = os.open(fn, os.O_WRONLY)
         os.lseek(fd, 5, os.SEEK_SET)
-        os.write(fd, '!')
+        os.write(fd, b'!')
         os.close(fd)
         try:
           self.runTest("read")
@@ -1352,7 +1372,6 @@ class Test(unittest_class):
         self.invok.xattr_count = 2
         self.invok.filesize_distr = self.invok.filesize_distr_random_exponential
         self.runTest("swift-get")
-        self.cleanup_files()
 
     def test_j0_dir_name(self):
         self.invok.files_per_dir = 20
