@@ -2,6 +2,10 @@
 # smallfile regression test
 # NOTE: this expects you to have /var/tmp in a filesystem that supports extended attributes
 # and it expects NFS to support extended attributes
+# you can set the environment variable PYTHON_PROG to switch between python3 and python2
+# for example: # PYTHON_PROG=python bash regtest.sh
+# python3 at present doesn't seem to support xattr module so some smallfile operations
+# are not yet supported under python3, the regression test knows how to deal with that.
 
 localhost_name="$1"
 if [ -z "$localhost_name" ] ; then localhost_name="localhost" ; fi
@@ -14,6 +18,7 @@ nfsdir=/var/tmp/smfnfs
 OK=0
 NOTOK=1
 GREP="grep -q "
+PYTHON=${PYTHON_PROG:-python3}
 
 assertfail() {
   status=$1
@@ -49,7 +54,7 @@ if [ $? != $OK ] ; then
     echo "NFS service startup failed!"
     exit $NOTOK
   fi
-  sudo exportfs -v -o rw,no_root_squash,sync localhost:$testdir
+  sudo exportfs -v -o rw,no_root_squash,sync,fsid=15 localhost:$testdir
   sudo mount -v -t nfs -o actimeo=1 $localhost_name:$testdir $nfsdir
   if [ $? != $OK ] ; then 
     echo "NFS mount failed!"
@@ -60,25 +65,25 @@ fi
 # run the smallfile.py module's unit test
 
 echo "running smallfile.py unit test"
-python smallfile.py
+$PYTHON smallfile.py
 assertok $?
 
 # run the invoke_process.py unit test
 
 echo "running invoke_process.py unit test"
-python invoke_process.py
+$PYTHON invoke_process.py
 assertok $?
 
 # run drop_buffer_cache.py unit test
 
 echo "running drop_buffer_cache.py unit test"
-python drop_buffer_cache.py
+$PYTHON drop_buffer_cache.py
 assertok $?
 
 # test parsing
 
 echo "testing parsing"
-scmd="./smallfile_cli.py --top $testdir "
+scmd="$PYTHON smallfile_cli.py --top $testdir "
 f=smfregtest.log
 cleanup
 $scmd --files 0 > $f
@@ -161,8 +166,13 @@ done
 
 common_params="$scmd --files 100 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --response-times N --pause 1000 --xattr-count 9 --xattr-size 253"
 
+python2_only_ops="setxattr getxattr swift-put swift-get"
+if [ "$PYTHON" = "python3" ] ; then
+  python2_only_ops=''
+fi
+
 allops=\
-"cleanup create append read readdir ls-l chmod stat setxattr getxattr symlink mkdir rmdir rename delete-renamed swift-put swift-get "
+"cleanup create append read readdir ls-l chmod stat $python2_only_ops symlink mkdir rmdir rename delete-renamed "
 
 # with NFS, any operation using extended attributes is not supported
 nfs_allops=\
