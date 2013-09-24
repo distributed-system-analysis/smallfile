@@ -14,7 +14,7 @@ def write_sync_file(fpath, contents):
       # file should close when you exit with block
 
 def write_pickle(fpath, obj):
-    with open(fpath, 'w') as result_file:
+    with open(fpath, 'wb') as result_file:
       pickle.dump(obj, result_file)
       result_file.flush()
       os.fsync(result_file.fileno())  # have to do this or reader may not see data
