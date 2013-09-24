@@ -11,7 +11,7 @@ import smallfile
 from smallfile import smf_invocation
 import smf_test_params
 
-version = '2.0'
+version = '2.1'
 
 # convert boolean value into 'Y' or 'N'
 
