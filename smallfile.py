@@ -447,9 +447,10 @@ class smf_invocation:
       next_size = self.total_sz_kb
       if self.filesize_distr == self.filesize_distr_random_exponential:
         next_size = max(1, min(int(self.randstate.expovariate(1.0/self.total_sz_kb)), self.total_sz_kb*self.random_size_limit))
-        self.log.debug('rnd expn file size %d KB'%next_size)
-      else:
-        self.log.debug('fixed file size %d KB'%next_size)
+        if self.log_level == logging.DEBUG:
+          self.log.debug('rnd expn file size %d KB'%next_size)
+        else:
+          self.log.debug('fixed file size %d KB'%next_size)
       return next_size
 
 
@@ -544,6 +545,7 @@ class smf_invocation:
        path = join(path, 'd_%03d'%dir_in)
        return path
 
+    # FIXME: need to optimize out calls to os.path.join by replacing with string join of directory name list
 
     def mk_hashed_dir_name(self, file_num):
         path = ''
@@ -561,31 +563,22 @@ class smf_invocation:
         if self.hash_to_dir: return self.mk_hashed_dir_name(file_num)
         else: return self.mk_seq_dir_name(file_num)
 
-    # for multiple-mountpoint tests, we need to select top-level dir based on file number
-    # to spread load across mountpoints, so we use round-robin mountpoint selection
-
-    def select_tree(self, directory_list, filenum):
-      listlen = len(directory_list)
-      return directory_list[ filenum % listlen ]
-
     # generate file name to put in this directory
     # prefix can be used for process ID or host ID for example
     # names are unique to each thread
     # automatically computes subdirectory for file based on
     # files_per_dir, dirs_per_dir and placing file as high in tree as possible
+    # for multiple-mountpoint tests, we need to select top-level dir based on file number
+    # to spread load across mountpoints, so we use round-robin mountpoint selection
+    # NOTE: this routine is called A LOT, so need to optimize by avoiding lots of os.path.join calls
 
     def mk_file_nm(self, base_dirs, filenum=-1):
         if filenum == -1: filenum = self.filenum
-
-        dirpath = join('thrd_'+self.tid, self.mk_dir_name(filenum))
-        tree = self.select_tree(base_dirs, filenum)
-
-        # implement directory tree fitting files as high in the tree as possible
-
-        path = join(tree, dirpath)
-        filenm = self.prefix + "_" + self.tid + "_" + str(filenum) + "_" + self.suffix
-        path = join(path, filenm)
-        return path
+        listlen = len(base_dirs)
+        tree = base_dirs[ filenum % listlen ]
+        components = [ tree, os.sep, 'thrd_', self.tid, os.sep, self.mk_dir_name(filenum), os.sep, \
+                   self.prefix , "_" , self.tid , "_" , str(filenum) , "_" , self.suffix ]
+        return "".join(components)
 
     # generate buffer contents, use these on writes and compare against them for reads
     # where random data is used, 
