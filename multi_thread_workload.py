@@ -18,9 +18,9 @@ def create_worker_list(prm):
     nextinv = smallfile.smf_invocation.clone(prm.master_invoke)
     nextinv.tid = "%02d"%k
     if not prm.master_invoke.is_shared_dir:
-        nextinv.src_dirs = [ d + os.sep + prm.master_invoke.onhost + os.sep + "d" + nextinv.tid \
+        nextinv.src_dirs = [ d + os.sep + prm.master_invoke.onhost + os.sep + "thrd_" + nextinv.tid \
                              for d in nextinv.src_dirs ]
-        nextinv.dest_dirs = [ d + os.sep + prm.master_invoke.onhost + os.sep + "d" + nextinv.tid \
+        nextinv.dest_dirs = [ d + os.sep + prm.master_invoke.onhost + os.sep + "thrd_" + nextinv.tid \
                              for d in nextinv.dest_dirs ]
     t = invoke_process.subprocess(nextinv)
     thread_list.append(t)
