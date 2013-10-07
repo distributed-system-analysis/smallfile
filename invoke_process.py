@@ -23,6 +23,9 @@ class subprocess(multiprocessing.Process):
         (conn1, conn2) = multiprocessing.Pipe(False)
         self.receiver = conn1            # master process receives data on results of test here
         self.sender = conn2              # slave process sends data on results of test here
+        invocation.buf = None
+        invocation.biggest_buf = None
+        invocation.log = None
         self.invoke = invocation         # all the workload generation is done by this object
 
     def run(self):
@@ -37,6 +40,9 @@ class subprocess(multiprocessing.Process):
         finally:
           self.rsptimes = None # response time array should have been saved to file first
           self.invoke.log = None # log objects cannot be serialized
+          self.invoke.buf = None
+          self.invoke.biggest_buf = None
+          self.rsptimes = []
           self.sender.send(self.invoke)
 
 # below are unit tests for smf_invocation
