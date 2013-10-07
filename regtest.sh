@@ -1,18 +1,24 @@
 #!/bin/bash
 # smallfile regression test
+#
 # NOTE: this expects you to have /var/tmp in a filesystem that supports extended attributes
 # and it expects NFS to support extended attributes
+#
 # you can set the environment variable PYTHON_PROG to switch between python3 and python2
 # for example: # PYTHON_PROG=python bash regtest.sh
 # python3 at present doesn't seem to support xattr module so some smallfile operations
 # are not yet supported under python3, the regression test knows how to deal with that.
+#
+# you can have it use a directory in a tmpfs mountpoint, this is recommended so as not to wear out laptop drive.
+# by default, Fedora 17 has /run tmpfs mountpoint with sufficient space so this is default, but TMPDIR overrides
 
 localhost_name="$1"
 if [ -z "$localhost_name" ] ; then localhost_name="localhost" ; fi
 
 testdir="$TMPDIR/smfregtest"
 if [ "$TMPDIR" = "" ] ; then
-  testdir='/var/tmp/smfregtest'
+  # prefer to use tmpfs so we dont wear out disk on laptop or other system disk
+  testdir='/run/smfregtest'
 fi
 nfsdir=/var/tmp/smfnfs
 OK=0
@@ -38,24 +44,29 @@ assertok() {
 
 cleanup() {
   rm -rf /var/tmp/invoke*.log $testdir/*
-  mkdir -p $testdir
+  sudo mkdir -p $testdir
+  grep $nfsdir /proc/mounts 
+  if [ $? = $OK ] ; then sudo umount -v $nfsdir ; fi
 }
 
 
 # set up NFS mountpoint
 
+cleanup
 $GREP $nfsdir /proc/mounts
 if [ $? != $OK ] ; then
-  mkdir -pv $nfsdir
-  rm -rf $testdir
-  mkdir -p $testdir
+  sudo mkdir -pv $nfsdir
+  sudo chown $USER $nfsdir
+  sudo rm -rf $testdir
+  sudo mkdir -p $testdir
+  sudo chown $USER $testdir
   sudo service nfs restart
   if [ $? != $OK ] ; then 
     echo "NFS service startup failed!"
     exit $NOTOK
   fi
   sudo exportfs -v -o rw,no_root_squash,sync,fsid=15 localhost:$testdir
-  sudo mount -v -t nfs -o actimeo=1 $localhost_name:$testdir $nfsdir
+  sudo mount -v -t nfs -o nfsvers=3,actimeo=1 $localhost_name:$testdir $nfsdir
   if [ $? != $OK ] ; then 
     echo "NFS mount failed!"
     exit $NOTOK
@@ -124,7 +135,8 @@ assertfail $?
 
 cleanup
 mkdir -p $nfsdir/smf
-$scmd --verify-read N --response-times Y --finish N --stonewall N --permute-host-dirs Y --top $nfsdir/smf --same-dir Y --operation cleanup --threads 5 --files 20 --files-per-dir 5 --dirs-per-dir 3 --record-size 6 --file-size 30 --file-size-distribution exponential --prefix a --suffix b --hash-into-dirs Y --pause 5 --host-set $localhost_name | tee $f
+scmd="$PYTHON smallfile_cli.py --top $nfsdir/smf "
+$scmd --verify-read N --response-times Y --finish N --stonewall N --permute-host-dirs Y --same-dir Y --operation cleanup --threads 5 --files 20 --files-per-dir 5 --dirs-per-dir 3 --record-size 6 --file-size 30 --file-size-distribution exponential --prefix a --suffix b --hash-into-dirs Y --pause 5 --host-set $localhost_name | tee $f
 assertok $?
 expect_strs=( 'verify read? : N' \
         "hosts in test : \['$localhost_name'\]" \
@@ -164,7 +176,7 @@ for j in `seq 1 $expect_ct` ; do
   assertok $s
 done
 
-common_params="$scmd --files 100 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --response-times N --pause 1000 --xattr-count 9 --xattr-size 253"
+common_params="--files 100 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --response-times N --pause 1000 --xattr-count 9 --xattr-size 253"
 
 python2_only_ops="setxattr getxattr swift-put swift-get"
 if [ "$PYTHON" = "python3" ] ; then
@@ -181,16 +193,19 @@ nfs_allops=\
 # for debug: allops="create cleanup"
 
 echo "******** testing non-distributed operations"
+scmd="$PYTHON smallfile_cli.py --top $testdir "
 for op in $allops ; do
   rm -rf /var/tmp/invoke*.log
-  $common_params --top $testdir --operation $op
+  $scmd $common_params --top $testdir --operation $op
   assertok $?
 done
 
 echo "******** testing distributed operations"
+mkdir -pv $nfsdir/smf
+scmd="$PYTHON smallfile_cli.py --top $nfsdir/smf "
 for op in $nfs_allops ; do
   rm -rf /var/tmp/invoke*.log
-  $common_params --top $nfsdir/smf --host-set $localhost_name --operation $op
+  $scmd $common_params --top $nfsdir/smf --host-set $localhost_name --operation $op
   assertok $?
 done
 
@@ -198,5 +213,5 @@ $GREP $nfsdir /proc/mounts
 if [ $? == $OK ] ; then
   sudo umount -v $nfsdir
 fi
-rm -rf $testdir
+sudo rm -rf $testdir
 
