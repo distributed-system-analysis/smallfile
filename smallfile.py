@@ -18,6 +18,7 @@ Created on Apr 22, 2009
 # so it now uses unittest2, but it isn't installed by default so we have to conditionalize its use
 # we only need it installed where we want to run regression test this way
 # on Fedora: # yum install python-unittest2
+# alternative single-test syntax: python smallfile.py -v Test.test_c1_Mkdir
 
 import os
 import os.path
@@ -180,9 +181,9 @@ class smf_invocation:
 
     # build largest supported buffer, and fill it full of random hex digits, then
     # just use a substring of it below
-    biggest_buf_size_bits = 24
+    biggest_buf_size_bits = 20
     #random_seg_size_bits = 10
-    random_seg_size_bits = 5
+    random_seg_size_bits = 10
     biggest_buf_size = 1 << biggest_buf_size_bits
 
     # constructor sets up initial, default values for test parameters
@@ -218,6 +219,7 @@ class smf_invocation:
         self.tid = ""                 # thread ID 
         self.log_to_stderr = False    # set to true for debugging to screen
         self.verbose = False          # set this to true for debugging
+        self.dirs_on_demand = False   # set this to True to let do_create create directories as needed
          # for internal use only
         self.log_level = logging.INFO
         self.log = None               # use python log module, it is thread safe
@@ -250,6 +252,7 @@ class smf_invocation:
         new.suffix = s.suffix
         new.hash_to_dir = s.hash_to_dir
         new.fsync = s.fsync
+        new.dirs_on_demand = s.dirs_on_demand
         new.stonewall = s.stonewall
         new.finish_all_rq = s.finish_all_rq
         new.measure_rsptimes = s.measure_rsptimes
@@ -279,6 +282,7 @@ class smf_invocation:
         s += " filesize_distr="+str(self.filesize_distr)
         s += " files_per_dir=%d"%self.files_per_dir
         s += " dirs_per_dir=%d"%self.dirs_per_dir
+        s += " dirs_on_demand="+str(self.dirs_on_demand)
         s += " xattr_size=%d"%self.xattr_size
         s += " xattr_count=%d"%self.xattr_count
         s += " starting_gate="+str(self.starting_gate)
@@ -576,7 +580,7 @@ class smf_invocation:
         if filenum == -1: filenum = self.filenum
         listlen = len(base_dirs)
         tree = base_dirs[ filenum % listlen ]
-        components = [ tree, os.sep, 'thrd_', self.tid, os.sep, self.mk_dir_name(filenum), os.sep, \
+        components = [ tree, os.sep, self.mk_dir_name(filenum), os.sep, \
                    self.prefix , "_" , self.tid , "_" , str(filenum) , "_" , self.suffix ]
         return "".join(components)
 
@@ -624,11 +628,14 @@ class smf_invocation:
     # use set to avoid duplicating operations on directories
     
     def make_all_subdirs(self):
+        self.log.debug('making all subdirs')
         abort_filename = self.abort_fn()
         if (self.tid != '00') and self.is_shared_dir: return
         dirset=set()
         for tree in [ self.src_dirs, self.dest_dirs ]:
-          for j in range(0, self.iterations+1):
+          if self.hash_to_dir: dir_range = range(0, self.iterations + 1)
+          else: dir_range = range(0, self.iterations + self.files_per_dir, self.files_per_dir)
+          for j in dir_range:
             fpath = self.mk_file_nm(tree, j)
             dpath = os.path.dirname(fpath)
             dirset.add(dpath)
@@ -644,27 +651,29 @@ class smf_invocation:
     # clean up all subdirectories
 
     def clean_all_subdirs(self):
+        self.log.debug('cleaning all subdirs')
         if (self.tid != '00') and self.is_shared_dir: return
         dirset=set()
         for tree in [ self.src_dirs, self.dest_dirs ]:
-          for j in range(0, self.iterations+1):
+          if self.hash_to_dir: dir_range = range(0, self.iterations + 1)
+          else: dir_range = range(0, self.iterations + self.files_per_dir, self.files_per_dir)
+          for j in dir_range:
             fpath = self.mk_file_nm(tree, j)
             dpath = os.path.dirname(fpath)
             dirset.add(dpath)
         for unique_dpath in dirset:
-            #print 'start cleaning dir '+unique_dpath
             while len(unique_dpath) > 10:  # FIXME: arbitrary, but don't try to delete directories at very top
                 if not exists(unique_dpath):
-                        #print 'already removed ' + unique_dpath
                         unique_dpath = os.path.dirname(unique_dpath)
                         continue
                 else:
                         try:
-                          #print 'removing dir '+unique_dpath
+                          #print('removing dir '+unique_dpath)
                           os.rmdir(unique_dpath)
                         except OSError as e:
-                          self.log.error('deleting directory dpath: %s'%e)
                           if (e.errno == errno.ENOTEMPTY): break
+                          if (e.errno == errno.EACCES): break
+                          self.log.error('deleting directory dpath: %s'%e)
                           if (e.errno != errno.ENOENT) and not self.is_shared_dir: raise e
                         unique_dpath = os.path.dirname(unique_dpath)
                         if len(unique_dpath) <= len(self.src_dirs[0]):
@@ -698,6 +707,11 @@ class smf_invocation:
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, written)
                 self.rq += 1
                 remaining_kb -= (rszbytes/self.BYTES_PER_KB)
+            except OSError as e:
+              if (e.errno == errno.ENOENT) and self.dirs_on_demand:  # if directory doesn't exist
+                os.makedirs(os.path.dirname(fn))
+                self.filenum -= 1  # retry this file now that its directory exists
+                continue
             finally:
               if fd >= 0: 
                 if self.fsync: os.fsync(fd)
@@ -708,7 +722,13 @@ class smf_invocation:
         while self.do_another_file():
             dir = self.mk_file_nm(self.src_dirs) + '.d'
             self.op_starttime()
-            os.mkdir(dir)
+            try:
+              os.mkdir(dir)
+            except OSError as e:
+              if (e.errno == errno.ENOENT) and self.dirs_on_demand:
+                os.makedirs(os.path.dirname(dir))
+                self.filenum -= 1
+                continue
             self.op_endtime(self.opname)
 
     def do_rmdir(self):
@@ -823,7 +843,7 @@ class smf_invocation:
                 self.rq += 1
                 if len(bytesread) != rszbytes:
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, len(bytesread))
-                if self.verify_read:
+                if self.verify_read and self.verbose:
                   self.log.debug('read fn %s next_fsz %u remain %u rszbytes %u bytesread %u'%(fn, next_fsz, remaining_kb, rszbytes, len(bytesread)))
                   if self.buf[0:rszbytes] != bytesread:
                     raise MFRdWrExc('read: buffer contents wrong', self.filenum, self.rq, len(bytesread))
@@ -1056,7 +1076,8 @@ class smf_invocation:
         self.start_log()
         self.log.info('do_workload: ' + str(self))
         ensure_dir_exists(self.network_dir)
-        self.make_all_subdirs()
+        if self.opname == "create" or self.opname == "mkdir" or self.opname == "swift-put": 
+            self.make_all_subdirs()
         self.init_random_seed()
         self.biggest_buf = self.create_biggest_buf(False)
         self.prepare_buf()
@@ -1200,9 +1221,8 @@ class Test(unittest_class):
     def test_a_MkFn(self):
         fn = self.invok.mk_file_nm(self.invok.src_dirs, 0)
 
-        thrd_nm = 'thrd_'+self.invok.tid
         expectedFn = join( \
-                       join(self.invok.src_dirs[0], join(thrd_nm, 'd_000')), \
+                       join(self.invok.src_dirs[0], 'd_000'), \
                        self.invok.prefix + "_" + self.invok.tid + "_0_" + self.invok.suffix)
         #print(fn, expectedFn)
         self.assertTrue( fn == expectedFn )
@@ -1280,8 +1300,6 @@ class Test(unittest_class):
         self.runTest("rename")
         fn = self.invok.mk_file_nm(self.invok.dest_dirs)
         self.assertTrue(exists(fn))
-        self.invok.clean_all_subdirs() # won't delete any files or directories that contain them
-        self.checkDirListEmpty(self.invok.src_dirs)
 
     def test_f_DeleteRenamed(self):
         self.mk_files()
@@ -1421,6 +1439,8 @@ class Test(unittest_class):
         for j in range(0, thread_count):
             s = smf_invocation.clone(self.invok)  # test copy constructor
             s.tid = str(j)
+            s.src_dirs = [ join(d, 'thrd_'+s.tid) for d in s.src_dirs ]
+            s.dest_dirs = [ join(d, 'thrd_'+s.tid) for d in s.dest_dirs ]
             invokeList.append(s)
         threadList=[]
         for s in invokeList: 
