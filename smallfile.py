@@ -523,7 +523,7 @@ class smf_invocation:
     # this algorithm should take O(log(F))
 
     def mk_seq_dir_name( self, file_num ):
-       dir_in = file_num / self.files_per_dir
+       dir_in = file_num // self.files_per_dir
 
        # generate powers of self.files_per_dir not greater than dir_in
 
@@ -538,30 +538,28 @@ class smf_invocation:
 
        levels = len(level_dirs)
        level = levels - 1
-       path = ''
+       pathlist = []
        while level > -1:
            dirs_in_level = level_dirs[level]
-           #print 'dirs_per_level=%d'%dirs_in_level
            quotient = dir_in // dirs_in_level
            dir_in = dir_in - (quotient * dirs_in_level)
-           path = join(path, 'd_%03d'%quotient)
+           dirnm = 'd_' + str(quotient).zfill(3)
+           pathlist.append(dirnm)
            level -= 1
-       path = join(path, 'd_%03d'%dir_in)
-       return path
-
-    # FIXME: need to optimize out calls to os.path.join by replacing with string join of directory name list
+       pathlist.append('d_' + str(dir_in).zfill(3))
+       return os.sep.join(pathlist)
 
     def mk_hashed_dir_name(self, file_num):
-        path = ''
-        dir_num = file_num / self.files_per_dir
+        pathlist = []
+        random_hash = (file_num * self.some_prime) % self.iterations
+        dir_num = random_hash // self.files_per_dir
+        #print('file_num=%d, rhash=%d, dir_num=%d'%(file_num, random_hash, dir_num))
         while dir_num > 1:
-                # try using floating point fraction to generate a uniform random distribution on directories
                 dir_num_hash = (dir_num * self.some_prime) % self.dirs_per_dir
-                path = join('h_%03d'%dir_num_hash, path)
-                #print file_num, dirs_in_tree, f, fract, next_dir_num, hashed_path
-                #print file_num, dir_num_hash, path
-                dir_num /= self.dirs_per_dir
-        return path
+                pathlist.insert(0,  'h_'+str(dir_num_hash).zfill(3) )
+                #print(file_num, dir_num_hash, path)
+                dir_num //= self.dirs_per_dir
+        return os.sep.join(pathlist)
 
     def mk_dir_name(self, file_num):
         if self.hash_to_dir: return self.mk_hashed_dir_name(file_num)
@@ -582,7 +580,7 @@ class smf_invocation:
         tree = base_dirs[ filenum % listlen ]
         components = [ tree, os.sep, self.mk_dir_name(filenum), os.sep, \
                    self.prefix , "_" , self.tid , "_" , str(filenum) , "_" , self.suffix ]
-        return "".join(components)
+        return ''.join(components)
 
     # generate buffer contents, use these on writes and compare against them for reads
     # where random data is used, 
@@ -594,6 +592,7 @@ class smf_invocation:
         biggest_buf = bytearray([ self.randstate.randrange(0,127) for k in range(0,(1<<self.random_seg_size_bits)) ])
       else:
         biggest_buf = bytearray([ (k%128) for k in range(0,(1<<self.random_seg_size_bits)) ])
+      biggest_buf = biggest_buf.replace(b'\\',b'!')
       #print('%d %s'%(len(biggest_buf), biggest_buf))
       for j in range(0,self.biggest_buf_size_bits+1-self.random_seg_size_bits):
         biggest_buf.extend(biggest_buf[:])
@@ -952,7 +951,7 @@ class smf_invocation:
                 if len(bytesread) != rszbytes:
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, len(bytesread))
                 if self.verify_read:
-                  self.log.debug('swift_get bytesread %u'%len(bytesread))
+                  if self.verbose: self.log.debug('swift_get bytesread %u'%len(bytesread))
                   if self.buf[0:rszbytes] != bytesread:
                     self.log.debug( 'expected buf: ' + binary_buf_str(self.buf[0:rszbytes]))
                     self.log.debug('saw buf: ' + binary_buf_str(bytesread))
@@ -1011,14 +1010,14 @@ class smf_invocation:
                   try: 
                     xattr_nm = 'user.smallfile-all-%d'%j
                     v = xattr.getxattr(fd, xattr_nm)
-                    self.log.debug('xattr ' + xattr_nm + ' = ' + binary_buf_str(v))
+                    #self.log.debug('xattr ' + xattr_nm + ' = ' + binary_buf_str(v))
                   except IOError as e:
                     if e.errno != errno.ENODATA: raise e
               for j in range(0, self.xattr_count):
                   xattr_nm = 'user.smallfile-all-%d'%j
                   v = binary_buf_str(self.buf[j:self.xattr_size+j])
                   xattr.setxattr(fd, xattr_nm, v)
-                  self.log.debug('xattr ' + xattr_nm + ' set to ' + v)
+                  #self.log.debug('xattr ' + xattr_nm + ' set to ' + v)
 
               # alternative to ftruncate/fallocate is close then open to prevent preallocation
               # since in theory close wipes out the preallocation and 
@@ -1037,7 +1036,7 @@ class smf_invocation:
               os.rename(fn, fn2)
             except Exception as e:
               ensure_deleted(fn)
-              if verbose: print('exception on %s'%fn)
+              if self.verbose: print('exception on %s'%fn)
               raise e
             finally:
               if fd > -1: os.close(fd)
@@ -1389,6 +1388,7 @@ class Test(unittest_class):
         self.invok.dirs_per_dir = 3
         d = self.invok.mk_dir_name(29*self.invok.files_per_dir)
         expected = join('d_001',join('d_000', join('d_000', 'd_002')))
+        #print('dirname=%s,expected=%s'%(d, expected))
         self.assertTrue(d == expected)
         self.invok.dirs_per_dir = 7
         d = self.invok.mk_dir_name(320*self.invok.files_per_dir)
@@ -1414,9 +1414,13 @@ class Test(unittest_class):
         self.invok.files_per_dir = 5 
         self.invok.dirs_per_dir = 4
         self.invok.iterations = 500 
-        self.hash_to_dir = True
+        self.invok.hash_to_dir = True
         self.mk_files()
-        self.assertTrue(exists(self.lastFileNameInTest(self.invok.src_dirs)))
+        fn = self.lastFileNameInTest(self.invok.src_dirs)
+        expectedFn = os.sep.join([self.invok.src_dirs[0],'h_001', 'h_000', 'h_001','p_regtest_499_deep_hashed'])
+        #print(fn + ' ' + expectedFn)
+        self.assertTrue(fn == expectedFn)
+        self.assertTrue(exists(fn))
         self.cleanup_files()
 
     def test_z_multithr_stonewall(self):
