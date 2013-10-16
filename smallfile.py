@@ -316,6 +316,7 @@ class smf_invocation:
         # results returned in variables below
         self.filenum = -1    # how many files have been accessed so far
         self.filenum_final = 0 # how many files accessed when test ended
+        self.file_dirs = []   # subdirectory within each thread's directory where each file goes
         self.rq = 0         # how many reads/writes have been attempted so far
         self.rq_final = 0  # how many reads/writes completed when test ended
         self.start_time = None
@@ -578,7 +579,7 @@ class smf_invocation:
         if filenum == -1: filenum = self.filenum
         listlen = len(base_dirs)
         tree = base_dirs[ filenum % listlen ]
-        components = [ tree, os.sep, self.mk_dir_name(filenum), os.sep, \
+        components = [ tree, os.sep, self.file_dirs[filenum], os.sep, \
                    self.prefix , "_" , self.tid , "_" , str(filenum) , "_" , self.suffix ]
         return ''.join(components)
 
@@ -800,7 +801,7 @@ class smf_invocation:
             fd = -1
             try:
               next_fsz = self.get_next_file_size()
-              fd = os.open(fn, os.O_WRONLY)
+              fd = os.open(fn, os.O_WRONLY) # don't use O_APPEND, it has different semantics!
               os.lseek(fd, 0, os.SEEK_END )
               rszkb = self.record_sz_kb
               if rszkb == 0: rszkb = next_fsz
@@ -1072,6 +1073,8 @@ class smf_invocation:
 
     def do_workload(self):
         self.reset()
+        for j in range(0, self.iterations+self.files_per_dir):
+            self.file_dirs.append(self.mk_dir_name(j))
         self.start_log()
         self.log.info('do_workload: ' + str(self))
         ensure_dir_exists(self.network_dir)
@@ -1206,8 +1209,9 @@ class Test(unittest_class):
     def mk_files(self):
         self.cleanup_files()
         self.runTest("create")
-        self.assertTrue(exists(self.lastFileNameInTest(self.invok.src_dirs)))
-        assert (os.path.getsize(self.lastFileNameInTest(self.invok.src_dirs)) == self.invok.total_sz_kb * self.invok.BYTES_PER_KB)
+        lastfn = self.lastFileNameInTest(self.invok.src_dirs)
+        self.assertTrue(exists(lastfn))
+        assert (os.path.getsize(lastfn) == self.invok.total_sz_kb * self.invok.BYTES_PER_KB)
 
     def test1_recreate_src_dest_dirs(self):
         for s in self.invok.src_dirs:
@@ -1218,6 +1222,7 @@ class Test(unittest_class):
           os.mkdir(s)
      
     def test_a_MkFn(self):
+        self.mk_files()
         fn = self.invok.mk_file_nm(self.invok.src_dirs, 0)
 
         expectedFn = join( \
@@ -1225,7 +1230,6 @@ class Test(unittest_class):
                        self.invok.prefix + "_" + self.invok.tid + "_0_" + self.invok.suffix)
         #print(fn, expectedFn)
         self.assertTrue( fn == expectedFn )
-        self.mk_files()
         assert exists(fn)
         os.unlink(fn)
         self.assertTrue( not exists(fn) )
