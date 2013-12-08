@@ -616,7 +616,7 @@ class smf_invocation:
         total_xattr_space = self.xattr_size + self.xattr_count   # use +, not *, see way buffers are used
         if total_xattr_space > total_space: total_space = total_xattr_space
 
-        unique_offset = hash(self.tid)%128 + self.filenum  # FIXME: think harder about this
+        unique_offset = (hash(self.tid) + self.filenum)%1024  # FIXME: think harder about this
 
         if total_space + unique_offset > smf_invocation.biggest_buf_size:
           raise Exception('biggest supported buffer size is %d bytes'%smf_invocation.biggest_buf_size)
@@ -849,7 +849,7 @@ class smf_invocation:
                     raise MFRdWrExc('read: buffer contents wrong', self.filenum, self.rq, len(bytesread))
                 remaining_kb -= rszkb
             finally:
-              os.close(fd)
+              if fd > -1: os.close(fd)
             self.op_endtime(self.opname)
 
     def do_readdir(self):
