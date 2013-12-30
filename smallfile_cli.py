@@ -64,7 +64,9 @@ def run_multi_host_workload(prm):
     pickle_fn = os.path.join(prm.master_invoke.network_dir,'param.pickle')
     #if verbose: print('writing ' + pickle_fn)
     sync_files.write_pickle(pickle_fn, prm)
-    if sys.version.startswith('2'):
+    if os.getenv('PYPY'):
+      python_prog = os.getenv('PYPY')
+    elif sys.version.startswith('2'):
       python_prog = 'python'
     elif sys.version.startswith('3'):
       python_prog = 'python3'

@@ -179,7 +179,7 @@ done
 common_params="--files 100 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --response-times N --pause 1000 --xattr-count 9 --xattr-size 253"
 
 python2_only_ops="setxattr getxattr swift-put swift-get"
-if [ "$PYTHON" = "python3" ] ; then
+if [ "$PYTHON" = "python3" -o "$PYTHON" = "pypy" ] ; then
   python2_only_ops=''
 fi
 
