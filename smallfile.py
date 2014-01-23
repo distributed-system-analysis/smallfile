@@ -696,7 +696,7 @@ class smf_invocation:
               self.prepare_buf()
               remaining_kb = next_fsz
               while remaining_kb > 0:
-                if remaining_kb < (len(self.buf)/self.BYTES_PER_KB): 
+                if remaining_kb*self.BYTES_PER_KB < len(self.buf): 
                   rszbytes = remaining_kb * self.BYTES_PER_KB
                   written = os.write(fd, self.buf[0:rszbytes])
                 else:
@@ -808,7 +808,7 @@ class smf_invocation:
               self.prepare_buf()
               remaining_kb = next_fsz
               while remaining_kb > 0:
-                if remaining_kb < (len(self.buf)/self.BYTES_PER_KB): 
+                if remaining_kb*self.BYTES_PER_KB < len(self.buf): 
                   rszbytes = remaining_kb * self.BYTES_PER_KB
                   written = os.write(fd, self.buf[0:rszbytes])
                 else:
