@@ -260,7 +260,7 @@ def parse():
     if prm_remote_pgm_dir: prm_list.append( ('remote program directory', prm_remote_pgm_dir) )
     if prm_network_sync_dir: prm_list.append( ('network thread sync. dir.', prm_network_sync_dir) )
   if inv.record_sz_kb == 0 and inv.verbose:
-    print('record size not specified, large files will default to record size %d'%(smf_invocation.biggest_buf_size))
+    print('record size not specified, large files will default to record size %d KB'%(smf_invocation.biggest_buf_size/inv.BYTES_PER_KB))
   if not prm_slave:
     print('smallfile version %s'%version)
     for (prm_name, prm_value) in prm_list:
