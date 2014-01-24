@@ -259,7 +259,8 @@ def parse():
              ('permute host directories?', '%s'%bool2YN(prm_permute_host_dirs)) ] )
     if prm_remote_pgm_dir: prm_list.append( ('remote program directory', prm_remote_pgm_dir) )
     if prm_network_sync_dir: prm_list.append( ('network thread sync. dir.', prm_network_sync_dir) )
-
+  if inv.record_sz_kb == 0 and inv.verbose:
+    print('record size not specified, large files will default to record size %d'%(smf_invocation.biggest_buf_size))
   if not prm_slave:
     print('smallfile version %s'%version)
     for (prm_name, prm_value) in prm_list:
