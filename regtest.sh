@@ -5,31 +5,39 @@
 # and it expects NFS to support extended attributes
 #
 # you can set the environment variable PYTHON_PROG to switch between python3 and python2
-# for example: # PYTHON_PROG=python bash regtest.sh
+# for example: # PYTHON_PROG=python3 bash regtest.sh
 # python3 at present doesn't seem to support xattr module so some smallfile operations
 # are not yet supported under python3, the regression test knows how to deal with that.
 #
 # you can have it use a directory in a tmpfs mountpoint, this is recommended so as not to wear out laptop drive.
 # by default, Fedora 17 has /run tmpfs mountpoint with sufficient space so this is default, but TMPDIR overrides
+#
+# we don't use "tee" program to display results as they are happening because this erases any failure status code
+# returned by smallfile, and this status code is vital to regression test.  
+# Instead we log all smallfile output to smfregtest.log where it can be analyzed later  if failure occurs
+#
 
 localhost_name="$1"
 if [ -z "$localhost_name" ] ; then localhost_name="localhost" ; fi
 
 testdir="$TMPDIR/smfregtest"
+xattrs=1
 if [ "$TMPDIR" = "" ] ; then
   # prefer to use tmpfs so we dont wear out disk on laptop or other system disk
   testdir='/run/smfregtest'
+  xattrs=0
 fi
 nfsdir=/var/tmp/smfnfs
 OK=0
 NOTOK=1
 GREP="grep -q "
-PYTHON=${PYTHON_PROG:-python3}
+PYTHON=${PYTHON_PROG:-python}
 
 assertfail() {
   status=$1
   if [ $status == $OK ] ; then
     echo "ERROR: unexpected success status $status"
+    echo "see end of $logfile for cause" 
     exit $NOTOK
   fi
 }
@@ -38,6 +46,7 @@ assertok() {
   status=$1
   if [ $status != $OK ] ; then
     echo "ERROR: unexpected failure status $status"
+    echo "see end of $logfile for cause"
     exit $NOTOK
   fi
 }
@@ -91,44 +100,50 @@ echo "running drop_buffer_cache.py unit test"
 $PYTHON drop_buffer_cache.py
 assertok $?
 
+# test assertion mechanism
+
+scmd="$PYTHON smallfile_cli.py --top $testdir "
+cleanup
+$scmd --top /foo/bar/no-such-dir  >> $f
+assertfail $?
+
 # test parsing
 
 echo "testing parsing"
-scmd="$PYTHON smallfile_cli.py --top $testdir "
 f=smfregtest.log
 cleanup
-$scmd --files 0 > $f
+$scmd --files 0 >> $f
 assertfail $?
 $GREP 'non-negative' $f
 assertok $?
 
 cleanup
-$scmd --threads 0 > $f
+$scmd --threads 0 >> $f
 assertfail $?
 $GREP 'non-negative' $f
 assertok $?
 
-$scmd --files -1 > $f
+$scmd --files -1 >> $f
 assertfail $?
-$scmd --record-size -1 > $f
+$scmd --record-size -1 >> $f
 assertfail $?
-$scmd --file-size -1 > $f
+$scmd --file-size -1 >> $f
 assertfail $?
-$scmd --files-per-dir 0 > $f
+$scmd --files-per-dir 0 >> $f
 assertfail $?
-$scmd --dirs-per-dir 0 > $f
+$scmd --dirs-per-dir 0 >> $f
 assertfail $?
-$scmd --record-size -1  > $f
+$scmd --record-size -1  >> $f
 assertfail $?
-$scmd --record-size a > $f
+$scmd --record-size a >> $f
 assertfail $?
-$scmd --top / > $f
+$scmd --top / >> $f
 assertfail $?
-$scmd --response-times foo > $f
+$scmd --response-times foo >> $f
 assertfail $?
-$scmd --stonewall foo > $f
+$scmd --stonewall foo >> $f
 assertfail $?
-$scmd --finish foo > $f
+$scmd --finish foo >> $f
 assertfail $?
 
 # run a command with all CLI options and verify that they were successfully parsed
@@ -136,7 +151,7 @@ assertfail $?
 cleanup
 mkdir -p $nfsdir/smf
 scmd="$PYTHON smallfile_cli.py --top $nfsdir/smf "
-$scmd --verify-read N --response-times Y --finish N --stonewall N --permute-host-dirs Y --same-dir Y --operation cleanup --threads 5 --files 20 --files-per-dir 5 --dirs-per-dir 3 --record-size 6 --file-size 30 --file-size-distribution exponential --prefix a --suffix b --hash-into-dirs Y --pause 5 --host-set $localhost_name | tee $f
+$scmd --verify-read N --response-times Y --finish N --stonewall N --permute-host-dirs Y --same-dir Y --operation cleanup --threads 5 --files 20 --files-per-dir 5 --dirs-per-dir 3 --record-size 6 --file-size 30 --file-size-distribution exponential --prefix a --suffix b --hash-into-dirs Y --pause 5 --host-set $localhost_name >> $f
 assertok $?
 expect_strs=( 'verify read? : N' \
         "hosts in test : \['$localhost_name'\]" \
@@ -173,7 +188,7 @@ for j in `seq 1 $expect_ct` ; do
   if [ $s != $OK ] ; then 
     echo "expecting: $expected_str"
   fi
-  assertok $s
+  assertok $s $f
 done
 
 common_params="--files 100 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --response-times N --pause 1000 --xattr-count 9 --xattr-size 253"
@@ -186,17 +201,23 @@ fi
 allops=\
 "cleanup create append read readdir ls-l chmod stat $python2_only_ops symlink mkdir rmdir rename delete-renamed "
 
-# with NFS, any operation using extended attributes is not supported
-nfs_allops=\
+allops_noxattrs=\
 "cleanup create append read readdir ls-l chmod stat symlink mkdir rmdir rename delete-renamed "
 
+# with NFS or tmpfs, any operation using extended attributes is not supported
+nfs_allops="$allops_noxattrs"
+local_allops="$allops"
+if [ $xattrs = 0 ] ; then
+  local_allops="$allops_noxattrs"
+fi
 # for debug: allops="create cleanup"
 
 echo "******** testing non-distributed operations"
 scmd="$PYTHON smallfile_cli.py --top $testdir "
-for op in $allops ; do
+for op in $local_allops ; do
   rm -rf /var/tmp/invoke*.log
-  $scmd $common_params --top $testdir --operation $op
+  echo "testing local op $op"
+  $scmd $common_params --top $testdir --operation $op >> $f
   assertok $?
 done
 
@@ -205,7 +226,8 @@ mkdir -pv $nfsdir/smf
 scmd="$PYTHON smallfile_cli.py --top $nfsdir/smf "
 for op in $nfs_allops ; do
   rm -rf /var/tmp/invoke*.log
-  $scmd $common_params --top $nfsdir/smf --host-set $localhost_name --operation $op
+  echo "testing distributed op $op"
+  $scmd $common_params --top $nfsdir/smf --host-set $localhost_name --operation $op >> $f
   assertok $?
 done
 
