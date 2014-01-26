@@ -16,29 +16,8 @@ See Appendix on this page for instructions pertaining to license.
 #
 # ./smallfile_cli.py 
 #
-import sys
-import os
-import os.path
-import errno
-import threading
-import time
-import socket
-import string
-import parse
-import pickle
-import math
-import random
-import shutil
 
 # smallfile modules
-import ssh_thread
-import smallfile
-from smallfile import smf_invocation, ensure_deleted, ensure_dir_exists, get_hostname, hostaddr
-from smallfile import OK, NOTOK
-import invoke_process
-import sync_files
-import output_results
-import smf_test_params
 import multi_thread_workload
 import parse_slave
 
