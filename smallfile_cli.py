@@ -110,7 +110,7 @@ def run_multi_host_workload(prm):
       os.listdir(master_invoke.network_dir)
       hosts_ready = True
       if os.path.exists(abortfn): raise Exception('worker host signaled abort')
-      for j in range(last_host_seen+1, len(prm_host_set)-1):
+      for j in range(last_host_seen+1, len(prm_host_set)):
         h=prm_host_set[j]
         fn = master_invoke.gen_host_ready_fname(h.strip())
         if verbose: print('checking for host filename '+fn)
