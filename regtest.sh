@@ -32,12 +32,13 @@ OK=0
 NOTOK=1
 GREP="grep -q "
 PYTHON=${PYTHON_PROG:-python}
+f=smfregtest.log
 
 assertfail() {
   status=$1
   if [ $status == $OK ] ; then
     echo "ERROR: unexpected success status $status"
-    echo "see end of $logfile for cause" 
+    echo "see end of $f for cause" 
     exit $NOTOK
   fi
 }
@@ -46,7 +47,7 @@ assertok() {
   status=$1
   if [ $status != $OK ] ; then
     echo "ERROR: unexpected failure status $status"
-    echo "see end of $logfile for cause"
+    echo "see end of $f for cause"
     exit $NOTOK
   fi
 }
@@ -58,6 +59,16 @@ cleanup() {
   if [ $? = $OK ] ; then sudo umount -v $nfsdir ; fi
 }
 
+# make sure sshd is running on this node
+
+is_systemctl=1
+which systemctl
+if [ $? != $OK ] ; then  # chances are it's pre-systemctl Linux distro, use "service" instead
+  ssh localhost pwd || sudo service sshd start
+  is_systemctl=0
+else
+  ssh localhost pwd || sudo systemctl start sshd
+fi
 
 # set up NFS mountpoint
 
@@ -69,18 +80,27 @@ if [ $? != $OK ] ; then
   sudo rm -rf $testdir
   sudo mkdir -p $testdir
   sudo chown $USER $testdir
-  sudo service nfs restart
+  if [ $is_systemctl -eq 1 ] ; then
+    sudo systemctl start nfs-server
+  else
+    sudo service nfs restart
+  fi
   if [ $? != $OK ] ; then 
     echo "NFS service startup failed!"
     exit $NOTOK
   fi
   sudo exportfs -v -o rw,no_root_squash,sync,fsid=15 localhost:$testdir
-  sudo mount -v -t nfs -o nfsvers=3,actimeo=1 $localhost_name:$testdir $nfsdir
+  sudo mount -v -t nfs -o nfsvers=3,tcp,actimeo=1 $localhost_name:$testdir $nfsdir
   if [ $? != $OK ] ; then 
     echo "NFS mount failed!"
     exit $NOTOK
   fi
 fi
+
+# test assertion mechanism
+
+cp -r /foo/bar/no-such-dir /tmp/ >> $f 2>&1
+assertfail $?
 
 # run the smallfile.py module's unit test
 
@@ -100,17 +120,10 @@ echo "running drop_buffer_cache.py unit test"
 $PYTHON drop_buffer_cache.py
 assertok $?
 
-# test assertion mechanism
-
-scmd="$PYTHON smallfile_cli.py --top $testdir "
-cleanup
-$scmd --top /foo/bar/no-such-dir  >> $f
-assertfail $?
-
 # test parsing
 
 echo "testing parsing"
-f=smfregtest.log
+scmd="$PYTHON smallfile_cli.py --top $testdir "
 cleanup
 $scmd --files 0 >> $f
 assertfail $?
@@ -191,7 +204,7 @@ for j in `seq 1 $expect_ct` ; do
   assertok $s $f
 done
 
-common_params="--files 100 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --response-times N --pause 1000 --xattr-count 9 --xattr-size 253"
+common_params="--files 100 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --response-times N --xattr-count 9 --xattr-size 253 "
 
 python2_only_ops="setxattr getxattr swift-put swift-get"
 if [ "$PYTHON" = "python3" -o "$PYTHON" = "pypy" ] ; then
@@ -217,7 +230,7 @@ scmd="$PYTHON smallfile_cli.py --top $testdir "
 for op in $local_allops ; do
   rm -rf /var/tmp/invoke*.log
   echo "testing local op $op"
-  $scmd $common_params --top $testdir --operation $op >> $f
+  $scmd $common_params --top $testdir --stonewall N --operation $op >> $f
   assertok $?
 done
 
@@ -227,7 +240,18 @@ scmd="$PYTHON smallfile_cli.py --top $nfsdir/smf "
 for op in $nfs_allops ; do
   rm -rf /var/tmp/invoke*.log
   echo "testing distributed op $op"
-  $scmd $common_params --top $nfsdir/smf --host-set $localhost_name --operation $op >> $f
+  $scmd $common_params --top $nfsdir/smf --host-set $localhost_name --pause 4000 --operation $op >> $f
+  assertok $?
+done
+
+echo "******* testing distributed operation with a host-local fs"
+
+scmd="$PYTHON smallfile_cli.py --top $testdir --network-sync-dir $nfsdir/sync "
+for op in $local_allops ; do
+  rm -rf /var/tmp/invoke*.log
+  rm -rf $nfsdir/sync
+  echo "testing remote-but-local op $op"
+  $scmd $common_params --host-set $localhost_name --stonewall N --operation $op >> $f
   assertok $?
 done
 
