@@ -77,6 +77,10 @@ except ImportError as e:
 
 is_windows_os = False
 if os.getenv("HOMEDRIVE"): is_windows_os = True
+# O_BINARY variable is so that we don't need to special-case windows
+# in every open statement
+O_BINARY=0
+if is_windows_os: O_BINARY=os.O_BINARY
 
 # FIXME: pass in the file pathname instead of file number so we don't use self.filenum for reporting.
 
@@ -730,7 +734,7 @@ class smf_invocation:
             self.op_starttime()
             fd = -1
             try: 
-              fd = os.open( fn, os.O_CREAT|os.O_EXCL|os.O_WRONLY )
+              fd = os.open( fn, os.O_CREAT|os.O_EXCL|os.O_WRONLY|O_BINARY )
               if (fd < 0):
                 raise MFRdWrExc(self.opname, self.filenum, 0, 0)
               remaining_kb = self.get_next_file_size()
@@ -826,7 +830,7 @@ class smf_invocation:
             fn = self.mk_file_nm(self.src_dirs)
             self.prepare_buf()
             self.op_starttime()
-            fd = os.open(fn, os.O_WRONLY)
+            fd = os.open(fn, os.O_WRONLY|O_BINARY)
             for j in range(0, self.xattr_count):
               # make sure each xattr has a unique value
               xattr.setxattr(fd, 'user.smallfile-%d'%j, binary_buf_str(self.buf[j:self.xattr_size+j]))
@@ -840,7 +844,7 @@ class smf_invocation:
             self.op_starttime()
             fd = -1
             try:
-              fd = os.open(fn, os.O_WRONLY) # don't use O_APPEND, it has different semantics!
+              fd = os.open(fn, os.O_WRONLY|O_BINARY) # don't use O_APPEND, it has different semantics!
               os.lseek(fd, 0, os.SEEK_END )
               remaining_kb = self.get_next_file_size()
               self.prepare_buf()
@@ -869,7 +873,7 @@ class smf_invocation:
             fd = -1
             try:
               next_fsz = self.get_next_file_size()
-              fd = os.open(fn, os.O_RDONLY)
+              fd = os.open(fn, os.O_RDONLY|O_BINARY)
               self.prepare_buf()
               rszkb = self.get_record_size_to_use()
               remaining_kb = next_fsz
@@ -973,7 +977,7 @@ class smf_invocation:
           self.log.debug('swift_get fn %s '%fn)
           next_fsz = self.get_next_file_size()
           self.op_starttime()
-          fd = os.open(fn, os.O_RDONLY)
+          fd = os.open(fn, os.O_RDONLY|O_BINARY)
           rszkb = self.record_sz_kb
           if rszkb == 0: rszkb = next_fsz
           remaining_kb = next_fsz
@@ -1019,7 +1023,7 @@ class smf_invocation:
             fd = -1  # so we know to not close it if file never got opened
             try:
               #print(fn)
-              fd = os.open(fn, os.O_WRONLY|os.O_CREAT)
+              fd = os.open(fn, os.O_WRONLY|os.O_CREAT|O_BINARY)
               os.fchmod(fd, 0o667)
               fszbytes = next_fsz * self.BYTES_PER_KB
               #os.ftruncate(fd, fszbytes)
@@ -1395,7 +1399,7 @@ class Test(unittest_class):
         self.mk_files()
         self.invok.verify_read = True
         fn = self.lastFileNameInTest(self.invok.src_dirs)
-        fd = os.open(fn, os.O_WRONLY)
+        fd = os.open(fn, os.O_WRONLY|O_BINARY)
         os.lseek(fd, 5, os.SEEK_SET)
         os.write(fd, b'!')
         os.close(fd)
