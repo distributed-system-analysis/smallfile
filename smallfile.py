@@ -715,6 +715,7 @@ class smf_invocation:
                         except OSError as e:
                           if (e.errno == errno.ENOTEMPTY): break
                           if (e.errno == errno.EACCES): break
+                          if (e.errno == errno.EBUSY): break  # might be mountpoint directory
                           self.log.error('deleting directory dpath: %s'%e)
                           if (e.errno != errno.ENOENT) and not self.is_shared_dir: raise e
                         unique_dpath = os.path.dirname(unique_dpath)
