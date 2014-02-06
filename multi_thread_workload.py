@@ -4,7 +4,7 @@ import time
 import random
 
 import smallfile
-from smallfile import ensure_deleted, OK, NOTOK, SMFResultException, abort_test
+from smallfile import ensure_deleted, ensure_dir_exists, OK, NOTOK, SMFResultException, abort_test
 import invoke_process
 import sync_files
 import output_results
@@ -42,9 +42,11 @@ def run_multi_thread_workload(prm):
 
   if prm_slave:
     time.sleep(1.1)
+    for d in master_invoke.top_dirs: ensure_dir_exists(d)
     os.listdir(master_invoke.network_dir)
     for dlist in [ master_invoke.src_dirs, master_invoke.dest_dirs ]:
       for d in dlist:
+          ensure_dir_exists(d)
           os.listdir(d) # hack to ensure that 
           if verbose: print(host + ' saw ' + d)
 
