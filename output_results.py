@@ -28,6 +28,8 @@ def output_results(invoke_list, prm_host_set, prm_thread_count, pct_files_min):
       print('total files = %d'%total_files)
       rszkb = my_host_invoke.record_sz_kb
       if rszkb == 0: rszkb = my_host_invoke.total_sz_kb
+      if rszkb * my_host_invoke.BYTES_PER_KB > my_host_invoke.biggest_buf_size:
+        rszkb = my_host_invoke.biggest_buf_size / my_host_invoke.BYTES_PER_KB
       if total_records > 0:
         total_data_gb = total_records * rszkb * 1.0 / KB_PER_GB
         print('total data = %9.3f GB'%total_data_gb)
