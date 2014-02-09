@@ -48,7 +48,7 @@ def run_multi_thread_workload(prm):
       for d in dlist:
           ensure_dir_exists(d)
           os.listdir(d) # hack to ensure that 
-          if verbose: print(host + ' saw ' + d)
+          if verbose: print(host + ' saw ' + str(d))
 
   # for each thread set up smf_invocation instance,
   # create a thread instance, and delete the thread-ready file 
@@ -69,10 +69,15 @@ def run_multi_thread_workload(prm):
   # wait for all threads to reach the starting gate
   # this makes it more likely that they will start simultaneously
 
+  startup_timeout = prm.startup_timeout
+  if smallfile.is_windows_os:
+    print('adding time for Windows synchronization')
+    startup_timeout += 30
   abort_fname = my_host_invoke.abort_fn()
   threads_ready = False  # really just to set scope of variable
   k=0
-  for sec in range(0, prm.startup_timeout*2):
+  for sec in range(0, startup_timeout*2):
+    os.listdir(t.invoke.network_dir) # hack to ensure that directory is up to date
     threads_ready = True
     for t in thread_list:
         fn = t.invoke.gen_thread_ready_fname(t.invoke.tid)
@@ -88,7 +93,7 @@ def run_multi_thread_workload(prm):
 
   if not threads_ready: 
     abort_test(abort_fname, thread_list)
-    raise Exception('threads did not reach starting gate within %d sec'%prm.startup_timeout)
+    raise Exception('threads did not reach starting gate within %d sec'%startup_timeout)
 
   # declare that this host is at the starting gate
 
@@ -110,13 +115,15 @@ def run_multi_thread_workload(prm):
   
   if verbose: print('awaiting '+sg)
   if prm_slave:
-    for sec in range(0, prm.host_startup_timeout*2):
+    for sec in range(0, startup_timeout*2):
+      ndlist = os.listdir(my_host_invoke.network_dir) # hack to ensure that directory is up to date
+      if verbose: print(str(ndlist))
       if os.path.exists(sg):
         break
       time.sleep(0.5)
     if not os.path.exists(sg):
       abort_test(my_host_invoke.abort_fn(), thread_list)
-      raise Exception('starting signal not seen within %d seconds'%prm.host_startup_timeout)
+      raise Exception('starting signal not seen within %d seconds'%startup_timeout)
   if verbose: print("starting test on host " + host + " in 2 seconds")
   time.sleep(2 + random.random())  
 
