@@ -31,7 +31,6 @@ import random
 import shutil
 
 # smallfile modules
-import ssh_thread
 import smallfile
 from smallfile import smf_invocation, ensure_deleted, ensure_dir_exists, get_hostname, hostaddr
 from smallfile import OK, NOTOK
@@ -40,6 +39,9 @@ import sync_files
 import output_results
 import smf_test_params
 import multi_thread_workload
+
+import launcher_thread
+import ssh_thread
 
 # FIXME: should be monitoring progress, not total elapsed time
 min_files_per_sec = 15 
@@ -73,24 +75,28 @@ def run_multi_host_workload(prm):
     else:
       raise Exception('unrecognized python version %s'%sys.version)
     #print('python_prog = %s'%python_prog)
-    ssh_thread_list = []
+    remote_thread_list = []
     host_ct = len(prm_host_set)
     for j in range(0, len(prm_host_set)):
-        n = prm_host_set[j]
-        this_remote_cmd = '%s %s/smallfile_remote.py --network-sync-dir %s '%\
-           (python_prog, prm.remote_pgm_dir, prm.master_invoke.network_dir)
+        remote_host = prm_host_set[j]
+        smf_remote_pgm = os.path.join(prm.remote_pgm_dir, 'smallfile_remote.py')
+        this_remote_cmd = '%s %s --network-sync-dir %s '%\
+           (python_prog, smf_remote_pgm, prm.master_invoke.network_dir)
         
         #this_remote_cmd = remote_cmd
         if prm_permute_host_dirs:
           this_remote_cmd += ' --as-host %s'%prm_host_set[(j+1)%host_ct]
         else:
-          this_remote_cmd += ' --as-host %s'%n
+          this_remote_cmd += ' --as-host %s'%remote_host
         if verbose: print(this_remote_cmd)
-        ssh_thread_list.append(ssh_thread.ssh_thread(n, this_remote_cmd))
+        if smallfile.is_windows_os:
+          remote_thread_list.append(launcher_thread.launcher_thread(prm, remote_host, this_remote_cmd ))
+        else:
+          remote_thread_list.append(ssh_thread.ssh_thread(remote_host, this_remote_cmd))
 
     # start them, pacing starts so that we don't get ssh errors
 
-    for t in ssh_thread_list:
+    for t in remote_thread_list:
         t.start()
 
     # wait for hosts to arrive at starting gate
@@ -104,10 +110,14 @@ def run_multi_host_workload(prm):
     last_host_seen=-1
     sec = 0
     sec_delta = 0.5
+    host_timeout = prm.host_startup_timeout
+    if smallfile.is_windows_os: host_timeout += 20
+
     try:
      # FIXME: make timeout criteria be that new new hosts seen in X seconds
-     while sec < prm.host_startup_timeout:
-      os.listdir(master_invoke.network_dir)
+     while sec < host_timeout:
+      ndirlist = os.listdir(master_invoke.network_dir)
+      if master_invoke.verbose: print('shared dir list: ' + str(ndirlist))
       hosts_ready = True
       if os.path.exists(abortfn): raise Exception('worker host signaled abort')
       for j in range(last_host_seen+1, len(prm_host_set)):
@@ -136,7 +146,7 @@ def run_multi_host_workload(prm):
     if not hosts_ready:
       smallfile.abort_test(abortfn, [])
       if not exception_seen: 
-        raise Exception('hosts did not reach starting gate within %d seconds'%prm.host_startup_timeout)
+        raise Exception('hosts did not reach starting gate within %d seconds'%host_timeout)
       else:
         print('saw exception %s, aborting test'%str(e))
     else:
@@ -151,7 +161,7 @@ def run_multi_host_workload(prm):
     # wait for them to finish
 
     all_ok = True
-    for t in ssh_thread_list:
+    for t in remote_thread_list:
         t.join()
         if t.status != OK: 
           all_ok = False
