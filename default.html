@@ -3,11 +3,11 @@
 <HEAD>
 	<META HTTP-EQUIV="CONTENT-TYPE" CONTENT="text/html; charset=utf-8">
 	<TITLE>smallfile distributed I/O benchmark | Red Hat Intranet</TITLE>
-	<META NAME="GENERATOR" CONTENT="LibreOffice 4.0.3.3 (Linux)">
+	<META NAME="GENERATOR" CONTENT="LibreOffice 4.1.3.2 (Linux)">
 	<META NAME="AUTHOR" CONTENT="anonymous">
 	<META NAME="CREATED" CONTENT="0;0">
 	<META NAME="CHANGEDBY" CONTENT="Ben England">
-	<META NAME="CHANGED" CONTENT="20130604;9024400">
+	<META NAME="CHANGED" CONTENT="20140210;131202570963820">
 	<META NAME="category-departments" CONTENT="Engineering">
 	<META NAME="category-keywords" CONTENT="filesystem">
 	<META NAME="category-offices" CONTENT="Westford, MA">
@@ -24,14 +24,17 @@
 		H1.cjk { font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif }
 		H1.ctl { font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif }
 		H2 { margin-top: 0.1in; margin-bottom: 0in; border: none; padding: 0in; color: #000000; font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif; font-size: 10pt; font-weight: normal; line-height: 130% }
-		H1.with-tabs-western { font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif; font-size: 22pt }
-		H1.with-tabs-cjk { font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif }
-		H1.with-tabs-ctl { font-family: "Liberation Sans", "Lucida Grande", "Helvetica", sans-serif }
 		PRE { color: #000000 }
 		PRE.cjk { font-family: "WenQuanYi Zen Hei", monospace }
 		PRE.ctl { font-family: "Lohit Devanagari", monospace }
+		H3 { color: #000000 }
+		H3.western { font-family: "Albany", sans-serif }
+		H3.cjk { font-family: "WenQuanYi Zen Hei Sharp" }
+		H3.ctl { font-family: "Lohit Devanagari" }
+		P.sdfootnote { margin-left: 0.24in; text-indent: -0.24in; margin-bottom: 0in; font-size: 10pt; line-height: 100% }
 		A:link { color: #003399; text-decoration: none }
 		A:visited { color: #000000 }
+		A.sdfootnoteanc { font-size: 57% }
 	-->
 	</STYLE>
 </HEAD>
@@ -47,17 +50,10 @@
 	<INPUT TYPE=HIDDEN NAME="form_id" VALUE="comment_form">
 </FORM>
 <DIV ID="content-wrapper" DIR="LTR" STYLE="background: #dfe1e4">
-	<P><BR><BR>
-	</P>
 	<DIV ID="inner-wrap" DIR="LTR">
-		<P><BR><BR>
-		</P>
 		<DIV ID="center" DIR="LTR">
-			<P><BR><BR>
-			</P>
 			<DIV ID="tabs-wrapper" DIR="LTR">
-				<H1 CLASS="with-tabs-western" STYLE="margin-top: 0in; margin-bottom: 0.2in; border: none; padding: 0in">
-				smallfile distributed I/O benchmark</H1>
+				<H1 CLASS="western">smallfile distributed I/O benchmark</H1>
 			</DIV>
 			<DIV ID="node-71422" DIR="LTR">
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">&nbsp;This
@@ -74,6 +70,58 @@
 				Here's an example of the kind of data that can be generated with
 				it:</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><IMG SRC="default_files/glusterfs-smallfile-2.jpg" NAME="graphics2" ALIGN=BOTTOM WIDTH=725 HEIGHT=614 BORDER=0></P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
+				</P>
+				<DIV ID="Table of Contents1" DIR="LTR">
+					<DIV ID="Table of Contents1_Head" DIR="LTR">
+						<P STYLE="margin-top: 0.17in; line-height: 100%; page-break-before: always; page-break-after: avoid">
+						<FONT FACE="Albany, sans-serif"><FONT SIZE=4 STYLE="font-size: 16pt"><B>Table
+						of Contents</B></FONT></FONT></P>
+					</DIV>
+					<P STYLE="margin-left: 0.2in; margin-bottom: 0in; line-height: 100%">
+					<FONT FACE="Liberation Serif, serif"><FONT SIZE=3><A HREF="#__RefHeading__236_244684570">Use
+					with distributed filesystems	5</A></FONT></FONT></P>
+					<P STYLE="margin-left: 0.2in; margin-bottom: 0in; line-height: 100%">
+					<FONT FACE="Liberation Serif, serif"><FONT SIZE=3><A HREF="#__RefHeading__238_244684570">Use
+					with non-networked filesystems	6</A></FONT></FONT></P>
+					<P STYLE="margin-left: 0.2in; margin-bottom: 0in; line-height: 100%">
+					<FONT FACE="Liberation Serif, serif"><FONT SIZE=3><A HREF="#__RefHeading__112_244684570">Use
+					of subdirectories	7</A></FONT></FONT></P>
+					<P STYLE="margin-left: 0.2in; margin-bottom: 0in; line-height: 100%">
+					<FONT FACE="Liberation Serif, serif"><FONT SIZE=3><A HREF="#__RefHeading__114_244684570">Sharing
+					directories across threads	7</A></FONT></FONT></P>
+					<P STYLE="margin-left: 0.2in; margin-bottom: 0in; line-height: 100%">
+					<FONT FACE="Liberation Serif, serif"><FONT SIZE=3><A HREF="#__RefHeading__116_244684570">Hashing
+					files into directory tree	7</A></FONT></FONT></P>
+					<P STYLE="margin-left: 0.2in; margin-bottom: 0in; line-height: 100%">
+					<FONT FACE="Liberation Serif, serif"><FONT SIZE=3><A HREF="#__RefHeading__118_244684570">Random
+					file size distribution option	8</A></FONT></FONT></P>
+					<P STYLE="margin-left: 0.2in; margin-bottom: 0in; line-height: 100%">
+					<FONT FACE="Liberation Serif, serif"><FONT SIZE=3><A HREF="#__RefHeading__120_244684570">Avoiding
+					caching effects	8</A></FONT></FONT></P>
+					<P STYLE="margin-left: 0.2in; margin-bottom: 0in; line-height: 100%">
+					<FONT FACE="Liberation Serif, serif"><FONT SIZE=3><A HREF="#__RefHeading__240_244684570">Use
+					of --pause in multi-thread tests	9</A></FONT></FONT></P>
+					<P STYLE="margin-left: 0.2in; margin-bottom: 0in; line-height: 100%">
+					<FONT FACE="Liberation Serif, serif"><FONT SIZE=3><A HREF="#__RefHeading__122_244684570">Response
+					time collection	9</A></FONT></FONT></P>
+					<P STYLE="margin-left: 0.2in; margin-bottom: 0in; line-height: 100%">
+					<FONT FACE="Liberation Serif, serif"><FONT SIZE=3><A HREF="#__RefHeading__124_244684570">Synchronization	11</A></FONT></FONT></P>
+					<P STYLE="margin-left: 0.39in; margin-bottom: 0in; line-height: 100%">
+					<FONT FACE="Liberation Serif, serif"><FONT SIZE=3><A HREF="#__RefHeading__126_244684570">How
+					test parameters are transmitted to worker threads	12</A></FONT></FONT></P>
+					<P STYLE="margin-left: 0.39in; margin-bottom: 0in; line-height: 100%">
+					<FONT FACE="Liberation Serif, serif"><FONT SIZE=3><A HREF="#__RefHeading__128_244684570">How
+					remote worker threads are launched	12</A></FONT></FONT></P>
+					<P STYLE="margin-left: 0.39in; margin-bottom: 0in; line-height: 100%">
+					<FONT FACE="Liberation Serif, serif"><FONT SIZE=3><A HREF="#__RefHeading__130_244684570">How
+					results are returned to master process	12</A></FONT></FONT></P>
+				</DIV>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
+				</P>
+				<H1 CLASS="western">What it can do</H1>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
+				</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">Capabilities
 				include:</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">- can
@@ -91,34 +139,31 @@
 				to extend to new workload types</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">-
 				provides CLI for scripted use, but workload generator is separate
-				from CLI and can also be invoked directly from a GUI if desired</P>
+				from CLI so it is possible to develop a GUI for it</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">-
 				supports either fixed file size or random exponential file size</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">- can
 				capture response time data in .csv format, provides utility to
 				reduce this data to statistics</P>
-				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">- has
-				run successfully on Windows, though this functionality is not
-				regularly tested at present.</P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">-
+				supports Windows (different launching method, see below)</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">-
 				writes unique data pattern in all files, verifies data read
 				against this pattern</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">- in
 				multi-host tests, can force all clients to read files written by
 				different client</P>
-				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">For a
-				multi-host test, ALL hosts <EM>must provide access to the same
-				shared directory</EM> with pathname.</P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
+				</P>
 				<H1 CLASS="western" STYLE="margin-top: 0in; margin-bottom: 0.2in">
 				Restrictions</H1>
 				<UL>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">untested
-					on python 3, probably doesn't run yet (exception syntax) 
-					</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">does
-					not work on laptop when hostname is not resolvable via DNS (e.g.
-					dhcp-185-182) 
-					</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">For
+					a multi-host test, ALL hosts <EM>must provide access to the same
+					shared directory</EM></P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><EM><SPAN STYLE="font-style: normal">does
+					not support mixed workloads (mixture of different operation
+					types)<A CLASS="sdfootnoteanc" NAME="sdfootnote1anc" HREF="#sdfootnote1sym"><SUP>1</SUP></A></SPAN></EM></P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">is
 					not accurate on memory-resident filesystem on single host 
 					</P>
@@ -127,8 +172,20 @@
 					restriction) 
 					</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">does
-					not support HTTP access 
-					</P>
+					not support HTTP access (can use ssbench or cosbench for Swift
+					testing)</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">does
+					not support mixture of Windows and non-Windows clients at
+					present</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">For
+					POSIX-like operating systems, we have only tested with Linux,
+					but there is a high probability that it would work with Apple OS
+					and most other UNIX-like operating systems – we just don't
+					have the time to  test with them.</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">We
+					only have tested on Windows XP and Windows 7 so far, and cannot
+					guarantee that any other Windows will work, although it is
+					likely that any Windows after Windows XP should be ok.</P>
 				</UL>
 				<H1 CLASS="western" STYLE="margin-top: 0in; margin-bottom: 0.2in">
 				How to run</H1>
@@ -205,6 +262,14 @@
 						– simulates OpenStack Swift behavior for each GET operation. 
 						</P>
 					</UL>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--</B><B>top
+					 -- </B><SPAN STYLE="font-weight: normal">top-level directory,
+					all file accesses are done inside this directory tree. If you
+					wish to use multiple mountpoints,provide a list of top-level
+					directories separated by comma (no whitespace).</SPAN></P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--host-set</B><SPAN STYLE="font-weight: normal">
+					-- comma-separated set of hosts used for this test, no domain
+					names allowed. Default: non-distributed test.</SPAN></P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--files</B>
 					-- how many files should each thread process?&nbsp;</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--threads</B>
@@ -220,16 +285,8 @@
 					</SPAN>fixed file size.</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--record-size</B>
 					-- record size in KB, how much data is transferred in a single
-					read or write system call.&nbsp; If 0 then it is set to the file
-					size. Default: 0</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--top</B>
-					-- top-level directory, all file accesses are done inside this
-					directory tree. If you wish to use multiple mountpoints,provide
-					a list of top-level directories separated by comma (no
-					whitespace).</P>
-					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--host-set</B>
-					-- comma-separated set of hosts used for this test, no domain
-					names allowed. Default: non-distributed test.</P>
+					read or write system call.&nbsp; If 0 then it is set to the
+					minimum of the file size and 1-MB record size limit. Default: 0</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--files-per-dir</B>
 					-- maximum number of files contained in any one directory.
 					Default: 200</P>
@@ -272,6 +329,20 @@
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--stonewall</B>
 					-- if Y then thread will measure throughput as soon as it
 					detects that another thread has finished. Default: N</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--verify-read
+					– </B><SPAN STYLE="font-weight: normal">if Y then smallfile
+					will verify read data is correct.  Default: Y</SPAN></P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--response-times</B><SPAN STYLE="font-weight: normal">
+					– if Y then save response time for each file operation in a
+					rsptimes*csv file in the shared network directory.   Record
+					format is </SPAN><FONT FACE="Courier 10 Pitch"><SPAN STYLE="font-weight: normal">operation-type,
+					start-time, response-time</SPAN></FONT><FONT FACE="Liberation Serif, serif"><SPAN STYLE="font-weight: normal">.
+					  The operation type is included so that you can run different
+					workloads at the same time and easily merge the data from these
+					runs.  The start-time field is the time that the file operation
+					started, down to microsecond resolution.  The response time
+					field is the file operation duration down to microsecond
+					resolution.</SPAN></FONT></P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--remote-pgm-dir
 					</B>– don't need to specify this unless the smallfile software
 					lives in a different directory on the target hosts and the
@@ -313,8 +384,103 @@
 				<PRE CLASS="western" STYLE="margin-bottom: 0.2in; border: none; padding: 0in"><STRONG> </STRONG><STRONG><FONT SIZE=3># python -m unittest smallfile.Test.test_c3_Symlink</FONT></STRONG></PRE><P STYLE="margin-bottom: 0in; line-height: 100%">
 				<BR>
 				</P>
-				<P STYLE="margin-bottom: 0in; line-height: 100%"><FONT FACE="Liberation Serif, serif"><FONT SIZE=4 STYLE="font-size: 16pt">Use
-				with non-networked filesystems</FONT></FONT></P>
+				<P STYLE="margin-bottom: 0in; line-height: 100%"><BR>
+				</P>
+				<H2 STYLE="font-weight: normal"><A NAME="__RefHeading__236_244684570"></A>
+				<FONT SIZE=4 STYLE="font-size: 16pt">Use with distributed
+				filesystems</FONT></H2>
+				<P STYLE="margin-bottom: 0.2in">With distributed filesystems, it
+				is necessary to have multiple hosts simultaneously applying
+				workload to measure  the performance of a distributed filesystem.
+				 The –host-set parameter lets you specify a comma-separated
+				list of hosts to use.  
+				</P>
+				<P STYLE="margin-bottom: 0.2in">For any distributed filesystem
+				test, there must be a single directory which is shared across all
+				hosts, both test driver and worker hosts, that can be used to
+				pass test parameters, pass back results, and coordinate activity
+				across the hosts.  This is referred to below as the “shared
+				directory” in what follows.  By default this is the
+				<B>network_shared/</B> subdirectory of the –top directory, but
+				you can override this default by specifying the <B>–network-sync-dir</B>
+				directory parameter, see the next section for why this is useful.</P>
+				<P STYLE="margin-bottom: 0.2in">Some distributed filesystems,
+				such as NFS and Gluster, have relaxed, eventual-consistency
+				caching of directories; this will cause problems for the shared
+				directory. To work around this problem, you can use a separate
+				NFS mountpoint exported from a Linux NFS server, mounted with the
+				option <FONT FACE="Courier 10 Pitch">actimeo=1</FONT> (to limit
+				duration of time NFS will cache directory entries and metadata).
+				You then reference this mountpoint using the –<B>network-sync-dir</B>
+				option of <B>smallfile</B>. For example:</P>
+				<P STYLE="margin-bottom: 0.2in"><BR><BR>
+				</P>
+				<P STYLE="margin-left: 0.49in; margin-bottom: 0in"><FONT SIZE=3>#
+				<B>mount -t nfs -o actimeo=1</B>
+				<I>your-linux-server</I>:/<I>your/nfs/export</I> <B>/mnt/nfs</B></FONT></P>
+				<P STYLE="margin-left: 0.49in; margin-bottom: 0in"><FONT SIZE=3>#
+				<B>./smallfile_cli.py –top</B> <I>/your/distributed/filesystem</I>
+				–<B>network-sync-dir /mnt/nfs/smf-shared </B></FONT>
+				</P>
+				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in; border: none; padding: 0in">
+				<BR><BR>
+				</H2>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><SPAN STYLE="font-weight: normal">For
+				non-Windows tests, the user must set up password-less ssh between
+				the test driver and the host.  If security is an issue, a
+				non-root username can be used throughout, since smallfile
+				requires no special privileges.  Edit the
+				</SPAN><B>$HOME/.ssh/authorized_keys</B><SPAN STYLE="font-weight: normal">
+				file to contain the public key of the account on the test driver.
+				  The test driver will bypass the .ssh/known_hosts file by using
+				</SPAN><B>-o StrictHostKeyChecking=no</B><SPAN STYLE="font-weight: normal">
+				option in the </SPAN><B>ssh</B><SPAN STYLE="font-weight: normal">
+				command.</SPAN></P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
+				</P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><SPAN STYLE="font-weight: normal">For
+				Windows tests, e</SPAN><SPAN STYLE="font-weight: normal">ach
+				wo</SPAN><SPAN STYLE="font-weight: normal">r</SPAN><SPAN STYLE="font-weight: normal">ker
+				host </SPAN><SPAN STYLE="font-weight: normal">must be running the</SPAN><SPAN STYLE="font-weight: normal">
+				</SPAN><B>launch_smf_host.py</B><SPAN STYLE="font-weight: normal">
+				program that polls the shared network directory for a file that
+				contains the command to launch </SPAN><B>smallfile_remote.py</B><SPAN STYLE="font-weight: normal">
+				in the same way that would happen with ssh </SPAN><SPAN STYLE="font-weight: normal">on
+				non-Windows tests</SPAN><SPAN STYLE="font-weight: normal">.  The
+				command-line parameters are:</SPAN></P>
+				<UL>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--shared
+					shared-directory</B><SPAN STYLE="font-weight: normal"> – this
+					must point at the directory shared by all smallfile hosts. 
+					Normally this is the </SPAN><B>network_shared</B><SPAN STYLE="font-weight: normal">
+					subdirectory of the </SPAN><B>–top </B><SPAN STYLE="font-weight: normal">directory
+					but it could be the </SPAN><B>–network-sync-dir</B><SPAN STYLE="font-weight: normal">
+					directory if that is specified.</SPAN></P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>--as-host
+					host-name </B><SPAN STYLE="font-weight: normal">– </SPAN><SPAN STYLE="font-weight: normal">specify
+					what hostname identifier will be used for this host.  Why not
+					just ask the host what name to use?  Hosts can have multiple
+					network interfaces, and therefore can have multiple host names. 
+					in some cases we want to use IP addresses instead.</SPAN></P>
+				</UL>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><SPAN STYLE="font-weight: normal">An
+				example of how to start a Windows test with this method follows,
+				using actual DOS prompt syntax.  Something like the first command
+				must be run on every host participating in the test, before the
+				test actually is started.</SPAN></P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
+				</P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><FONT FACE="Courier 10 Pitch"><FONT SIZE=2 STYLE="font-size: 9pt"><SPAN STYLE="font-weight: normal">&gt;
+				start python launch_smf_host.py –shared <A HREF="/z:/smf">z:\smf</A>\network_shared
+				–as-host gprfc023</SPAN></FONT></FONT></P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><FONT FACE="Courier 10 Pitch"><FONT SIZE=2 STYLE="font-size: 9pt"><SPAN STYLE="font-weight: normal">&gt;
+				python smallfile_cli.py –top <A HREF="/z:/smf">z:\smf</A>
+				–host-set gprfc023</SPAN></FONT></FONT></P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
+				</P>
+				<H2 STYLE="font-weight: normal"><A NAME="__RefHeading__238_244684570"></A>
+				<FONT SIZE=4 STYLE="font-size: 16pt">Use with non-networked
+				filesystems</FONT></H2>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
 				</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">There
@@ -334,56 +500,11 @@
 				</SPAN><SPAN STYLE="font-variant: normal"><SPAN STYLE="font-style: normal">underneath
 				the directory specified with the </SPAN></SPAN><SPAN STYLE="font-variant: normal">–</SPAN><SPAN STYLE="font-variant: normal"><SPAN STYLE="font-style: normal"><B>top</B></SPAN></SPAN><SPAN STYLE="font-variant: normal">
 				</SPAN><SPAN STYLE="font-variant: normal"><SPAN STYLE="font-style: normal">parameter.</SPAN></SPAN></P>
-				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><BR><BR>
+				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in; border: none; padding: 0in">
+				<BR><BR>
 				</H2>
-				<P STYLE="margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Use
-				with distributed filesystems</FONT></P>
-				<P STYLE="margin-bottom: 0.2in">Some distributed filesystems,
-				such as NFS and Gluster, have relaxed, eventual-consistency
-				caching of directories; this will cause problems for smallfile's
-				network_shared directory.  To work around this problem, you can
-				use a separate NFS mountpoint exported from a Linux NFS server,
-				mounted with the option actimeo=1 (to limit duration of time NFS
-				will cache directory entries and metadata).  You then reference
-				this mountpoint using the <B>–network-sync-dir</B> option of
-				smallfile.    For example:</P>
-				<P STYLE="margin-bottom: 0.2in"><BR><BR>
-				</P>
-				<P STYLE="margin-left: 0.49in; margin-bottom: 0in"><FONT SIZE=3>#
-				<B>mount -t nfs -o actimeo=1</B>
-				<I>your-linux-server</I>:/<I>your/nfs/export</I> <B>/mnt/nfs</B></FONT></P>
-				<P STYLE="margin-left: 0.49in; margin-bottom: 0in"><FONT SIZE=3>#
-				<B>./smallfile_cli.py –top</B> <I>/your/distributed/filesystem</I>
-				<B>–network-sync-dir /mnt/nfs/smf-shared </B></FONT>
-				</P>
-				<H2 STYLE="margin-left: 0.49in; margin-top: 0in; border: none; padding: 0in">
-				<BR>
-				</H2>
-				<H2 STYLE="margin-top: 0in; border: none; padding: 0in"><FONT SIZE=4 STYLE="font-size: 16pt">Use
-				of --pause in multi-thread tests</FONT></H2>
-				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">In some
-				filesystems, the first thread that starts running will be
-				operating at memory speed (example: NFS writes) and can easily
-				finish before other threads have a chance to get started.&nbsp;
-				This immediately invalidates the test.&nbsp; To make this less
-				likely, it is possible to insert a per-file delay into each
-				thread with the --pause option so that the other threads have a
-				chance to participate in the test during the measurement
-				interval.&nbsp;&nbsp;&nbsp; It is preferable to run a longer test
-				instead, because in some cases you might otherwise restrict
-				throughput unintentionally.&nbsp; But if you know that your
-				throughput upper bound is X files/sec and you have N threads
-				running, then your per-thread throughput should be no more than
-				N/X, so a reasonable pause would be something like 3X/N
-				microseconds.&nbsp; For&nbsp; example, if you know that you
-				cannot do better than 100000 files/sec and you have 20 threads
-				running,try a 60/100000 = 600 microsecond pause.&nbsp; Verify
-				that this isn't affecting throughput by reducing the pause and
-				running a longer test.</P>
-				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
-				</P>
-				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Use
-				of subdirectories</FONT></H2>
+				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><A NAME="__RefHeading__112_244684570"></A>
+				<FONT SIZE=4 STYLE="font-size: 16pt">Use of subdirectories</FONT></H2>
 				<P>Before a test even starts, the smallfile benchmark ensures
 				that the directories needed by that test already exist (there is
 				a specific operation type for testing performance of subdirectory
@@ -417,8 +538,9 @@
 				test directory scanning speed, use <B>readdir</B> or <B>ls-l</B>
 				operations. 
 				</P>
-				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Sharing
-				directories across threads</FONT></H2>
+				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><A NAME="__RefHeading__114_244684570"></A>
+				<FONT SIZE=4 STYLE="font-size: 16pt">Sharing directories across
+				threads</FONT></H2>
 				<P>Some applications require that many threads, possibly spread
 				across many host machines, need to share a set of directories.
 				The <B>--same-dir</B> parameter makes it possible for the
@@ -428,8 +550,9 @@
 				scalability. However, if the user sets this parameter to Y, then
 				the top per-thread directory for all threads will be <B>T </B>instead
 				of <B>T/host/dTT</B> as described in preceding section.</P>
-				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Hashing
-				files into directory tree</FONT></H2>
+				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><A NAME="__RefHeading__116_244684570"></A>
+				<FONT SIZE=4 STYLE="font-size: 16pt">Hashing files into directory
+				tree</FONT></H2>
 				<P><FONT SIZE=2 STYLE="font-size: 11pt">For applications which
 				create very large numbers of small files (millions for example),
 				it is impossible or at the very least impractical to place them
@@ -457,8 +580,9 @@
 				of the file being accessed by the thread will be hashed into the
 				set of directories that are being used by this thread. </FONT>
 				</P>
-				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Random
-				file size distribution option</FONT></H2>
+				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><A NAME="__RefHeading__118_244684570"></A>
+				<FONT SIZE=4 STYLE="font-size: 16pt">Random file size
+				distribution option</FONT></H2>
 				<P STYLE="margin-bottom: 0.2in"><FONT SIZE=2 STYLE="font-size: 11pt">In
 				real life, users don't create files that all have the same size.
 				Typically there is a file size distribution with a majority of
@@ -486,8 +610,8 @@
 				works in the same way. All other operations are metadata
 				operations and do not require that the file size be known in
 				advance.</FONT></P>
-				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><FONT SIZE=4 STYLE="font-size: 16pt">Avoiding
-				caching effects</FONT></H2>
+				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><A NAME="__RefHeading__120_244684570"></A>
+				<FONT SIZE=4 STYLE="font-size: 16pt">Avoiding caching effects</FONT></H2>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><A NAME="Avoiding_caching_effects"></A>
 				THere are two types of caching effects that we wish to avoid,
 				data caching and metadata caching.&nbsp; If the average object
@@ -505,6 +629,32 @@
 				files used should be roughly 8 times the number of servers.&nbsp;
 				Use of many separate files ensures that this cache eviction data
 				is spread across all servers approximately equally.<STRONG>&nbsp;</STRONG></P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
+				</P>
+				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in; border: none; padding: 0in"><A NAME="__RefHeading__240_244684570"></A>
+				<FONT SIZE=4 STYLE="font-size: 16pt">Use of --pause in
+				multi-thread tests</FONT></H2>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">In some
+				filesystems, the first thread that starts running will be
+				operating at memory speed (example: NFS writes) and can easily
+				finish before other threads have a chance to get started.&nbsp;
+				This immediately invalidates the test.&nbsp; To make this less
+				likely, it is possible to insert a per-file delay into each
+				thread with the --pause option so that the other threads have a
+				chance to participate in the test during the measurement
+				interval.&nbsp;&nbsp;&nbsp; It is preferable to run a longer test
+				instead, because in some cases you might otherwise restrict
+				throughput unintentionally.&nbsp; But if you know that your
+				throughput upper bound is X files/sec and you have N threads
+				running, then your per-thread throughput should be no more than
+				N/X, so a reasonable pause would be something like 3X/N
+				microseconds.&nbsp; For&nbsp; example, if you know that you
+				cannot do better than 100000 files/sec and you have 20 threads
+				running,try a 60/100000 = 600 microsecond pause.&nbsp; Verify
+				that this isn't affecting throughput by reducing the pause and
+				running a longer test.</P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
+				</P>
 				<H1 CLASS="western" STYLE="margin-top: 0in; margin-bottom: 0.2in">
 				Results</H1>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">All
@@ -522,7 +672,7 @@
 				The percentage of requested files which were processed in the
 				measurement interval is also displayed, and if the number is
 				lower than a threshold (default 70%) then an error is raised.</P>
-				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in; border: none; padding: 0in">
+				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in; border: none; padding: 0in"><A NAME="__RefHeading__122_244684570"></A>
 				Response time collection</H2>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">response
 				times for operations on each file are saved by thread in .csv
@@ -538,11 +688,12 @@
 				such as Excel, and<BR>graphed.&nbsp; An x-y scatterplot can be
 				useful to see changes over time in response time.</P>
 				<H1 CLASS="western" STYLE="margin-top: 0in; margin-bottom: 0.2in">
-				Background</H1>
+				Comparable Benchmarks</H1>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">There
 				are many existing performance test benchmarks. I have tried just
 				about all the ones that I've heard of. Here are the ones I have
-				looked at:</P>
+				looked at, I'm sure there are many more that I failed to include
+				here.</P>
 				<UL>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>Bonnie++</B>
 					-- works well for a single host, but you cannot generate load
@@ -581,14 +732,23 @@
 				<UL>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>fio</B>
 					-- Linux test tool -- broader coverage of Linux system calls
-					particularly around async. and direct I/O 
+					particularly around async. and direct I/O</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>diskperf</B>
+					– open-source tool that generates limited small-file workloads
+					for a single host.</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>dbench</B>
+					– developed by samba team</P>
+					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in"><B>SPECsfs</B>
+					– not open-source, but <B>netmist</B> workload generator is
+					another distributed workload generator (configured similarly to
+					iozone) but with a wider range of workloads.  
 					</P>
 				</UL>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">&nbsp;</P>
 				<H1 CLASS="western" STYLE="margin-top: 0in; margin-bottom: 0.2in">
 				Design principles</H1>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">A
-				cluster-aware test tool has to:</P>
+				cluster-aware test tool ideally should:</P>
 				<UL>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">start
 					threads on all hosts at same time 
@@ -600,7 +760,7 @@
 					easy to use in all file system environments 
 					</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">be
-					highly portable 
+					highly portable and be trivial to install 
 					</P>
 					<LI><P STYLE="margin-bottom: 0in; border: none; padding: 0in">have
 					very low overhead 
@@ -641,7 +801,7 @@
 				</OL>
 				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><BR><BR>
 				</H2>
-				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><A NAME="Synchronization"></A>
+				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in"><A NAME="__RefHeading__124_244684570"></A><A NAME="Synchronization"></A>
 				<FONT SIZE=4 STYLE="font-size: 16pt">Synchronization</FONT></H2>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">A
 				single directory is used to synchronize the threads and hosts.
@@ -698,37 +858,85 @@
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
 				</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">Synchronization
-				operations do not require the worker threads to read the
-				synchronization directory. For distributed tests, the test driver
-				host has to check whether the various per-host synchronization
-				files exist, but this does not require a readdir operation. The
-				test driver does this check in such a way that the number of file
-				lookups is only slightly more than the number of hosts, and this
-				does not require reading the entire directory, only doing a set
-				of lookup operations on individual files, so it's <I>O(n)</I>
-				scalable as well.</P>
+				operations <I>in theory</I> do not require the worker threads to
+				read the synchronization directory.  For distributed tests, the
+				test driver host has to check whether the various per-host
+				synchronization files exist, but this does not require a readdir
+				operation. The test driver does this check in such a way that the
+				number of file lookups is only slightly more than the number of
+				hosts, and this does not require reading the entire directory,
+				only doing a set of lookup operations on individual files, so
+				it's <I>O(n)</I> scalable as well.</P>
 				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
 				</P>
-				<H2 STYLE="margin-top: 0in; margin-bottom: 0.2in; border: none; padding: 0in">
-				<FONT SIZE=4 STYLE="font-size: 16pt">How results are returned to
-				master process</FONT></H2>
-				<P>For either single-host or multi-host tests, each test thread
-				is implemented as a <B>smf_invocation</B> object and all thread
-				state is kept there.&nbsp; Results are returned by using python
-				&quot;pickle&quot; files to serialize the state of these
-				per-thread objects containing details of each thread's progress
-				during the test.&nbsp; The pickle files are stored in the shared
-				synchronization directory. 
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">The bad
+				news is that some filesystems do not synchronize directories
+				quickly without an explicit readdir() operation, so we are at
+				present doing os.listdir() as a workaround --  this may have to
+				be revisited for very large tests.</P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
+				</P>
+				<H3 CLASS="western" STYLE="font-weight: normal"><A NAME="__RefHeading__126_244684570"></A>
+				How test parameters are transmitted to worker threads</H3>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in">The
+				results of the command line parse are saved in a <B>smf_test_params</B>
+				object and stored in a python pickle file, which is a
+				representation independent of CPU architecture or operating
+				system.  The file is placed in the shared network directory. 
+				Remote worker processes are invoked via the <B>smallfile_remote.py</B>
+				command and read this file to discover test parameters.</P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
+				</P>
+				<H3 CLASS="western" STYLE="margin-top: 0in; margin-bottom: 0in; border: none; padding: 0in; font-weight: normal"><A NAME="__RefHeading__128_244684570"></A>
+				How remote worker threads are launched</H3>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
+				</P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><SPAN STYLE="font-weight: normal">For
+				Linux or other non-Windows environments, the test driver launches
+				worker threads using parallel ssh commands to invoke the
+				smallfile_remote.py program, and when this program exits, that is
+				how the test driver discovers that the remote threads on this
+				host have completed.  </SPAN>
+				</P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><BR>
+				</P>
+				<P STYLE="margin-bottom: 0in; border: none; padding: 0in"><SPAN STYLE="font-weight: normal">For
+				Windows environments, ssh usage is more problematic.  Sshd
+				requires installation of cygwin, a Windows app that emulates a
+				Linux-like environment, but we really want to test with native
+				win32 environment instead.  So a different launching method is
+				used (and this method works on non-Windows environments as well).
+				 </SPAN>
+				</P>
+				<H3 CLASS="western" STYLE="font-weight: normal"><A NAME="__RefHeading__130_244684570"></A>
+				<FONT SIZE=4>How results are returned to master process</FONT></H3>
+				<P STYLE="margin-bottom: 0in; line-height: 100%"><A NAME="__RefHeading__132_244684570"></A>
+				<FONT FACE="Liberation Serif, serif"><FONT SIZE=3>For either
+				single-host or multi-host tests, each test thread is implemented
+				as a <B>smf_invocation</B> object and all thread state is kept
+				there.&nbsp; Results are returned by using python &quot;pickle&quot;
+				files to serialize the state of these per-thread objects
+				containing details of each thread's progress during the test.&nbsp;
+				The pickle files are stored in the shared synchronization
+				directory. 
 				<SCRIPT SRC="default_files/wysiwyg_002.js"></SCRIPT>
 				<SCRIPT>
 <!--//--><![CDATA[//><!--
 var _paq = _paq || [];(function(){var u=(("https:" == document.location.protocol) ? "https://metrics.corp.redhat.com/" : "https://metrics.corp.redhat.com/");_paq.push(["setSiteId", 1]);_paq.push(["setTrackerUrl", u+"piwik.php"]);_paq.push(["setDocumentTitle", "Home/smallfile+distributed+I%2FO+benchmark"]);_paq.push(["trackPageView"]);_paq.push(["enableLinkTracking"]);var d=document,g=d.createElement("script"),s=d.getElementsByTagName("script")[0];g.type="text/javascript";g.defer=true;g.async=true;g.src=u+"piwik.js";s.parentNode.insertBefore(g,s);})();
 //--><!]]>
 
-</SCRIPT></P>
+
+</SCRIPT></FONT></FONT></P>
 			</DIV>
 		</DIV>
 	</DIV>
+</DIV>
+<DIV ID="sdfootnote1">
+	<P CLASS="sdfootnote"><A CLASS="sdfootnotesym" NAME="sdfootnote1sym" HREF="#sdfootnote1anc">1</A>You
+	can generate a mixed workload by running multiple invocations of
+	smallfile at the same time, but this approach has limited utility
+	and you will have to aggregate the resulting performance stats
+	yourself.</P>
 </DIV>
 </BODY>
 </HTML>
