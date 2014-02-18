@@ -756,6 +756,7 @@ class smf_invocation:
                 os.makedirs(os.path.dirname(fn))
                 self.filenum -= 1  # retry this file now that its directory exists
                 continue
+              raise e
             finally:
               if fd >= 0: 
                 if self.fsync: os.fsync(fd)
