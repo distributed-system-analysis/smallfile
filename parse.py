@@ -11,7 +11,7 @@ import smallfile
 from smallfile import smf_invocation
 import smf_test_params
 
-version = '2.2'
+version = '2.1'
 
 # convert boolean value into 'Y' or 'N'
 
@@ -37,6 +37,7 @@ def usage(msg):  # call if CLI syntax error or invalid parameter
     print('  --dirs-per-dir positive-integer                  (default: %d)'%dflts.dirs_per_dir)
     print('  --threads positive-integer                       (default: %d)'%2)
     print('  --record-size non-negative-integer-KB            (default: %d)'%dflts.record_sz_kb)
+    print('  --record-ctime-size                              (default: N)')
     print('  --xattr-size non-negative-integer-bytes          (default: %d)'%dflts.xattr_size)
     print('  --xattr-count non-negative-integer-bytes         (default: %d)'%dflts.xattr_count)
     print('  --file-size-distribution exponential             (default: fixed-size)')
@@ -47,7 +48,7 @@ def usage(msg):  # call if CLI syntax error or invalid parameter
     print('  --suffix alphanumeric-string')
     print('  --fsync Y|N                                      (default: %s)'%bool2YN(dflts.fsync))
     print('  --finish Y|N                                     (default: %s)'%bool2YN(dflts.finish_all_rq))
-    print('  --incompressible Y|N                                (default: %s)'%bool2YN(dflts.verify_read))
+    print('  --incompressible Y|N                             (default: %s)'%bool2YN(dflts.verify_read))
     print('  --verify-read Y|N                                (default: %s)'%bool2YN(dflts.verify_read))
     print('  --response-times Y|N                             (default: %s)'%bool2YN(dflts.measure_rsptimes))
     print('  --same-dir Y|N                                   (default: %s)'%bool2YN(dflts.is_shared_dir))
@@ -167,6 +168,7 @@ def parse():
     elif prm == 'stonewall': inv.stonewall = str2bool(val, rawprm)
     elif prm == 'finish': inv.finish_all_rq = str2bool(val, rawprm)
     elif prm == 'fsync': inv.fsync = str2bool(val, rawprm)
+    elif prm == 'record-ctime-size': inv.record_ctime_size = str2bool(val, rawprm)
     elif prm == 'permute-host-dirs': 
         prm_permute_host_dirs = str2bool(val, rawprm)
         pass_on_prm = ''
@@ -211,7 +213,7 @@ def parse():
     prm_top_dirs = inv.top_dirs
   if prm_network_sync_dir:
     if not prm_host_set and not prm_slave:
-      usage('you do not need to specify a network thread synchronization directory unless you use multiple hosts')
+      print('you do not need to specify a network thread synchronization directory unless you use multiple hosts')
     inv.network_dir = prm_network_sync_dir
   else:
     prm_network_sync_dir = inv.network_dir
