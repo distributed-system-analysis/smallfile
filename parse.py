@@ -11,7 +11,7 @@ import smallfile
 from smallfile import smf_invocation
 import smf_test_params
 
-version = '2.1'
+version = '2.2'
 
 # convert boolean value into 'Y' or 'N'
 
@@ -47,6 +47,7 @@ def usage(msg):  # call if CLI syntax error or invalid parameter
     print('  --suffix alphanumeric-string')
     print('  --fsync Y|N                                      (default: %s)'%bool2YN(dflts.fsync))
     print('  --finish Y|N                                     (default: %s)'%bool2YN(dflts.finish_all_rq))
+    print('  --incompressible Y|N                                (default: %s)'%bool2YN(dflts.verify_read))
     print('  --verify-read Y|N                                (default: %s)'%bool2YN(dflts.verify_read))
     print('  --response-times Y|N                             (default: %s)'%bool2YN(dflts.measure_rsptimes))
     print('  --same-dir Y|N                                   (default: %s)'%bool2YN(dflts.is_shared_dir))
@@ -170,6 +171,7 @@ def parse():
         prm_permute_host_dirs = str2bool(val, rawprm)
         pass_on_prm = ''
     elif prm == 'response-times': inv.measure_rsptimes = str2bool(val, rawprm)
+    elif prm == 'incompressible': inv.incompressible = str2bool(val, rawprm)
     elif prm == 'verify-read': inv.verify_read = str2bool(val, rawprm)
     elif prm == 'same-dir': inv.is_shared_dir = str2bool(val, rawprm)
     elif prm == 'verbose': inv.verbose = str2bool(val, rawprm)
