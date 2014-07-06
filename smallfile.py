@@ -140,6 +140,29 @@ def ensure_dir_exists( dirpath ):
         if not os.path.isdir(dirpath):
             raise Exception("%s already exists and is not a directory!"%dirpath)
 
+# next two routines are for asynchronous replication
+# we remember the time when a file was completely written and its size using xattr, then
+# we read xattr in do_await_create operation and compute latencies from that
+
+def remember_ctime_size_xattr(filedesc):
+    nowtime = str(time.time())
+    st = os.fstat(filedesc)
+    xattr.setxattr(filedesc, 'user.smallfile-ctime-size', nowtime+','+str(st.st_size/smf_invocation.BYTES_PER_KB))
+
+def recall_ctime_size_xattr(pathname):
+    (ctime, size_kb) = (None, None)
+    try: 
+        with open(pathname, "r") as filedesc:
+            xattr_str = xattr.getxattr(filedesc, 'user.smallfile-ctime-size')
+            token_pair = xattr_str.split(',')
+            ctime = float(token_pair[0])
+            size_kb = int(token_pair[1])
+    except IOError as e:
+            eno = e.errno
+            if eno != errno.ENODATA:
+                raise e
+    return (ctime, size_kb)
+
 def get_hostname(h):
   if h == None: h = socket.gethostname()
   return h
@@ -151,6 +174,11 @@ def hostaddr(h):
   else: a = socket.gethostbyname(h)
   return a
 
+def hexdump(b):
+  s = ''
+  for j in range(0, len(b)):
+    s += '%02x'%b[j]
+  return s
 
 if sys.version < '3':
   import codecs
@@ -161,12 +189,6 @@ else:
     if isinstance(b, str): return bytes(b).decode('UTF-8', 'backslashreplace')
     else: return b.decode('UTF-8', 'backslashreplace')
       
-def hexdump(b):
-  s = ''
-  for j in range(0, len(b)):
-    s += '%02x'%b[j]
-  return s
-
 # parameters for test stored here
 # initialize with default values
 # FIXME: do we need a copy constructor?
@@ -176,7 +198,7 @@ loggers = {}  # so we only instantiate logger for a given thread name once
 class smf_invocation:
     workloads = None  # will be filled in at bottom of class when all per-workload-type do_ functions are defined
     rename_suffix = ".rnm"
-    all_op_names = [ "create", "delete", "append", "read", "readdir", "rename", "delete-renamed", "cleanup", "symlink", "mkdir", "rmdir", "stat", "chmod", "setxattr", "getxattr", "swift-get", "swift-put", "ls-l" ]
+    all_op_names = [ "create", "delete", "append", "read", "readdir", "rename", "delete-renamed", "cleanup", "symlink", "mkdir", "rmdir", "stat", "chmod", "setxattr", "getxattr", "swift-get", "swift-put", "ls-l", "await-create" ]
     OK = 0
     NOTOK = 1
     BYTES_PER_KB = 1024  # bytes per kilobyte
@@ -221,6 +243,7 @@ class smf_invocation:
         self.suffix = ""              # append this to file name
         self.hash_to_dir = False      # controls whether directories are accessed sequentially or randomly
         self.fsync = False            # controls whether an fsync is issued after a file is modified (write or setxattr)
+        self.record_ctime_size = False # if True, write xattr with ctime and size in KB during creates/appends
         self.stonewall = True         # if so, end test as soon as any thread finishes
         self.finish_all_rq = True     # if so, finish remaining requests after test ends
         self.measure_rsptimes = False # if so, append operation response times to .rsptimes
@@ -264,6 +287,7 @@ class smf_invocation:
         new.prefix = s.prefix
         new.suffix = s.suffix
         new.hash_to_dir = s.hash_to_dir
+        new.record_ctime_size = s.record_ctime_size
         new.fsync = s.fsync
         new.dirs_on_demand = s.dirs_on_demand
         new.stonewall = s.stonewall
@@ -304,6 +328,7 @@ class smf_invocation:
         s += " prefix="+self.prefix
         s += " suffix="+self.suffix
         s += " hash_to_dir="+str(self.hash_to_dir)
+        s += " fsync="+str(self.fsync)
         s += " stonewall="+str(self.stonewall)
         s += " files_between_checks="+str(self.files_between_checks)
         s += " verify_read="+str(self.verify_read)
@@ -381,9 +406,12 @@ class smf_invocation:
 
     # indicate start of an operation
 
-    def op_starttime(self):
+    def op_starttime(self, starttime=None):
         if self.measure_rsptimes:
-            self.op_start_time = time.time()
+            if not starttime: 
+                self.op_start_time = time.time()
+            else:
+                self.op_start_time = starttime
 
     # indicate end of an operation, 
     # this appends the elapsed time of the operation to .rsptimes array
@@ -602,8 +630,6 @@ class smf_invocation:
 
     # generate buffer contents, use these on writes and compare against them for reads
     # where random data is used, 
-    # we generate a random byte sequence of 2^random_seg_size_bits in length
-    # and then repeat the sequence until we get to size 2^biggest_buf_size_bits in length
 
     def create_biggest_buf(self, contents_random):
 
@@ -611,19 +637,22 @@ class smf_invocation:
 
       random_segment_size = (1<<self.random_seg_size_bits)
       if not self.incompressible:
+        # we generate a random byte sequence of 2^random_seg_size_bits in length
+        # and then repeat the sequence until we get to size 2^biggest_buf_size_bits in length
         if contents_random:
           biggest_buf = bytearray([ self.randstate.randrange(0,127) for k in range(0,random_segment_size) ])
         else:
           biggest_buf = bytearray([ (k%128) for k in range(0,random_segment_size) ])
         biggest_buf = biggest_buf.replace(b'\\',b'!')  # to prevent confusion in python when printing out buffer contents
-
+      
         # keep doubling buffer size until it is big enough
-  
+        
         for j in range(0,self.biggest_buf_size_bits-self.random_seg_size_bits):
           biggest_buf.extend(biggest_buf[:])
-      else:
-        # for buffer to be incompressible, we can't repeat the same (small) random sequence
 
+      else: # if incompressible
+        # for buffer to be incompressible, we can't repeat the same (small) random sequence
+        # FIXME: why shouldn't we always do it this way?
         biggest_buf = bytearray([ self.randstate.randrange(0,255) ])  # initialize to a single random byte
         assert( len(biggest_buf) == 1 )
         powerof2 = 1
@@ -675,6 +704,7 @@ class smf_invocation:
         # NOTE: this means self.biggest_buf must be 1K larger than smf_invocation.biggest_buf_size
 
         self.buf = self.biggest_buf[ unique_offset : total_space + unique_offset ]
+
         # assert len(self.buf) == total_space
 
 
@@ -689,7 +719,6 @@ class smf_invocation:
         if rszkb > (smf_invocation.biggest_buf_size // self.BYTES_PER_KB):
           rszkb = smf_invocation.biggest_buf_size // self.BYTES_PER_KB
         return rszkb
-
 
     # make all subdirectories needed for test in advance, don't include in measurement
     # use set to avoid duplicating operations on directories
@@ -748,8 +777,8 @@ class smf_invocation:
                                 break
 
     # operation-specific test code goes in do_<opname>()
-    # whatever record size sequence we use here must also be attempted in do_read
-
+    # whatever record size sequence we use in do_create must also be attempted in do_read
+        
     def do_create(self):
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
@@ -770,6 +799,8 @@ class smf_invocation:
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, written)
                 self.rq += 1
                 remaining_kb -= (rszbytes/self.BYTES_PER_KB)
+              if self.record_ctime_size:
+                remember_ctime_size_xattr(fd)
             except OSError as e:
               if (e.errno == errno.ENOENT) and self.dirs_on_demand:  # if directory doesn't exist
                 os.makedirs(os.path.dirname(fn))
@@ -859,6 +890,8 @@ class smf_invocation:
             self.op_endtime(self.opname)
 
     def do_append(self):
+        if self.record_ctime_size and xattr_not_installed:
+            raise Exception('xattr module not present but record-ctime-size specified')
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
             self.op_starttime()
@@ -877,6 +910,8 @@ class smf_invocation:
                 if written != rszbytes:
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, written)
                 remaining_kb -= (rszbytes/self.BYTES_PER_KB)
+              if self.record_ctime_size:
+                remember_ctime_size_xattr(fd)
             finally:
               if fd >= 0: 
                 if self.fsync: os.fsync(fd)
@@ -903,7 +938,6 @@ class smf_invocation:
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, len(bytesread))
                 if self.verify_read and self.verbose:
                   self.log.debug('read fn %s next_fsz %u remain %u rszbytes %u bytesread %u'%(fn, next_fsz, remaining_kb, rszbytes, len(bytesread)))
-                  bytes_read_buf = bytearray(bytesread)
                   if self.buf[0:rszbytes] != bytesread:
                     raise MFRdWrExc('read: buffer contents wrong', self.filenum, self.rq, len(bytesread))
                 remaining_kb -= rszkb
@@ -956,6 +990,33 @@ class smf_invocation:
             os.stat(fn)
             self.op_endtime(self.opname+'-stat')
 
+    # await-create is used for geo-replication testing
+    # instead of creating the files, we wait for them to appear (e.g. on the slave geo-rep volume)
+    # and measure throughput (and someday latency)
+
+    def do_await_create(self):
+        while self.do_another_file():
+            fn = self.mk_file_nm(self.src_dirs)
+            self.log.debug('awaiting file %s'%fn)
+            while not os.path.exists(fn):
+              time.sleep(1.0)
+            self.log.debug('awaiting original ctime-size xattr for file %s'%fn)
+            while True:
+              (original_ctime, original_sz_kb) = recall_ctime_size_xattr(fn)
+              if original_ctime != None: break
+              time.sleep(1.0)
+            self.log.debug('waiting for file %s created at %f to grow to original size %u'%\
+                            (fn, original_ctime, original_sz_kb))
+            while True:
+              st = os.stat(fn)
+              if st.st_size > original_sz_kb * self.BYTES_PER_KB:
+                raise Exception( 'asynchronously created replica in %s is %u bytes, larger than original %u KB'%\
+                                (fn, st.st_size, original_sz_kb))
+              elif st.st_size == original_sz_kb * self.BYTES_PER_KB:
+                break
+            self.op_starttime(starttime = original_ctime)
+            self.op_endtime(self.opname)
+
     def do_rename(self):
         in_same_dir = (self.dest_dirs == self.src_dirs)
         while self.do_another_file():
@@ -974,6 +1035,8 @@ class smf_invocation:
             os.unlink(fn)
             self.op_endtime(self.opname)
             
+    # we only need this method because filenames after rename are different,
+
     def do_delete_renamed(self):
         in_same_dir = (self.dest_dirs == self.src_dirs)
         while self.do_another_file():
@@ -1184,7 +1247,8 @@ class smf_invocation:
         'delete-renamed': do_delete_renamed, \
         'cleanup'       : do_cleanup, \
         'swift-put'     : do_swift_put, \
-        'swift-get'     : do_swift_get
+        'swift-get'     : do_swift_get, \
+        'await-create'  : do_await_create
         }
 
 # threads used to do multi-threaded unit testing
@@ -1297,7 +1361,7 @@ class Test(unittest_class):
     def test_b_Cleanup(self):
         self.cleanup_files()
         
-    def test_c0_Create(self):
+    def test_c_Create(self):
         self.mk_files()  # depends on cleanup_files
         fn = self.lastFileNameInTest(self.invok.src_dirs)
         assert exists(fn) 
@@ -1389,10 +1453,16 @@ class Test(unittest_class):
         fn = self.lastFileNameInTest(self.invok.src_dirs)
         self.assertTrue(self.file_size(fn) == ((orig_kb + 2048) * self.invok.BYTES_PER_KB ))
 
-    def test_h_read(self):
+    def test_h00_read(self):
+        self.invok.record_ctime_size = True
         self.mk_files()
         self.invok.verify_read = True
         self.runTest("read")
+
+    # this test inherits files from preceding test
+
+    def test_h0_await_create(self):
+        self.runTest("await-create")
 
     def test_h1_Read_Rsz_0_big_file(self):
         self.test_g2_Append_Rsz_0_big_file()
