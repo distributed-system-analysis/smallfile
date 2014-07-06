@@ -161,6 +161,12 @@ else:
     if isinstance(b, str): return bytes(b).decode('UTF-8', 'backslashreplace')
     else: return b.decode('UTF-8', 'backslashreplace')
       
+def hexdump(b):
+  s = ''
+  for j in range(0, len(b)):
+    s += '%02x'%b[j]
+  return s
+
 # parameters for test stored here
 # initialize with default values
 # FIXME: do we need a copy constructor?
@@ -218,6 +224,7 @@ class smf_invocation:
         self.stonewall = True         # if so, end test as soon as any thread finishes
         self.finish_all_rq = True     # if so, finish remaining requests after test ends
         self.measure_rsptimes = False # if so, append operation response times to .rsptimes
+        self.incompressible = False   # if so, write/expect binary random (incompressible) data, not text
         self.verify_read = True       # if so, compare read data to what was written
         self.pause_between_files = 0  # how many microsec to sleep between each file
         self.pause_sec = 0.0          # same as pause_between_files but in floating-point seconds
@@ -260,6 +267,8 @@ class smf_invocation:
         new.fsync = s.fsync
         new.dirs_on_demand = s.dirs_on_demand
         new.stonewall = s.stonewall
+        new.verify_read = s.verify_read
+        new.incompressible = s.incompressible
         new.finish_all_rq = s.finish_all_rq
         new.measure_rsptimes = s.measure_rsptimes
         new.pause_between_files = s.pause_between_files
@@ -297,6 +306,8 @@ class smf_invocation:
         s += " hash_to_dir="+str(self.hash_to_dir)
         s += " stonewall="+str(self.stonewall)
         s += " files_between_checks="+str(self.files_between_checks)
+        s += " verify_read="+str(self.verify_read)
+        s += " incompressible="+str(self.incompressible)
         s += " finish_all_rq=" + str(self.finish_all_rq)
         s += " rsp_times=" + str(self.measure_rsptimes)
         s += " tid="+self.tid
@@ -475,7 +486,6 @@ class smf_invocation:
     def wait_for_gate(self):
         if self.starting_gate:
             gateReady = self.gen_thread_ready_fname(self.tid)
-            #print 'thread at gate, file ' + gateReady
             touch(gateReady)
             while not os.path.exists(self.starting_gate):
                 if os.path.exists(self.abort_fn()): raise Exception("thread " + str(self.tid) + " saw abort flag")
@@ -561,11 +571,9 @@ class smf_invocation:
         pathlist = []
         random_hash = (file_num * self.some_prime) % self.iterations
         dir_num = random_hash // self.files_per_dir
-        #print('file_num=%d, rhash=%d, dir_num=%d'%(file_num, random_hash, dir_num))
         while dir_num > 1:
                 dir_num_hash = (dir_num * self.some_prime) % self.dirs_per_dir
                 pathlist.insert(0,  'h_'+str(dir_num_hash).zfill(3) )
-                #print(file_num, dir_num_hash, path)
                 dir_num //= self.dirs_per_dir
         return os.sep.join(pathlist)
 
@@ -602,16 +610,31 @@ class smf_invocation:
       # generate random byte sequence if desired.
 
       random_segment_size = (1<<self.random_seg_size_bits)
-      if contents_random:
-        biggest_buf = bytearray([ self.randstate.randrange(0,127) for k in range(0,random_segment_size) ])
+      if not self.incompressible:
+        if contents_random:
+          biggest_buf = bytearray([ self.randstate.randrange(0,127) for k in range(0,random_segment_size) ])
+        else:
+          biggest_buf = bytearray([ (k%128) for k in range(0,random_segment_size) ])
+        biggest_buf = biggest_buf.replace(b'\\',b'!')  # to prevent confusion in python when printing out buffer contents
+
+        # keep doubling buffer size until it is big enough
+  
+        for j in range(0,self.biggest_buf_size_bits-self.random_seg_size_bits):
+          biggest_buf.extend(biggest_buf[:])
       else:
-        biggest_buf = bytearray([ (k%128) for k in range(0,random_segment_size) ])
-      biggest_buf = biggest_buf.replace(b'\\',b'!')  # to prevent confusion in python when printing out buffer contents
+        # for buffer to be incompressible, we can't repeat the same (small) random sequence
 
-      # keep doubling buffer size until it is big enough
-
-      for j in range(0,self.biggest_buf_size_bits-self.random_seg_size_bits):
-        biggest_buf.extend(biggest_buf[:])
+        biggest_buf = bytearray([ self.randstate.randrange(0,255) ])  # initialize to a single random byte
+        assert( len(biggest_buf) == 1 )
+        powerof2 = 1
+        powersum = 1
+        for j in range(0, self.biggest_buf_size_bits-1):
+          assert( len(biggest_buf) == powersum )
+          powerof2 *= 2
+          powersum += powerof2
+          # biggest_buf length is now 2^j - 1
+          biggest_buf.extend( bytearray([ self.randstate.randrange(0,255) for k in range(0, powerof2) ]))
+        biggest_buf.extend( bytearray([ self.randstate.randrange(0,255) ]))
 
       # add extra space at end so that we can get different buffer contents by just using different offset into biggest_buf
 
@@ -652,7 +675,6 @@ class smf_invocation:
         # NOTE: this means self.biggest_buf must be 1K larger than smf_invocation.biggest_buf_size
 
         self.buf = self.biggest_buf[ unique_offset : total_space + unique_offset ]
-
         # assert len(self.buf) == total_space
 
 
@@ -714,7 +736,6 @@ class smf_invocation:
                         continue
                 else:
                         try:
-                          #print('removing dir '+unique_dpath)
                           os.rmdir(unique_dpath)
                         except OSError as e:
                           if (e.errno == errno.ENOTEMPTY): break
@@ -727,7 +748,8 @@ class smf_invocation:
                                 break
 
     # operation-specific test code goes in do_<opname>()
-        
+    # whatever record size sequence we use here must also be attempted in do_read
+
     def do_create(self):
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
@@ -741,12 +763,9 @@ class smf_invocation:
               self.prepare_buf()
               rszkb = self.get_record_size_to_use()
               while remaining_kb > 0:
-                if remaining_kb*self.BYTES_PER_KB < len(self.buf): 
-                  rszbytes = remaining_kb * self.BYTES_PER_KB
-                  written = os.write(fd, self.buf[0:rszbytes])
-                else:
-                  rszbytes = len(self.buf)
-                  written = os.write(fd, self.buf)
+                next_kb = min(rszkb, remaining_kb)
+                rszbytes = next_kb * self.BYTES_PER_KB
+                written = os.write(fd, self.buf[0:rszbytes])
                 if written != rszbytes:
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, written)
                 self.rq += 1
@@ -851,12 +870,9 @@ class smf_invocation:
               self.prepare_buf()
               rszkb = self.get_record_size_to_use()
               while remaining_kb > 0:
-                if remaining_kb < rszkb: 
-                  rszbytes = remaining_kb * self.BYTES_PER_KB
-                  written = os.write(fd, self.buf[0:rszbytes])
-                else:
-                  rszbytes = len(self.buf)
-                  written = os.write(fd, self.buf)
+                next_kb = min(remaining_kb, rszkb)
+                rszbytes = next_kb * self.BYTES_PER_KB
+                written = os.write(fd, self.buf[0:rszbytes])
                 self.rq += 1
                 if written != rszbytes:
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, written)
@@ -887,6 +903,7 @@ class smf_invocation:
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, len(bytesread))
                 if self.verify_read and self.verbose:
                   self.log.debug('read fn %s next_fsz %u remain %u rszbytes %u bytesread %u'%(fn, next_fsz, remaining_kb, rszbytes, len(bytesread)))
+                  bytes_read_buf = bytearray(bytesread)
                   if self.buf[0:rszbytes] != bytesread:
                     raise MFRdWrExc('read: buffer contents wrong', self.filenum, self.rq, len(bytesread))
                 remaining_kb -= rszkb
@@ -979,11 +996,9 @@ class smf_invocation:
           next_fsz = self.get_next_file_size()
           self.op_starttime()
           fd = os.open(fn, os.O_RDONLY|O_BINARY)
-          rszkb = self.record_sz_kb
-          if rszkb == 0: rszkb = next_fsz
+          rszkb = self.get_record_size_to_use()
           remaining_kb = next_fsz
           self.prepare_buf()
-          remaining_kb = next_fsz
           try:
             while remaining_kb > 0:
                 next_kb = min(rszkb, remaining_kb)
@@ -998,7 +1013,7 @@ class smf_invocation:
                     self.log.debug( 'expected buf: ' + binary_buf_str(self.buf[0:rszbytes]))
                     self.log.debug('saw buf: ' + binary_buf_str(bytesread))
                     raise MFRdWrExc('read: buffer contents wrong', self.filenum, self.rq, len(bytesread))
-                remaining_kb -= rszkb
+                remaining_kb -= next_kb
                 self.rq += 1
             for j in range(0, self.xattr_count):
               try: 
@@ -1018,12 +1033,10 @@ class smf_invocation:
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs) + '.tmp'
             next_fsz = self.get_next_file_size()
-            #print(next_fsz)
             self.prepare_buf()
             self.op_starttime()
             fd = -1  # so we know to not close it if file never got opened
             try:
-              #print(fn)
               fd = os.open(fn, os.O_WRONLY|os.O_CREAT|O_BINARY)
               os.fchmod(fd, 0o667)
               fszbytes = next_fsz * self.BYTES_PER_KB
@@ -1031,12 +1044,11 @@ class smf_invocation:
               #ret = fallocate.fallocate(fd, 0, 0, fszbytes)
               #if ret != self.OK:
               #  raise Exception('fallocate call failed with return %d'%ret)
-              rszkb = self.record_sz_kb
-              if rszkb == 0: rszkb = next_fsz
+              rszkb = self.get_record_size_to_use()
               remaining_kb = next_fsz
               while remaining_kb > 0:
-                if remaining_kb < rszkb: rszkb = remaining_kb
-                rszbytes = rszkb * self.BYTES_PER_KB
+                next_kb = min(rszkb, remaining_kb)
+                rszbytes = next_kb * self.BYTES_PER_KB
                 self.log.debug('reading %d bytes'%rszbytes)
                 if rszbytes != len(self.buf):
                   self.log.debug( 'swift put self.buf: ' + binary_buf_str(self.buf[0:rszbytes]))
@@ -1047,7 +1059,7 @@ class smf_invocation:
                 if written != rszbytes:
                     self.log.error('written byte count %u not correct byte count %u'%(written, rszbytes))
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, written)
-                remaining_kb -= rszkb
+                remaining_kb -= next_kb
               for j in range(0, self.xattr_count):
                   try: 
                     xattr_nm = 'user.smallfile-all-%d'%j
@@ -1124,7 +1136,6 @@ class smf_invocation:
             self.make_all_subdirs()
         self.init_random_seed()
         self.biggest_buf = self.create_biggest_buf(False)
-        self.prepare_buf()
         if self.total_sz_kb > 0:
             self.files_between_checks = max(10, self.max_files_between_checks - (self.total_sz_kb/100))
         try:
@@ -1276,7 +1287,6 @@ class Test(unittest_class):
         expectedFn = join( \
                        join(self.invok.src_dirs[0], 'd_000'), \
                        ivk.prefix + "_" + ivk.tid + "_1_" + ivk.suffix)
-        #print(fn, expectedFn)
         self.assertTrue( fn == expectedFn )
         self.assertTrue(exists(fn))
         self.assertTrue(exists(lastfn))
@@ -1287,7 +1297,7 @@ class Test(unittest_class):
     def test_b_Cleanup(self):
         self.cleanup_files()
         
-    def test_c_Create(self):
+    def test_c0_Create(self):
         self.mk_files()  # depends on cleanup_files
         fn = self.lastFileNameInTest(self.invok.src_dirs)
         assert exists(fn) 
@@ -1413,26 +1423,32 @@ class Test(unittest_class):
     def test_z1_create(self):
         self.cleanup_files()
         self.invok.filesize_distr = self.invok.filesize_distr_random_exponential
+        self.invok.incompressible = True
+        self.invok.verify_read = True
         self.invok.invocations = 40
         self.invok.record_sz_kb = 0
         self.invok.total_sz_kb = 16
         self.runTest("create")
 
     # inherits files from the z1_create test
-    def test_z2_append(self):
+    def test_z2_read(self):
         self.invok.filesize_distr = self.invok.filesize_distr_random_exponential
-        self.invok.invocations = 40
-        self.invok.record_sz_kb = 0
-        self.invok.total_sz_kb = 16
-        self.runTest("append")
-
-    # inherits files from the z1_create test
-    def test_z3_read(self):
-        self.invok.filesize_distr = self.invok.filesize_distr_random_exponential
+        self.invok.incompressible = True
+        self.invok.verify_read = True
         self.invok.invocations = 40
         self.invok.record_sz_kb = 0
         self.invok.total_sz_kb = 16
         self.runTest("read")
+
+    # inherits files from the z1_create test
+    def test_z3_append(self):
+        self.invok.filesize_distr = self.invok.filesize_distr_random_exponential
+        self.invok.incompressible = True
+        self.invok.verify_read = True
+        self.invok.invocations = 40
+        self.invok.record_sz_kb = 0
+        self.invok.total_sz_kb = 16
+        self.runTest("append")
 
     def test_i1_do_swift_put(self):
         if xattr_not_installed: return
@@ -1462,7 +1478,6 @@ class Test(unittest_class):
         self.invok.dirs_per_dir = 3
         d = self.invok.mk_dir_name(29*self.invok.files_per_dir)
         expected = join('d_001',join('d_000', join('d_000', 'd_002')))
-        #print('dirname=%s,expected=%s'%(d, expected))
         self.assertTrue(d == expected)
         self.invok.dirs_per_dir = 7
         d = self.invok.mk_dir_name(320*self.invok.files_per_dir)
@@ -1492,7 +1507,6 @@ class Test(unittest_class):
         self.mk_files()
         fn = self.lastFileNameInTest(self.invok.src_dirs)
         expectedFn = os.sep.join([self.invok.src_dirs[0],'h_001', 'h_000', 'h_001','p_regtest_499_deep_hashed'])
-        #print(fn + ' ' + expectedFn)
         self.assertTrue(fn == expectedFn)
         self.assertTrue(exists(fn))
         self.cleanup_files()
@@ -1532,7 +1546,6 @@ class Test(unittest_class):
             threads_ready = True
             for s in invokeList:
                 thread_ready_file = s.gen_thread_ready_fname(s.tid)
-                #print 'waiting for ' + thread_ready_file
                 if not os.path.exists(thread_ready_file): 
                   threads_ready = False
                   break
