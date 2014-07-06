@@ -82,8 +82,10 @@ if [ $? != $OK ] ; then
   sudo chown $USER $testdir
   if [ $is_systemctl -eq 1 ] ; then
     sudo systemctl start nfs-server
+    sudo systemctl start sshd
   else
-    sudo service nfs restart
+    sudo service ssh start || echo "perhaps ssh service already started"
+    sudo service nfs start || echo "perhaps nfs service already started"
   fi
   if [ $? != $OK ] ; then 
     echo "NFS service startup failed!"
