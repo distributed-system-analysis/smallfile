@@ -798,7 +798,7 @@ class smf_invocation:
                 if written != rszbytes:
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, written)
                 self.rq += 1
-                remaining_kb -= (rszbytes/self.BYTES_PER_KB)
+                remaining_kb -= next_kb
               if self.record_ctime_size:
                 remember_ctime_size_xattr(fd)
             except OSError as e:
@@ -940,7 +940,7 @@ class smf_invocation:
                   self.log.debug('read fn %s next_fsz %u remain %u rszbytes %u bytesread %u'%(fn, next_fsz, remaining_kb, rszbytes, len(bytesread)))
                   if self.buf[0:rszbytes] != bytesread:
                     raise MFRdWrExc('read: buffer contents wrong', self.filenum, self.rq, len(bytesread))
-                remaining_kb -= rszkb
+                remaining_kb -= next_kb
             finally:
               if fd > -1: os.close(fd)
             self.op_endtime(self.opname)
@@ -1454,6 +1454,7 @@ class Test(unittest_class):
         self.assertTrue(self.file_size(fn) == ((orig_kb + 2048) * self.invok.BYTES_PER_KB ))
 
     def test_h00_read(self):
+        if xattr_not_installed: return
         self.invok.record_ctime_size = True
         self.mk_files()
         self.invok.verify_read = True
@@ -1462,6 +1463,7 @@ class Test(unittest_class):
     # this test inherits files from preceding test
 
     def test_h0_await_create(self):
+        if xattr_not_installed: return
         self.runTest("await-create")
 
     def test_h1_Read_Rsz_0_big_file(self):
