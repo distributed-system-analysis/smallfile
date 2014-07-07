@@ -909,7 +909,7 @@ class smf_invocation:
                 self.rq += 1
                 if written != rszbytes:
                     raise MFRdWrExc(self.opname, self.filenum, self.rq, written)
-                remaining_kb -= (rszbytes/self.BYTES_PER_KB)
+                remaining_kb -= next_kb
               if self.record_ctime_size:
                 remember_ctime_size_xattr(fd)
             finally:
