@@ -42,13 +42,14 @@ def output_results(invoke_list, prm_host_set, prm_thread_count, pct_files_min):
                 raise SMFResultException('at least one thread encountered error, test may be incomplete')
       if (max_elapsed_time > 0.001):  # can't compute rates unless test ran for a while
 
+        print("%f sec elapsed time"%max_elapsed_time)
         files_per_sec = total_files / max_elapsed_time
         print("%f files/sec"%files_per_sec)
         if total_records > 0: 
           iops = total_records / max_elapsed_time
           print("%f IOPS"%iops)
           mb_per_sec = iops * rszkb / 1024.0
-          print("%f sec elapsed time, %f MB/sec"%(max_elapsed_time, mb_per_sec))
+          print("%f MB/sec"%mb_per_sec)
       if (status == 'ok') and (pct_files < pct_files_min):
                 raise SMFResultException('not enough total files processed, change test parameters')
 
