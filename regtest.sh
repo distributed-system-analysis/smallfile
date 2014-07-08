@@ -64,10 +64,10 @@ cleanup() {
 is_systemctl=1
 which systemctl
 if [ $? != $OK ] ; then  # chances are it's pre-systemctl Linux distro, use "service" instead
-  ssh localhost pwd || sudo service sshd start
+  ssh localhost pwd || sudo service sshd start || echo 'attempted to start sshd'
   is_systemctl=0
 else
-  ssh localhost pwd || sudo systemctl start sshd
+  ssh localhost pwd || sudo systemctl start sshd || echo 'attempted to start sshd'
 fi
 
 # set up NFS mountpoint
@@ -80,12 +80,11 @@ if [ $? != $OK ] ; then
   sudo rm -rf $testdir
   sudo mkdir -p $testdir
   sudo chown $USER $testdir
+  sudo chmod 777 $testdir
   if [ $is_systemctl -eq 1 ] ; then
-    sudo systemctl start nfs-server
-    sudo systemctl start sshd
+    sudo systemctl start nfs-server || echo 'attempted nfs service start'
   else
-    sudo service ssh start || echo "perhaps ssh service already started"
-    sudo service nfs start || echo "perhaps nfs service already started"
+    sudo service nfs start || echo "attempted nfs service start"
   fi
   if [ $? != $OK ] ; then 
     echo "NFS service startup failed!"
@@ -206,7 +205,7 @@ for j in `seq 1 $expect_ct` ; do
   assertok $s $f
 done
 
-common_params="--files 100 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --response-times N --xattr-count 9 --xattr-size 253 "
+common_params="--files 100 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --verify-read Y --response-times N --xattr-count 9 --xattr-size 253 "
 
 python2_only_ops="setxattr getxattr swift-put swift-get"
 if [ "$PYTHON" = "python3" -o "$PYTHON" = "pypy" ] ; then
