@@ -115,7 +115,7 @@ def run_multi_thread_workload(prm):
   
   if verbose: print('awaiting '+sg)
   if prm_slave:
-    for sec in range(0, startup_timeout*2):
+    for sec in range(0, prm.host_startup_timeout + 10):
       ndlist = os.listdir(my_host_invoke.network_dir) # hack to ensure that directory is up to date
       if verbose: print(str(ndlist))
       if os.path.exists(sg):
@@ -123,9 +123,9 @@ def run_multi_thread_workload(prm):
       time.sleep(0.5)
     if not os.path.exists(sg):
       abort_test(my_host_invoke.abort_fn(), thread_list)
-      raise Exception('starting signal not seen within %d seconds'%startup_timeout)
+      raise Exception('starting signal not seen within %d seconds'%prm.host_startup_timeout)
   if verbose: print("starting test on host " + host + " in 2 seconds")
-  time.sleep(2 + random.random())  
+  time.sleep(2 + random.random())  # give other hosts a chance to see starting gate file
 
   # FIXME: don't timeout the test, 
   # instead check thread progress and abort if you see any of them stalled
