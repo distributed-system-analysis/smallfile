@@ -17,7 +17,8 @@ class smf_test_params:
     # calculate timeouts 
 
     self.startup_timeout = 5
-    dirs = self.master_invoke.iterations * self.thread_count // self.master_invoke.files_per_dir
+    # make sure dirs is never zero or you will break host_startup_timeout calculation
+    dirs = 1 + (self.master_invoke.iterations * self.thread_count // self.master_invoke.files_per_dir)
     self.startup_timeout += (dirs // 5)
     self.host_startup_timeout = self.startup_timeout
     if self.host_set:
