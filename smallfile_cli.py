@@ -97,6 +97,7 @@ def run_multi_host_workload(prm):
     # start them, pacing starts so that we don't get ssh errors
 
     for t in remote_thread_list:
+        time.sleep(0.1)
         t.start()
 
     # wait for hosts to arrive at starting gate
@@ -108,13 +109,12 @@ def run_multi_host_workload(prm):
     hosts_ready = False  # set scope outside while loop
     abortfn = master_invoke.abort_fn()
     last_host_seen=-1
-    sec = 0
+    sec = 0.0
     sec_delta = 0.5
     host_timeout = prm.host_startup_timeout
     if smallfile.is_windows_os: host_timeout += 20
 
     try:
-     # FIXME: make timeout criteria be that new new hosts seen in X seconds
      while sec < host_timeout:
       ndirlist = os.listdir(master_invoke.network_dir)
       if master_invoke.verbose: print('shared dir list: ' + str(ndirlist))
@@ -127,7 +127,8 @@ def run_multi_host_workload(prm):
         if not os.path.exists(fn):
             hosts_ready = False
             break
-        last_host_seen=j
+        last_host_seen=j  # no need to wait for this host's ready file anymore
+        sec = 0.0  # so we exit while loop only if no hosts in host_timeout seconds
       if hosts_ready: break
 
       # be patient for large tests
@@ -172,6 +173,7 @@ def run_multi_host_workload(prm):
 
     try:
       invoke_list = []
+      one_shot_delay = True
       for h in prm_host_set:  # for each host in test
 
         # read results for each thread run in that host
@@ -181,7 +183,11 @@ def run_multi_host_workload(prm):
         if verbose: print('reading pickle file: %s'%pickle_fn)
         host_invoke_list = []
         try:
-                if not os.path.exists(pickle_fn): time.sleep(1.2)
+                if one_shot_delay and (not os.path.exists(pickle_fn)): 
+                  # all threads have joined already, they are done
+                  # we allow > 1 sec for this (NFS) client to see other clients' files
+                  time.sleep(1.2)
+                  one_shot_delay = False
                 with open(pickle_fn, 'rb') as pickle_file:
                   host_invoke_list = pickle.load(pickle_file)
                 if verbose: print(' read %d invoke objects'%len(host_invoke_list))
