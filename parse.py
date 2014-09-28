@@ -11,7 +11,7 @@ import smallfile
 from smallfile import smf_invocation
 import smf_test_params
 
-version = '2.1'
+version = '2.2'
 
 # convert boolean value into 'Y' or 'N'
 
@@ -102,7 +102,7 @@ def parse():
   prm_host_set = None
   prm_slave = False
   prm_permute_host_dirs = False
-  prm_remote_pgm_dir = None
+  prm_remote_pgm_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
   prm_top_dirs = None
   prm_network_sync_dir = None
 
@@ -212,14 +212,9 @@ def parse():
   else:
     prm_top_dirs = inv.top_dirs
   if prm_network_sync_dir:
-    if not prm_host_set and not prm_slave:
-      print('you do not need to specify a network thread synchronization directory unless you use multiple hosts')
     inv.network_dir = prm_network_sync_dir
   else:
     prm_network_sync_dir = inv.network_dir
-  if prm_remote_pgm_dir:
-    if not prm_host_set and not prm_slave:
-      usage('you do not need to specify a remote program directory unless you use multiple hosts')
   inv.starting_gate = os.path.join(inv.network_dir, 'starting_gate.tmp')   # location of file that signals start, end of test
 
   if inv.iterations < 10: inv.stonewall = False
