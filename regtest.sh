@@ -191,7 +191,7 @@ expect_strs=( 'verify read? : N' \
         'files/thread : 20' \
         'files per dir : 5' \
         'dirs per dir : 3' \
-        'record size (KB) : 6' \
+        'record size (KB, 0 = maximum) : 6' \
         'file size (KB) : 30' )
 expect_ct=${#expect_strs[*]}
 for j in `seq 1 $expect_ct` ; do 
