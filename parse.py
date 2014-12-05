@@ -161,7 +161,10 @@ def parse():
             usage('unrecognized operation name: %s'%val)
         inv.opname = val
     elif prm == 'top': 
-        prm_top_dirs = val.split(',')
+        prm_top_dirs = [os.path.abspath(p) for p in val.split(',')]
+        for p in prm_top_dirs:
+          if not os.path.isdir(p):
+            usage('you must ensure that shared directory %s is accessible from this host and every remote host in test'%p)
     elif prm == 'pause': 
         chkPositiveInt(val, rawprm)
         inv.pause_between_files = int(val)
@@ -179,9 +182,13 @@ def parse():
     elif prm == 'verbose': inv.verbose = str2bool(val, rawprm)
     elif prm == 'log-to-stderr': inv.log_to_stderr = str2bool(val, rawprm)
     elif prm == 'host-set': 
-        prm_host_set = val.split(",")
-        if len(prm_host_set) < 2: prm_host_set = val.strip().split()
-        if len(prm_host_set) == 0:
+        if os.path.isfile(val):
+          f = open(val, "r")
+          prm_host_set = [ record.strip() for record in f.readlines() ]
+        else:
+          prm_host_set = val.split(",")
+          if len(prm_host_set) < 2: prm_host_set = val.strip().split()
+          if len(prm_host_set) == 0:
             usage('host list must be non-empty when --host-set option used')
         pass_on_prm = ''
     elif prm == 'remote-pgm-dir': prm_remote_pgm_dir = val
@@ -199,9 +206,6 @@ def parse():
 
   if inv.record_sz_kb > inv.total_sz_kb and inv.total_sz_kb != 0:
     usage('record size cannot exceed file size')
-
-  if (inv.record_sz_kb != 0) and ((inv.total_sz_kb % inv.record_sz_kb) != 0):
-    usage('file size must be multiple of record size if record size is non-zero')
 
   if prm_top_dirs: 
     for d in prm_top_dirs:
@@ -234,7 +238,7 @@ def parse():
              ('operation', inv.opname), \
              ('files/thread', '%d'%inv.iterations), \
              ('threads', '%d'%prm_thread_count), \
-             ('record size (KB)', '%d'%inv.record_sz_kb), \
+             ('record size (KB, 0 = maximum)', '%d'%inv.record_sz_kb), \
              ('file size (KB)', '%d'%inv.total_sz_kb), \
              ('file size distribution', size_distribution_string), \
              ('files per dir', '%d'%inv.files_per_dir), \
