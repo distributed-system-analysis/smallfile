@@ -131,6 +131,15 @@ def run_multi_host_workload(prm):
         sec = 0.0  # so we exit while loop only if no hosts in host_timeout seconds
       if hosts_ready: break
 
+      # if one of ssh threads has died, no reason to continue
+      kill_remaining_threads = False
+      for t in remote_thread_list:
+        if not t.isAlive():
+          print('thread %s has died'%t)
+          kill_remaining_threads = True
+          break
+      if kill_remaining_threads: break
+
       # be patient for large tests
       # give user some feedback about how many hosts have arrived at the starting gate
 
@@ -155,7 +164,7 @@ def run_multi_host_workload(prm):
       # this is like firing the gun at the track meet
       try:
         sync_files.write_sync_file(starting_gate, 'hi')
-        if verbose: print('starting gate file %s created'%starting_gate)
+        print('starting all threads by creating starting gate file %s'%starting_gate)
       except IOError as e:
         print('error writing starting gate: %s'%os.strerror(e.errno))
 
