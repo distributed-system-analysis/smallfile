@@ -14,6 +14,9 @@ import os
 
 class ssh_thread(threading.Thread):
   ssh_prefix = 'ssh -x -o StrictHostKeyChecking=no '
+  def __str__(self):
+    return 'ssh-thread:%s:%s:%s'%(self.remote_host, str(self.status), self.remote_cmd)
+
   def __init__(self, remote_host, remote_cmd_in):
     threading.Thread.__init__(self)
     self.remote_host = remote_host
