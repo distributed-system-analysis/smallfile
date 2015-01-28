@@ -729,12 +729,15 @@ class smf_invocation:
         if (self.tid != '00') and self.is_shared_dir: return
         dirset=set()
         for tree in [ self.src_dirs, self.dest_dirs ]:
+          tree_range = range(0, len(tree))
           if self.hash_to_dir: dir_range = range(0, self.iterations + 1)
           else: dir_range = range(0, self.iterations + self.files_per_dir, self.files_per_dir)
-          for j in dir_range:
-            fpath = self.mk_file_nm(tree, j)
-            dpath = os.path.dirname(fpath)
-            dirset.add(dpath)
+          for k in tree_range:
+            for j in dir_range:
+              fpath = self.mk_file_nm(tree, j+k)
+              dpath = os.path.dirname(fpath)
+              dirset.add(dpath)
+        #print('dirset=%s'%dirset)
         for unique_dpath in dirset:
             if exists(abort_filename): break
             if not exists(unique_dpath): 
@@ -750,16 +753,42 @@ class smf_invocation:
     def clean_all_subdirs(self):
         self.log.debug('cleaning all subdirs')
         if (self.tid != '00') and self.is_shared_dir: return
-        dirset=set()
         for tree in [ self.src_dirs, self.dest_dirs ]:
+
+          # for efficiency, when we are not using --hash-to-dirs option, 
+          # we only make filename for every files_per_dir files
+
           if self.hash_to_dir: dir_range = range(0, self.iterations + 1)
           else: dir_range = range(0, self.iterations + self.files_per_dir, self.files_per_dir)
-          for j in dir_range:
-            fpath = self.mk_file_nm(tree, j)
+
+          # construct set of directories
+
+          tree_range = range(0, len(tree))
+          dirset=set()
+          for k in tree_range:
+           for j in dir_range:
+            fpath = self.mk_file_nm(tree, j+k)
             dpath = os.path.dirname(fpath)
             dirset.add(dpath)
-        for unique_dpath in dirset:
-            while len(unique_dpath) > 10:  # FIXME: arbitrary, but don't try to delete directories at very top
+
+          # now clean them up if empty, and do this recursively on parent directories also 
+          # until top directory or non-empty directory is reached
+
+          for unique_dpath in dirset:
+
+            # determine top directory (i.e. one of list passed in --top)
+
+            topdir=None
+            for t in tree:
+                if unique_dpath.startswith(t):
+                    topdir = t
+                    break
+            if not topdir:
+                raise Exception('directory %s is not part of any top-level directory in %s'%(unique_dpath, str(tree)))
+
+            # delete this directory and parent directories if empty and below top
+
+            while len(unique_dpath) > len(topdir):
                 if not exists(unique_dpath):
                         unique_dpath = os.path.dirname(unique_dpath)
                         continue
