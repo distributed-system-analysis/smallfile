@@ -90,7 +90,9 @@ if [ $? != $OK ] ; then
     echo "NFS service startup failed!"
     exit $NOTOK
   fi
+  sleep 1
   sudo exportfs -v -o rw,no_root_squash,sync,fsid=15 localhost:$testdir
+  sleep 1
   sudo mount -v -t nfs -o nfsvers=3,tcp,actimeo=1 $localhost_name:$testdir $nfsdir
   if [ $? != $OK ] ; then 
     echo "NFS mount failed!"
@@ -205,55 +207,91 @@ for j in `seq 1 $expect_ct` ; do
   assertok $s $f
 done
 
-common_params="--files 100 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --verify-read Y --response-times N --xattr-count 9 --xattr-size 253 "
 
-python2_only_ops="setxattr getxattr swift-put swift-get"
-if [ "$PYTHON" = "python3" -o "$PYTHON" = "pypy" ] ; then
-  python2_only_ops=''
-fi
+supported_ops()
+{
+        multitop=''
+        if [ "$2" = 'multitop' ] ; then multitop='multiple-topdirs' ; fi
+ 
+        # python3 does not support xattr-related ops yet, I forget why
+        xattr_ops="setxattr getxattr swift-put swift-get"
+        if [ "$PYTHON" = "python3" -o "$PYTHON" = "pypy" ] ; then xattr_ops='' ; fi
+        if [ $xattrs -eq 0 ] ; then xattr_ops='' ; fi
 
-allops=\
-"cleanup create append read readdir ls-l chmod stat $python2_only_ops symlink mkdir rmdir rename delete-renamed "
+        # directory-reading ops do not work with multiple top-level directories at present
+        single_topdir_ops='readdir ls-l'
+        if [ -n "$multitop" ] ; then single_topdir_ops='' ; fi
+        
+        # for debug only: ops="create cleanup"
+        ops="cleanup create append read $single_topdir_ops chmod stat $xattr_ops symlink mkdir rmdir rename delete-renamed"
+        echo $ops
+}
 
-allops_noxattrs=\
-"cleanup create append read readdir ls-l chmod stat symlink mkdir rmdir rename delete-renamed "
+run_one_cmd()
+{
+  cmd="$1"
+  ( echo "$cmd" ; $cmd ) | tee -a $f
+  assertok $?
+}
 
-# with NFS or tmpfs, any operation using extended attributes is not supported
-nfs_allops="$allops_noxattrs"
-local_allops="$allops"
-if [ $xattrs = 0 ] ; then
-  local_allops="$allops_noxattrs"
-fi
-# for debug: allops="create cleanup"
+common_params=\
+"$PYTHON smallfile_cli.py --files 100 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --verify-read Y --response-times N --xattr-count 9 --xattr-size 253 --stonewall N"
 
 echo "******** testing non-distributed operations"
-scmd="$PYTHON smallfile_cli.py --top $testdir "
-for op in $local_allops ; do
+
+for op in `supported_ops $xattrs ''` ; do
   rm -rf /var/tmp/invoke*.log
+  echo
   echo "testing local op $op"
-  $scmd $common_params --top $testdir --stonewall N --operation $op >> $f
-  assertok $?
+  run_one_cmd "$common_params --operation $op"
 done
 
-echo "******** testing distributed operations"
-mkdir -pv $nfsdir/smf
-scmd="$PYTHON smallfile_cli.py --top $nfsdir/smf "
-for op in $nfs_allops ; do
+echo "******** testing non-distributed ops with multiple top-level directories"
+
+topdirlist="${testdir}1,${testdir}2,${testdir}3,${testdir}4"
+scmd="$PYTHON smallfile_cli.py --top $topdirlist "
+topdirlist_nocomma=`echo $topdirlist | sed 's/,/ /g'`
+for d in $topdirlist_nocomma ; do
+  sudo mkdir -pv $d
+  sudo chmod 777 $d
+done
+for op in `supported_ops $xattrs 'multitop'` ; do
   rm -rf /var/tmp/invoke*.log
+  echo
+  echo "testing local op $op"
+  run_one_cmd "$common_params --operation $op"
+done
+for d in $topdirlist_nocomma ; do sudo rm -rf $d ; done
+
+echo "******** testing distributed operations"
+
+mkdir -pv $nfsdir/smf
+# as long as we use NFS for regression tests, NFS does not support xattrs at present
+save_xattrs=$xattrs
+xattrs=0
+for op in `supported_ops $xattrs ''` ; do
+  rm -rf /var/tmp/invoke*.log
+  echo
   echo "testing distributed op $op"
-  $scmd $common_params --top $nfsdir/smf --host-set $localhost_name --pause 4000 --operation $op >> $f
-  assertok $?
+  run_one_cmd "$common_params --host-set $localhost_name --stonewall Y --pause 4000 --operation $op"
 done
 
 echo "******* testing distributed operation with a host-local fs"
 
-scmd="$PYTHON smallfile_cli.py --top $testdir --network-sync-dir $nfsdir/sync "
-for op in $local_allops ; do
+for op in `supported_ops $xattrs ''` ; do
   rm -rf /var/tmp/invoke*.log
   rm -rf $nfsdir/sync
+  echo
   echo "testing remote-but-local op $op"
-  $scmd $common_params --host-set $localhost_name --stonewall N --operation $op >> $f
-  assertok $?
+  run_one_cmd "$common_params --top $testdir --network-sync-dir $nfsdir/sync --host-set $localhost_name --operation $op"
+done
+
+echo "*** run one long test of creates and reads ***"
+
+xattrs=$save_xattrs
+for op in create read cleanup ; do
+  rm -rf /var/tmp/invoke*.log
+  run_one_cmd "$common_params --top $testdir --files 2000 --stonewall Y --pause 1000"
 done
 
 $GREP $nfsdir /proc/mounts
