@@ -730,16 +730,20 @@ class smf_invocation:
         abort_filename = self.abort_fn()
         if (self.tid != '00') and self.is_shared_dir: return
         dirset=set()
+        # optimization: we could check to see if self.dest_dirs is actually used before we include it
         for tree in [ self.src_dirs, self.dest_dirs ]:
           tree_range = range(0, len(tree))
+          # if we are hashing into directories, we can't make any assumptions about which directories will be used first
           if self.hash_to_dir: dir_range = range(0, self.iterations + 1)
+          # optimization: if not hashing into directories, we put files_per_dir files into each directory, so 
+          # we only need to check every files_per_dir filenames for a new directory name
           else: dir_range = range(0, self.iterations + self.files_per_dir, self.files_per_dir)
-          for k in tree_range:
+          for k in tree_range:  # we need this range because we need to create directories in each top dir
             for j in dir_range:
               fpath = self.mk_file_nm(tree, j+k)
               dpath = os.path.dirname(fpath)
               dirset.add(dpath)
-        #print('dirset=%s'%dirset)
+        # since we put them into a set, duplicates are filtered out
         for unique_dpath in dirset:
             if exists(abort_filename): break
             if not exists(unique_dpath): 
@@ -751,6 +755,7 @@ class smf_invocation:
 
 
     # clean up all subdirectories
+    # algorithm same as make_all_subdirs
 
     def clean_all_subdirs(self):
         self.log.debug('cleaning all subdirs')
