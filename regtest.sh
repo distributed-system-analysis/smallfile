@@ -12,6 +12,22 @@
 # you can have it use a directory in a tmpfs mountpoint, this is recommended so as not to wear out laptop drive.
 # by default, Fedora 17 has /run tmpfs mountpoint with sufficient space so this is default, but TMPDIR overrides
 #
+# ext4 doesn't support xattrs by default.  To run a test on xattr-related operation types,  
+# set TMPDIR to an XFS filesystem.  You can create an XFS filesystem by using a loopback device, for example:
+#
+#   dd if=/dev/zero of=/var/tmp/xfs-fs.img bs=1024k count=1k
+#   losetup /dev/loop4 /var/tmp/xfs-fs.img
+#   mkfs -t xfs /dev/loop4
+#   mkdir -p /mnt/xattrtest
+#   mount -t xfs -o noatime,inode64 /dev/loop4 /mnt/xattrtest
+#   export TMPDIR=/mnt/xattrtest/smf
+#   mkdir /mnt/xattrtest/smf
+#   -- run test ---
+#   unset TMPDIR
+#   umount /mnt/xattrtest
+#   losetup -e /dev/loop4
+#   rm -fv /var/tmp/xfs-fs.img
+#
 # we don't use "tee" program to display results as they are happening because this erases any failure status code
 # returned by smallfile, and this status code is vital to regression test.  
 # Instead we log all smallfile output to smfregtest.log where it can be analyzed later  if failure occurs
@@ -246,6 +262,8 @@ for op in `supported_ops $xattrs ''` ; do
   run_one_cmd "$common_params --operation $op"
 done
 
+# we do these kinds of tests to support non-distributed filesystems and NFS exports of them
+
 echo "******** testing non-distributed ops with multiple top-level directories"
 
 topdirlist="${testdir}1,${testdir}2,${testdir}3,${testdir}4"
@@ -263,6 +281,8 @@ for op in `supported_ops $xattrs 'multitop'` ; do
 done
 for d in $topdirlist_nocomma ; do sudo rm -rf $d ; done
 
+# these kinds of tests are needed for distributed filesystems or NFS/SMB exports
+
 echo "******** testing distributed operations"
 
 mkdir -pv $nfsdir/smf
@@ -275,6 +295,8 @@ for op in `supported_ops $xattrs ''` ; do
   echo "testing distributed op $op"
   run_one_cmd "$common_params --host-set $localhost_name --stonewall Y --pause 4000 --operation $op"
 done
+
+# we do these tests for virtualization (many KVM guests or containers, shared storage but no shared fs)
 
 echo "******* testing distributed operation with a host-local fs"
 
