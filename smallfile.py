@@ -990,13 +990,26 @@ class smf_invocation:
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
             dir = os.path.dirname(fn)
-            if dir != prev_dir: 
+            common_dir = None
+            for d in self.top_dirs:
+                if dir.startswith(d):
+                    common_dir = dir[len(self.top_dirs[0]):]
+                    break
+            if not common_dir:
+                raise Exception('readdir: filename %s is not in any top dir in %s'%(fn, str(self.top_dirs)))
+            #print 'common_dir=%s, prev_dir=%s'%(common_dir, prev_dir)
+            if common_dir != prev_dir: 
                 if file_count != len(dir_map):
                     raise MFRdWrExc('readdir: not all files in directory %s were found'%prev_dir, self.filenum, self.rq, 0)
                 self.op_starttime()
-                dir_contents = os.listdir(dir)
+                dir_contents = []
+                for t in self.top_dirs:
+                    next_dir = t + common_dir
+                    #print next_dir
+                    dir_contents.extend(os.listdir(next_dir))
+                #print dir_contents
                 self.op_endtime(self.opname)
-                prev_dir = dir
+                prev_dir = common_dir
                 dir_map = {}
                 for listdir_filename in dir_contents: 
                   if not listdir_filename[0] == 'd': 
@@ -1008,23 +1021,46 @@ class smf_invocation:
                 raise MFRdWrExc('readdir: file missing from directory %s'%prev_dir, self.filenum, self.rq, 0)
             
     # this operation simulates a user doing "ls -lR" on a big directory tree
-    # eventually we'll be able to use readdirplus() system call?
+    # eventually we'll be able to use readdirplus() system call if python supports it?
 
     def do_ls_l(self):
         if self.hash_to_dir:
                 raise Exception("cannot do readdir test with --hash-into-dirs option")
         prev_dir = ''
+        dir_map = {}
+        file_count = 0
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
             dir = os.path.dirname(fn)
-            if dir != prev_dir: 
+            common_dir = None
+            for d in self.top_dirs:
+                if dir.startswith(d):
+                    common_dir = dir[len(self.top_dirs[0]):]
+                    break
+            if not common_dir:
+                raise Exception('ls-l: filename %s is not in any top dir in %s'%(fn, str(self.top_dirs)))
+            if common_dir != prev_dir: 
                 self.op_starttime()
-                dir_contents = os.listdir(dir)
+                dir_contents = []
+                for t in self.top_dirs:
+                    next_dir = t + common_dir
+                    #print next_dir
+                    dir_contents.extend(os.listdir(next_dir))
+                #print dir_contents
                 self.op_endtime(self.opname+'-readdir')
-                prev_dir = dir
-            self.op_starttime()
+                prev_dir = common_dir
+                dir_map = {}
+                for listdir_filename in dir_contents: 
+                  if not listdir_filename[0] == 'd': 
+                    dir_map[listdir_filename] = True  # only include files not directories
+                file_count = 0
+            self.op_starttime() # per-file stat timing different than readdir timing
             os.stat(fn)
             self.op_endtime(self.opname+'-stat')
+            if not fn.startswith('d'): 
+              file_count += 1 # only count files, not directories
+            if os.path.basename(fn) not in dir_map:
+                raise MFRdWrExc('readdir: file missing from directory %s'%prev_dir, self.filenum, self.rq, 0)
 
     # await-create is used for geo-replication testing
     # instead of creating the files, we wait for them to appear (e.g. on the slave geo-rep volume)
