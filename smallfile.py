@@ -271,6 +271,7 @@ class smf_invocation:
         new = smf_invocation()
         new.opname = s.opname
         new.iterations = s.iterations
+        new.top_dirs = s.top_dirs
         new.src_dirs = s.src_dirs
         new.dest_dirs = s.dest_dirs
         new.network_dir = s.network_dir
@@ -312,6 +313,7 @@ class smf_invocation:
     def __str__(self):
         s  = " opname="+self.opname
         s += " iterations="+str(self.iterations)
+        s += " top_dirs="+str(self.top_dirs)
         s += " src_dirs="+str(self.src_dirs)
         s += " dest_dirs="+str(self.dest_dirs)
         s += " network_dir="+str(self.network_dir)
