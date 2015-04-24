@@ -50,15 +50,18 @@ def parse():
         prm_as_host = smallfile.get_hostname(val)
     else: usage('unrecognized parameter name')
 
-  params = None
   param_pickle_fname = os.path.join(prm_network_sync_dir, 'param.pickle')
   if not os.path.exists(param_pickle_fname):
      time.sleep(1.1)
-  pickle_fn = os.path.join(prm_network_sync_dir, 'param.pickle')
-  #print(pickle_fn)
-  with open(pickle_fn, 'rb') as pickled_params:
-    params = pickle.load(pickled_params)
-  params.is_slave = True
-  params.as_host = prm_as_host
-  params.master_invoke.onhost = prm_as_host
+  params = None
+  try:
+    with open(param_pickle_fname, 'rb') as pickled_params:
+      params = pickle.load(pickled_params)
+      params.is_slave = True
+      params.as_host = prm_as_host
+      params.master_invoke.onhost = prm_as_host
+  except IOError as e:
+      if e.errno != errno.ENOENT: raise e
+      usage('could not read parameter pickle file %s'%param_pickle_fname)
   return params
+        
