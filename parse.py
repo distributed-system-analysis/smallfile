@@ -11,7 +11,7 @@ import smallfile
 from smallfile import smf_invocation
 import smf_test_params
 
-version = '2.2'
+version = '2.3'
 
 # convert boolean value into 'Y' or 'N'
 
@@ -198,7 +198,7 @@ def parse():
     # --ashost should not be used by end-user
     elif prm == 'as-host': 
         inv.onhost = smallfile.get_hostname(val)
-    else: usage('unrecognized parameter name')
+    else: usage('unrecognized parameter name: %s'%prm)
 
     pass_on_prm_list += ' ' + pass_on_prm  # parameter options that workload generators will need
 
