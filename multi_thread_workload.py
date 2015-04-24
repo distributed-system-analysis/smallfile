@@ -43,11 +43,9 @@ def run_multi_thread_workload(prm):
   if prm_slave:
     time.sleep(1.1)
     for d in master_invoke.top_dirs: ensure_dir_exists(d)
-    os.listdir(master_invoke.network_dir)
     for dlist in [ master_invoke.src_dirs, master_invoke.dest_dirs ]:
       for d in dlist:
           ensure_dir_exists(d)
-          os.listdir(d) # hack to ensure that 
           if verbose: print(host + ' saw ' + str(d))
 
   # for each thread set up smf_invocation instance,
@@ -77,7 +75,6 @@ def run_multi_thread_workload(prm):
   threads_ready = False  # really just to set scope of variable
   k=0
   for sec in range(0, startup_timeout*2):
-    os.listdir(t.invoke.network_dir) # hack to ensure that directory is up to date
     threads_ready = True
     for t in thread_list:
         fn = t.invoke.gen_thread_ready_fname(t.invoke.tid)
@@ -116,8 +113,8 @@ def run_multi_thread_workload(prm):
   if verbose: print('awaiting '+sg)
   if prm_slave:
     for sec in range(0, prm.host_startup_timeout + 10):
-      ndlist = os.listdir(my_host_invoke.network_dir) # hack to ensure that directory is up to date
-      if verbose: print(str(ndlist))
+      #ndlist = os.listdir(my_host_invoke.network_dir) # hack to ensure that directory is up to date
+      #if verbose: print(str(ndlist))
       if os.path.exists(sg):
         break
       time.sleep(0.5)
