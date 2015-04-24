@@ -32,7 +32,7 @@ import shutil
 
 # smallfile modules
 import smallfile
-from smallfile import smf_invocation, ensure_deleted, ensure_dir_exists, get_hostname, hostaddr
+from smallfile import smf_invocation, ensure_deleted, ensure_dir_exists, get_hostname, hostaddr, SMFResultException
 from smallfile import OK, NOTOK
 import invoke_process
 import sync_files
@@ -116,6 +116,7 @@ def run_multi_host_workload(prm):
 
     try:
      while sec < host_timeout:
+      # HACK to force directory entry coherency for Gluster and maybe other distributed fs
       ndirlist = os.listdir(master_invoke.network_dir)
       if master_invoke.verbose: print('shared dir list: ' + str(ndirlist))
       hosts_ready = True
@@ -170,17 +171,16 @@ def run_multi_host_workload(prm):
 
     # wait for them to finish
 
-    all_ok = True
     for t in remote_thread_list:
         t.join()
         if t.status != OK: 
-          all_ok = False
           print('ERROR: ssh thread for host %s completed with status %d'%(t.remote_host, t.status))
 
     # attempt to aggregate results by reading pickle files
     # containing smf_invocation instances with counters and times that we need
 
     try:
+      all_ok = NOTOK
       invoke_list = []
       one_shot_delay = True
       for h in prm_host_set:  # for each host in test
@@ -207,16 +207,16 @@ def run_multi_host_workload(prm):
                 print('  pickle file %s not found'%pickle_fn)
 
       output_results.output_results(invoke_list, prm_host_set, prm.thread_count,pct_files_min)
+      all_ok = OK
 
     except IOError as e:
         print('host %s filename %s: %s'%(h, pickle_fn, str(e)))
-        all_ok = False
     except KeyboardInterrupt as e:
         print('control-C signal seen (SIGINT)')
-        all_ok = False
-    if not all_ok: 
-        sys.exit(NOTOK)
-    sys.exit(OK)
+    except SMFResultException as e:
+        print str(e)
+
+    sys.exit(all_ok)
 
 
 # main routine that does everything for this workload
