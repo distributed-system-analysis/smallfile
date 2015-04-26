@@ -7,6 +7,7 @@ See Appendix on this page for instructions pertaining to license.
 
 import sys
 import os
+import errno
 import time
 import pickle
 import smallfile
