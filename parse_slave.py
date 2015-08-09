@@ -11,8 +11,6 @@ import errno
 import time
 import pickle
 import smallfile
-from smallfile import smf_invocation
-import smf_test_params
 
 # convert boolean value into 'Y' or 'N'
 
@@ -43,7 +41,6 @@ def parse():
     if (j == argc - 1) and (argc%2 != 1): usage('all parameters consist of a name and a value')
     val = sys.argv[j+1]
     if len(rawprm) < 3: usage('parameter name not long enough' )
-    pass_on_prm = rawprm + ' ' + val
     j += 2
     if prm == 'network-sync-dir': prm_network_sync_dir = val
     # --ashost should not be used by end-user

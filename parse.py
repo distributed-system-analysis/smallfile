@@ -271,10 +271,8 @@ def parse():
 
   # construct command to run remote slave process using CLI parameters, we have them all here
   if not prm_remote_pgm_dir: prm_remote_pgm_dir = os.getcwd()
-  remote_cmd = prm_remote_pgm_dir + os.sep + 'smallfile_cli.py ' + pass_on_prm_list
 
   # "inv" contains all per-thread parameters
   params = smf_test_params.smf_test_params(prm_host_set, prm_thread_count, inv, prm_remote_pgm_dir, prm_top_dirs, \
                                            prm_network_sync_dir, prm_slave, prm_permute_host_dirs)
-  #print params
   return params

@@ -8,7 +8,6 @@ See Appendix on this page for instructions pertaining to license.
 import multiprocessing
 import unittest
 import smallfile
-from smallfile import OK
 import os
 import time
 

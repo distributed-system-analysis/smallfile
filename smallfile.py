@@ -24,15 +24,9 @@ import os
 import os.path
 from os.path import exists, join
 import sys
-import glob
-import string
 import time
 import random
 import logging
-from logging import ERROR
-from logging import INFO
-from logging import WARN
-from logging import DEBUG
 import threading
 import socket
 import errno
@@ -433,8 +427,6 @@ class smf_invocation:
         with open(rsptime_fname, "w") as f:
           for (opname, start_time, rsp_time) in self.rsptimes:
             # time granularity is microseconds, accuracy is probably less than that
-            start_time_str = '%9.6f'%(start_time - self.start_time)
-            rsp_time_str = '%9.6f'%rsp_time
             f.write( '%8s, %9.6f, %9.6f\n'%(opname, (start_time - self.start_time),rsp_time))
           os.fsync(f.fileno()) # particularly for NFS this is needed
 
@@ -1540,7 +1532,6 @@ class Test(unittest_class):
 
     def test_h1_Read_Rsz_0_big_file(self):
         self.test_g2_Append_Rsz_0_big_file()
-        orig_kb = self.invok.total_sz_kb
         ivk = self.invok
         ivk.total_sz_kb = 2048
         ivk.iterations = 5

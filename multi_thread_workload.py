@@ -73,7 +73,6 @@ def run_multi_thread_workload(prm):
     startup_timeout += 30
   abort_fname = my_host_invoke.abort_fn()
   threads_ready = False  # really just to set scope of variable
-  k=0
   for sec in range(0, startup_timeout*2):
     threads_ready = True
     for t in thread_list:

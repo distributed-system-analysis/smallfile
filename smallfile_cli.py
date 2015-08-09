@@ -20,24 +20,16 @@ import sys
 import os
 import os.path
 import errno
-import threading
 import time
-import socket
-import string
 import parse
 import pickle
-import math
-import random
-import shutil
 
 # smallfile modules
 import smallfile
-from smallfile import smf_invocation, ensure_deleted, ensure_dir_exists, get_hostname, hostaddr, SMFResultException
+from smallfile import ensure_deleted, SMFResultException
 from smallfile import OK, NOTOK
-import invoke_process
 import sync_files
 import output_results
-import smf_test_params
 import multi_thread_workload
 
 import launcher_thread
@@ -52,13 +44,11 @@ pct_files_min = 70  # minimum percentage of files for valid test
 def run_multi_host_workload(prm):
 
     prm_host_set = prm.host_set
-    prm_slave = prm.is_slave
     prm_permute_host_dirs = prm.permute_host_dirs
     master_invoke = prm.master_invoke
 
     starting_gate = master_invoke.starting_gate
     verbose = master_invoke.verbose
-    host = master_invoke.onhost
 
     # construct list of ssh threads to invoke in parallel
 
