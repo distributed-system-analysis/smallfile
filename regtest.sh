@@ -1,19 +1,25 @@
 #!/bin/bash
 # smallfile regression test
 #
-# NOTE: this expects you to have /var/tmp in a filesystem that supports extended attributes
-# and it expects NFS to support extended attributes
+# NOTE: this expects you to have /var/tmp in a filesystem that 
+# supports extended attributes and it expects NFS to support extended attributes
 #
-# you can set the environment variable PYTHON_PROG to switch between python3 and python2
+# you can set the environment variable PYTHON_PROG 
+# to switch between python3 and python2
 # for example: # PYTHON_PROG=python3 bash regtest.sh
-# python3 at present doesn't seem to support xattr module so some smallfile operations
-# are not yet supported under python3, the regression test knows how to deal with that.
+# python3 at present doesn't seem to support xattr module 
+# so some smallfile operations are not yet supported under python3, 
+# the regression test knows how to deal with that.
 #
-# you can have it use a directory in a tmpfs mountpoint, this is recommended so as not to wear out laptop drive.
-# by default, Fedora 17 has /run tmpfs mountpoint with sufficient space so this is default, but TMPDIR overrides
+# you can have it use a directory in a tmpfs mountpoint, 
+# this is recommended so as not to wear out laptop drive.
+# by default, newer distros have /run tmpfs mountpoint with sufficient space 
+# so this is default, but TMPDIR overrides
 #
-# ext4 doesn't support xattrs by default.  To run a test on xattr-related operation types,  
-# set TMPDIR to an XFS filesystem.  You can create an XFS filesystem by using a loopback device, for example:
+# ext4 doesn't support xattrs by default.  
+# To run a test on xattr-related operation types,  
+# set TMPDIR to an XFS filesystem.  
+# You can create an XFS filesystem by using a loopback device, for example:
 #
 #   dd if=/dev/zero of=/var/tmp/xfs-fs.img bs=1024k count=1k
 #   losetup /dev/loop4 /var/tmp/xfs-fs.img
@@ -28,9 +34,11 @@
 #   losetup -e /dev/loop4
 #   rm -fv /var/tmp/xfs-fs.img
 #
-# we don't use "tee" program to display results as they are happening because this erases any failure status code
-# returned by smallfile, and this status code is vital to regression test.  
-# Instead we log all smallfile output to smfregtest.log where it can be analyzed later  if failure occurs
+# we don't use "tee" program to display results as they are happening 
+# because this erases any failure status code returned by smallfile, 
+# and this status code is vital to regression test.  
+# Instead we log all smallfile output to smfregtest.log 
+# where it can be analyzed later  if failure occurs
 #
 
 localhost_name="$1"
@@ -75,16 +83,29 @@ cleanup() {
   if [ $? = $OK ] ; then sudo umount -v $nfsdir ; fi
 }
 
-# make sure sshd is running on this node
-
 is_systemctl=1
 which systemctl
 if [ $? != $OK ] ; then  # chances are it's pre-systemctl Linux distro, use "service" instead
-  ssh localhost pwd || sudo service sshd start || echo 'attempted to start sshd'
   is_systemctl=0
-else
-  ssh localhost pwd || sudo systemctl start sshd || echo 'attempted to start sshd'
 fi
+
+start_service()
+{
+svcname=$1
+echo "attempting to start service $svcname"
+if [ $is_systemctl == 1 ] ; then
+  sudo systemctl start $svcname
+else
+  sudo service $svcname start
+fi
+if [ $? != $OK ] ; then
+  echo "FAILED to start service $svcname"
+  exit $NOTOK
+fi
+}
+
+start_service sshd
+start_service nfs
 
 # set up NFS mountpoint
 
@@ -97,15 +118,6 @@ if [ $? != $OK ] ; then
   sudo mkdir -p $testdir
   sudo chown $USER $testdir
   sudo chmod 777 $testdir
-  if [ $is_systemctl -eq 1 ] ; then
-    sudo systemctl start nfs-server || echo 'attempted nfs service start'
-  else
-    sudo service nfs start || echo "attempted nfs service start"
-  fi
-  if [ $? != $OK ] ; then 
-    echo "NFS service startup failed!"
-    exit $NOTOK
-  fi
   sleep 1
   sudo exportfs -v -o rw,no_root_squash,sync,fsid=15 localhost:$testdir
   sleep 1
