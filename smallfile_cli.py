@@ -1,10 +1,5 @@
 #!/usr/bin/python
-'''
-smallfile_cli.py -- CLI user interface for generating metadata-intensive workloads
-Copyright 2012 -- Ben England
-Licensed under the Apache License at http://www.apache.org/licenses/LICENSE-2.0
-See Appendix on this page for instructions pertaining to license.
-'''
+# -*- coding: utf-8 -*-
 
 # because it uses the "multiprocessing" python module instead of "threading"
 # module, it can scale to many cores
@@ -14,8 +9,17 @@ See Appendix on this page for instructions pertaining to license.
 #
 # how to run:
 #
-# ./smallfile_cli.py 
+# ./smallfile_cli.py
 #
+
+'''
+smallfile_cli.py
+CLI user interface for generating metadata-intensive workloads
+Copyright 2012 -- Ben England
+Licensed under the Apache License at http://www.apache.org/licenses/LICENSE-2.0
+See Appendix on this page for instructions pertaining to license.
+'''
+
 import sys
 import os
 import os.path
@@ -25,6 +29,7 @@ import parse
 import pickle
 
 # smallfile modules
+
 import smallfile
 from smallfile import ensure_deleted, SMFResultException
 from smallfile import OK, NOTOK
@@ -36,8 +41,10 @@ import launcher_thread
 import ssh_thread
 
 # FIXME: should be monitoring progress, not total elapsed time
-min_files_per_sec = 15 
+
+min_files_per_sec = 15
 pct_files_min = 70  # minimum percentage of files for valid test
+
 
 # run a multi-host test
 
@@ -53,36 +60,48 @@ def run_multi_host_workload(prm):
     # construct list of ssh threads to invoke in parallel
 
     sync_files.create_top_dirs(master_invoke, True)
-    pickle_fn = os.path.join(prm.master_invoke.network_dir,'param.pickle')
-    #if verbose: print('writing ' + pickle_fn)
+    pickle_fn = os.path.join(prm.master_invoke.network_dir, 'param.pickle')
+
+    # if verbose: print('writing ' + pickle_fn))
+
     sync_files.write_pickle(pickle_fn, prm)
     if os.getenv('PYPY'):
-      python_prog = os.getenv('PYPY')
+        python_prog = os.getenv('PYPY')
     elif sys.version.startswith('2'):
-      python_prog = 'python'
+        python_prog = 'python'
     elif sys.version.startswith('3'):
-      python_prog = 'python3'
+        python_prog = 'python3'
     else:
-      raise Exception('unrecognized python version %s'%sys.version)
-    #print('python_prog = %s'%python_prog)
+        raise Exception('unrecognized python version %s' % sys.version)
+
+    # print('python_prog = %s'%python_prog)
+
     remote_thread_list = []
     host_ct = len(prm_host_set)
     for j in range(0, len(prm_host_set)):
         remote_host = prm_host_set[j]
-        smf_remote_pgm = os.path.join(prm.remote_pgm_dir, 'smallfile_remote.py')
-        this_remote_cmd = '%s %s --network-sync-dir %s '%\
-           (python_prog, smf_remote_pgm, prm.master_invoke.network_dir)
-        
-        #this_remote_cmd = remote_cmd
+        smf_remote_pgm = os.path.join(prm.remote_pgm_dir,
+                                      'smallfile_remote.py')
+        this_remote_cmd = '%s %s --network-sync-dir %s ' \
+            % (python_prog, smf_remote_pgm, prm.master_invoke.network_dir)
+
+        # this_remote_cmd = remote_cmd
+
         if prm_permute_host_dirs:
-          this_remote_cmd += ' --as-host %s'%prm_host_set[(j+1)%host_ct]
+            this_remote_cmd += \
+                ' --as-host %s' % prm_host_set[(j + 1) % host_ct]
         else:
-          this_remote_cmd += ' --as-host %s'%remote_host
-        if verbose: print(this_remote_cmd)
+            this_remote_cmd += ' --as-host %s' % remote_host
+        if verbose:
+            print(this_remote_cmd)
         if smallfile.is_windows_os:
-          remote_thread_list.append(launcher_thread.launcher_thread(prm, remote_host, this_remote_cmd ))
+            remote_thread_list.append(
+                launcher_thread.launcher_thread(prm,
+                                                remote_host,
+                                                this_remote_cmd))
         else:
-          remote_thread_list.append(ssh_thread.ssh_thread(remote_host, this_remote_cmd))
+            remote_thread_list.append(ssh_thread.ssh_thread(remote_host,
+                                                            this_remote_cmd))
 
     # start them, pacing starts so that we don't get ssh errors
 
@@ -91,120 +110,145 @@ def run_multi_host_workload(prm):
         t.start()
 
     # wait for hosts to arrive at starting gate
-    # if only one host, then no wait will occur as starting gate file is already present
+    # if only one host, then no wait will occur
+    # as starting gate file is already present
     # every second we resume scan from last host file not found
-    # FIXME: for very large host sets, timeout only if no host responds within X seconds
-  
+    # FIXME: for very large host sets,
+    # timeout only if no host responds within X seconds
+
     exception_seen = None
     hosts_ready = False  # set scope outside while loop
     abortfn = master_invoke.abort_fn()
-    last_host_seen=-1
+    last_host_seen = -1
     sec = 0.0
     sec_delta = 0.5
     host_timeout = prm.host_startup_timeout
-    if smallfile.is_windows_os: host_timeout += 20
+    if smallfile.is_windows_os:
+        host_timeout += 20
 
     try:
-     while sec < host_timeout:
-      # HACK to force directory entry coherency for Gluster and maybe other distributed fs
-      ndirlist = os.listdir(master_invoke.network_dir)
-      if master_invoke.verbose: print('shared dir list: ' + str(ndirlist))
-      hosts_ready = True
-      if os.path.exists(abortfn): raise Exception('worker host signaled abort')
-      for j in range(last_host_seen+1, len(prm_host_set)):
-        h=prm_host_set[j]
-        fn = master_invoke.gen_host_ready_fname(h.strip())
-        if verbose: print('checking for host filename '+fn)
-        if not os.path.exists(fn):
-            hosts_ready = False
-            break
-        last_host_seen=j  # no need to wait for this host's ready file anymore
-        sec = 0.0  # so we exit while loop only if no hosts in host_timeout seconds
-      if hosts_ready: break
+        while sec < host_timeout:
+            # HACK to force directory entry coherency for Gluster
+            ndirlist = os.listdir(master_invoke.network_dir)
+            if master_invoke.verbose:
+                print('shared dir list: ' + str(ndirlist))
+            hosts_ready = True
+            if os.path.exists(abortfn):
+                raise Exception('worker host signaled abort')
+            for j in range(last_host_seen + 1, len(prm_host_set)):
+                h = prm_host_set[j]
+                fn = master_invoke.gen_host_ready_fname(h.strip())
+                if verbose:
+                    print('checking for host filename ' + fn)
+                if not os.path.exists(fn):
+                    hosts_ready = False
+                    break
+                last_host_seen = j  # saw this host's ready file
+                # we exit while loop only if no hosts in host_timeout seconds
+                sec = 0.0
+            if hosts_ready:
+                break
 
-      # if one of ssh threads has died, no reason to continue
-      kill_remaining_threads = False
-      for t in remote_thread_list:
-        if not t.isAlive():
-          print('thread %s has died'%t)
-          kill_remaining_threads = True
-          break
-      if kill_remaining_threads: break
+            # if one of ssh threads has died, no reason to continue
 
-      # be patient for large tests
-      # give user some feedback about how many hosts have arrived at the starting gate
+            kill_remaining_threads = False
+            for t in remote_thread_list:
+                if not t.isAlive():
+                    print('thread %s has died' % t)
+                    kill_remaining_threads = True
+                    break
+            if kill_remaining_threads:
+                break
 
-      time.sleep(sec_delta)
-      sec += sec_delta
-      sec_delta += 1
-      if verbose: print('last_host_seen=%d sec=%d'%(last_host_seen,sec))
+            # be patient for large tests
+            # give user some feedback about
+            # how many hosts have arrived at the starting gate
+
+            time.sleep(sec_delta)
+            sec += sec_delta
+            sec_delta += 1
+            if verbose:
+                print('last_host_seen=%d sec=%d' % (last_host_seen, sec))
     except KeyboardInterrupt as e:
-      print('saw SIGINT signal, aborting test')
-      exception_seen = e
+        print('saw SIGINT signal, aborting test')
+        exception_seen = e
     except Exception as e:
-      exception_seen = e
-      hosts_ready = False
+        exception_seen = e
+        hosts_ready = False
     if not hosts_ready:
-      smallfile.abort_test(abortfn, [])
-      if not exception_seen: 
-        raise Exception('hosts did not reach starting gate within %d seconds'%host_timeout)
-      else:
-        print('saw exception %s, aborting test'%str(e))
+        smallfile.abort_test(abortfn, [])
+        if not exception_seen:
+            raise Exception('hosts did not reach starting gate ' +
+                            'within %d seconds' % host_timeout)
+        else:
+            print('saw exception %s, aborting test' % str(e))
     else:
-      # ask all hosts to start the test
-      # this is like firing the gun at the track meet
-      try:
-        sync_files.write_sync_file(starting_gate, 'hi')
-        print('starting all threads by creating starting gate file %s'%starting_gate)
-      except IOError as e:
-        print('error writing starting gate: %s'%os.strerror(e.errno))
+
+        # ask all hosts to start the test
+        # this is like firing the gun at the track meet
+
+        try:
+            sync_files.write_sync_file(starting_gate, 'hi')
+            print('starting all threads by creating starting gate file %s' %
+                  starting_gate)
+        except IOError as e:
+            print('error writing starting gate: %s' % os.strerror(e.errno))
 
     # wait for them to finish
 
     for t in remote_thread_list:
         t.join()
-        if t.status != OK: 
-          print('ERROR: ssh thread for host %s completed with status %d'%(t.remote_host, t.status))
+        if t.status != OK:
+            print('ERROR: ssh thread for host %s completed with status %d' %
+                  (t.remote_host, t.status))
 
     # attempt to aggregate results by reading pickle files
-    # containing smf_invocation instances with counters and times that we need
+    # containing SmallfileWorkload instances
+    # with counters and times that we need
 
     try:
-      all_ok = NOTOK
-      invoke_list = []
-      one_shot_delay = True
-      for h in prm_host_set:  # for each host in test
+        all_ok = NOTOK
+        invoke_list = []
+        one_shot_delay = True
+        for h in prm_host_set:  # for each host in test
 
-        # read results for each thread run in that host
-        # from python pickle of the list of smf_invocation objects
+            # read results for each thread run in that host
+            # from python pickle of the list of SmallfileWorkload objects
 
-        pickle_fn = master_invoke.host_result_filename(h)
-        if verbose: print('reading pickle file: %s'%pickle_fn)
-        host_invoke_list = []
-        try:
-                if one_shot_delay and (not os.path.exists(pickle_fn)): 
-                  # all threads have joined already, they are done
-                  # we allow > 1 sec for this (NFS) client to see other clients' files
-                  time.sleep(1.2)
-                  one_shot_delay = False
+            pickle_fn = master_invoke.host_result_filename(h)
+            if verbose:
+                print('reading pickle file: %s' % pickle_fn)
+            host_invoke_list = []
+            try:
+                if one_shot_delay and not os.path.exists(pickle_fn):
+
+                    # all threads have joined already, they are done
+                    # we allow > 1 sec
+                    # for this (NFS) client to see other clients' files
+
+                    time.sleep(1.2)
+                    one_shot_delay = False
                 with open(pickle_fn, 'rb') as pickle_file:
-                  host_invoke_list = pickle.load(pickle_file)
-                if verbose: print(' read %d invoke objects'%len(host_invoke_list))
+                    host_invoke_list = pickle.load(pickle_file)
+                if verbose:
+                    print(' read %d invoke objects' % len(host_invoke_list))
                 invoke_list.extend(host_invoke_list)
                 ensure_deleted(pickle_fn)
-        except IOError as e:
-                if e.errno != errno.ENOENT: raise e
-                print('  pickle file %s not found'%pickle_fn)
+            except IOError as e:
+                if e.errno != errno.ENOENT:
+                    raise e
+                print('  pickle file %s not found' % pickle_fn)
 
-      output_results.output_results(invoke_list, prm_host_set, prm.thread_count,pct_files_min)
-      all_ok = OK
-
+        output_results.output_results(invoke_list, prm_host_set,
+                                      prm.thread_count, pct_files_min)
+        all_ok = OK
     except IOError as e:
-        print('host %s filename %s: %s'%(h, pickle_fn, str(e)))
+
+        print('host %s filename %s: %s' % (h, pickle_fn, str(e)))
     except KeyboardInterrupt as e:
         print('control-C signal seen (SIGINT)')
     except SMFResultException as e:
-        print str(e)
+        print(str(e))
 
     sys.exit(all_ok)
 
@@ -212,20 +256,25 @@ def run_multi_host_workload(prm):
 # main routine that does everything for this workload
 
 def run_workload():
-  # if a --host-set parameter was passed, it's a multi-host workload
-  # each remote instance will wait until all instances have reached starting gate
-   
-  params = parse.parse()
 
-  # for multi-host test
+    # if a --host-set parameter was passed,
+    # it's a multi-host workload
+    # each remote instance will wait
+    # until all instances have reached starting gate
 
-  if params.host_set and not params.is_slave:
-    return run_multi_host_workload(params)
-  return multi_thread_workload.run_multi_thread_workload(params)
+    params = parse.parse()
 
-# for future windows compatibility, all global code (not contained in a class or subroutine)
+    # for multi-host test
+
+    if params.host_set and not params.is_slave:
+        return run_multi_host_workload(params)
+    return multi_thread_workload.run_multi_thread_workload(params)
+
+
+# for future windows compatibility,
+# all global code (not contained in a class or subroutine)
 # must be moved to within a routine unless it's trivial (like constants)
 # because windows doesn't support fork().
 
-if __name__ == "__main__":
-  run_workload()
+if __name__ == '__main__':
+    run_workload()
