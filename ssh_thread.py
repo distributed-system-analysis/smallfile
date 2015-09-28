@@ -29,9 +29,7 @@ class ssh_thread(threading.Thread):
         self.remote_host = remote_host
         self.remote_cmd = '%s %s "%s"' % \
             (self.ssh_prefix, self.remote_host, remote_cmd_in)
-
-    # print('thread cmd %s'%self.remote_cmd)
-
+        # print('thread cmd %s'%self.remote_cmd)
         self.status = None
 
     def run(self):

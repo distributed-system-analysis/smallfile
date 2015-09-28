@@ -64,9 +64,7 @@ while True:
             f.close()
             os.unlink(launch_fn)
             print('launcher sees cmd: %s' % cmd)
-
-    # substitute --shared directory for --top directory if they are different
-
+            # substitute --shared directory for --top directory if they are different
             if top_dir != shared_dir:
                 cmd = cmd.replace(shared_dir, top_dir)
                 print('launcher edits cmd to : %s' % cmd)
