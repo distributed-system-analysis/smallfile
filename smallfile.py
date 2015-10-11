@@ -36,6 +36,7 @@ import os.path
 from os.path import exists, join
 import sys
 import time
+import copy
 import random
 import logging
 import threading
@@ -413,50 +414,6 @@ class SmallfileWorkload:
         # reset object state variables
 
         self.reset()
-
-    # copy constructor
-
-    def clone(smf_instance):
-        s = smf_instance
-        new = SmallfileWorkload()
-        new.opname = s.opname
-        new.iterations = s.iterations
-        new.top_dirs = s.top_dirs
-        new.src_dirs = s.src_dirs
-        new.dest_dirs = s.dest_dirs
-        new.network_dir = s.network_dir
-        new.is_shared_dir = s.is_shared_dir
-        new.record_sz_kb = s.record_sz_kb
-        new.total_sz_kb = s.total_sz_kb
-        new.filesize_distr = s.filesize_distr
-        new.files_per_dir = s.files_per_dir
-        new.dirs_per_dir = s.dirs_per_dir
-        new.xattr_size = s.xattr_size
-        new.xattr_count = s.xattr_count
-        new.files_between_checks = s.files_between_checks
-        new.starting_gate = s.starting_gate
-        new.prefix = s.prefix
-        new.suffix = s.suffix
-        new.hash_to_dir = s.hash_to_dir
-        new.record_ctime_size = s.record_ctime_size
-        new.fsync = s.fsync
-        new.dirs_on_demand = s.dirs_on_demand
-        new.stonewall = s.stonewall
-        new.verify_read = s.verify_read
-        new.incompressible = s.incompressible
-        new.finish_all_rq = s.finish_all_rq
-        new.measure_rsptimes = s.measure_rsptimes
-        new.pause_between_files = s.pause_between_files
-        new.pause_sec = s.pause_sec
-        new.onhost = s.onhost
-        new.log_to_stderr = s.log_to_stderr
-        new.verbose = s.verbose
-        new.log_level = s.log_level
-        new.log = None
-        new.tid = None
-        new.randstate = random.Random()
-        new.reset()
-        return new
 
     # convert object to string for logging, etc.
 
@@ -2036,7 +1993,7 @@ class Test(unittest_class):
         self.checkDirEmpty(self.invok.network_dir)
         invokeList = []
         for j in range(0, thread_count):
-            s = SmallfileWorkload.clone(self.invok)  # test copy constructor
+            s = copy.copy(self.invok)  # test copy constructor
             s.tid = str(j)
             s.src_dirs = [join(d, 'thrd_' + s.tid) for d in s.src_dirs]
             s.dest_dirs = [join(d, 'thrd_' + s.tid) for d in

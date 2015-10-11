@@ -4,6 +4,7 @@ import os
 import sys
 import time
 import random
+import copy
 
 import smallfile
 from smallfile import ensure_deleted, ensure_dir_exists, OK, NOTOK, \
@@ -20,7 +21,7 @@ def create_worker_list(prm):
 
     thread_list = []
     for k in range(0, prm.thread_count):
-        nextinv = smallfile.SmallfileWorkload.clone(prm.master_invoke)
+        nextinv = copy.copy(prm.master_invoke)
         nextinv.tid = '%02d' % k
         if not prm.master_invoke.is_shared_dir:
             nextinv.src_dirs = [d + os.sep + prm.master_invoke.onhost
