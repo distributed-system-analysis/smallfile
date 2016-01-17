@@ -236,6 +236,7 @@ class SmallfileWorkload:
         'create',
         'delete',
         'append',
+        'overwrite',
         'read',
         'readdir',
         'rename',
@@ -1147,6 +1148,12 @@ class SmallfileWorkload:
             self.op_endtime(self.opname)
 
     def do_append(self):
+        return self.do_write(append=True)
+
+    def do_overwrite(self):
+        return self.do_write()
+
+    def do_write(self, append=False):
         if self.record_ctime_size and not xattr_installed:
             raise Exception('xattr module not present ' +
                             'but record-ctime-size specified')
@@ -1157,7 +1164,7 @@ class SmallfileWorkload:
             try:
                 # don't use O_APPEND, it has different semantics!
                 fd = os.open(fn, os.O_WRONLY | O_BINARY)
-                os.lseek(fd, 0, os.SEEK_END)
+                if append: os.lseek(fd, 0, os.SEEK_END)
                 remaining_kb = self.get_next_file_size()
                 self.prepare_buf()
                 rszkb = self.get_record_size_to_use()
@@ -1597,6 +1604,7 @@ class SmallfileWorkload:
         'setxattr': do_setxattr,
         'chmod': do_chmod,
         'append': do_append,
+        'overwrite': do_overwrite,
         'read': do_read,
         'rename': do_rename,
         'delete-renamed': do_delete_renamed,
@@ -1810,7 +1818,15 @@ class Test(unittest_class):
         self.checkDirListEmpty(self.invok.src_dirs)
         self.checkDirListEmpty(self.invok.dest_dirs)
 
-    def test_g_Append(self):
+    def test_g0_Overwrite(self):
+        self.mk_files()
+        orig_kb = self.invok.total_sz_kb
+        self.runTest('overwrite')
+        fn = self.lastFileNameInTest(self.invok.src_dirs)
+        self.assertTrue(self.file_size(fn) == orig_kb
+                        * self.invok.BYTES_PER_KB)
+
+    def test_g1_Append(self):
         self.mk_files()
         orig_kb = self.invok.total_sz_kb
         self.invok.total_sz_kb *= 2
