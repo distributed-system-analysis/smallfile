@@ -167,13 +167,16 @@ beforehand)
 For example, if you want to run smallfile_cli.py on 1 host with 8 threads
 each creating 2 GB of 1-MiB files, you can use these options:
 
- # python smallfile_cli.py --operation create --threads 8 \
+  # python smallfile_cli.py --operation create --threads 8 \
+
    --file-size 1024 --files 2048 --top /mnt/gfs/smf
 
 To run a 4-host test doing same thing:
 
- # python smallfile_cli.py --operation create --threads 8 
+  # python smallfile_cli.py --operation create --threads 8 \
+
    --file-size 1024 --files 2048 --top /mnt/gfs/smf \
+
    --host-set host1,host2,host3,host4 
 
 Errors encountered by worker threads will be saved in /var/tmp/invoke-N.log where N is the thread number. After each test, a summary of thread results is displayed, and overall test results are aggregated for you, in three ways:
@@ -186,11 +189,11 @@ Users should never need to run smallfile.py -- this is the python class which
 implements the workload generator. Developers can run this module to invoke its
 unit test however:
 
- # python smallfile.py 
+  # python smallfile.py 
 
 To run just one unit test module, for example:
 
- # python -m unittest smallfile.Test.test_c3_Symlink
+  # python -m unittest smallfile.Test.test_c3_Symlink
 
 Results
 =======
@@ -210,9 +213,8 @@ lower than a threshold (default 70%) then an error is raised.
 response times for operations on each file are saved by thread in .csv form in
 the shared directory.  For example, you can turn these into an X-Y scatterplot so that you can see how response time varies over time.   For example:
 
- # python smallfile_cli.py --response-times Y
-
- # ls -ltr /var/tmp/rsptimes\*.csv
+  # python smallfile_cli.py --response-times Y
+  # ls -ltr /var/tmp/rsptimes\*.csv
 
 You should see 1 .csv file per thread.  These files can be loaded into any
 spreadsheet application and graphed.  An x-y scatterplot can be useful to see
@@ -275,9 +277,8 @@ mountpoint exported from a Linux NFS server, mounted with the option actimeo=1
 then reference this mountpoint using the –network-sync-dir option of smallfile.
 For example:
 
- # mount -t nfs -o actimeo=1 your-linux-server:/your/nfs/export /mnt/nfs
-
- # ./smallfile_cli.py –top /your/distributed/filesystem \
+  # mount -t nfs -o actimeo=1 your-linux-server:/your/nfs/export /mnt/nfs
+  # ./smallfile_cli.py –top /your/distributed/filesystem \
     –network-sync-dir /mnt/nfs/smf-shared
 
 For non-Windows tests, the user must set up password-less ssh between the test
@@ -293,11 +294,11 @@ command to launch smallfile_remote.py in the same way that would happen with
 ssh on non-Windows tests. The command-line parameters on each Windows host
 would be something like this:
 
- start python launch_smf_host.py –shared z:\smf\network_shared –as-host %hostname%
+  start python launch_smf_host.py –shared z:\smf\network_shared –as-host %hostname%
 
 Then from the test driver, you could run specifying your hosts:
 
- python smallfile_cli.py –top z:\smf –host-set gprfc023,gprfc024
+  python smallfile_cli.py –top z:\smf –host-set gprfc023,gprfc024
 
 
 Use with non-networked filesystems
@@ -412,7 +413,7 @@ to appear at the file copy destination. To do this, we need to specify a
 separate network sync directory. So for example, to create the original
 directory tree, we could use a command like:
 
- # ./smallfile_cli.py --top /mnt/glusterfs-master/smf \
+  # ./smallfile_cli.py --top /mnt/glusterfs-master/smf \
 
     --threads 16 --files 2000 --file-size 1024 \
 
@@ -423,7 +424,7 @@ being geo-replicated to a “slave” volume in a remote site asynchronously. We
 can measure the performance of this process using a command like this, where
 /mnt/glusterfs-slave is a read-only mountpoint accessing the slave volume.
 
- # ./smallfile_cli.py --top /mnt/glusterfs-slave/smf \
+  # ./smallfile_cli.py --top /mnt/glusterfs-slave/smf \
 
      --threads 16 --files 2000 --file-size 1024 \
 
