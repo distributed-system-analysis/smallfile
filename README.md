@@ -81,26 +81,7 @@ name-value pairs with the format --name value .
 
 The parameters are:
 
- * --operation -- operation name, one of the following: 
- ** create -- create a file and write data to it
- ** append -- open an existing file and append data to it 
- ** delete -- delete a file 
- ** rename -- rename a file 
- ** delete_renamed -- delete a file that had previously been renamed
- ** read -- read an existing file 
- ** stat -- just read metadata from an existing file 
- ** chmod -- change protection mask for file
- ** setxattr -- set extended attribute values in each file 
- ** getxattr - read extended attribute values in each file 
- ** symlink -- create a symlink pointing to each file (create must be run
-beforehand) 
- ** mkdir -- create a subdirectory with 1 file in it 
- ** rmdir -- remove a subdirectory and its 1 file
- ** readdir – scan directories only, don't read files or their metadata
- ** ls-l – scan directories and read basic file metadata
- ** cleanup -- delete any pre-existing files from a previous run 
- ** swift-put – simulates OpenStack Swift behavior when doing PUT operation
- ** swift-get -- simulates OpenStack Swift behavior for each GET operation. 
+ * --operation -- operation type (see list below for choices)
  * --top -- top-level directory, all file accesses are done inside this
   directory tree. If you wish to use multiple mountpoints,provide a list of
   top-level directories separated by comma (no whitespace).
@@ -161,6 +142,28 @@ previous runs for example)
   lives in a different directory on the target hosts and the test-driver host. 
  * --pause -- integer (microseconds) each thread will wait before starting next
   file. Default: 0
+
+Operation types are:
+
+* create -- create a file and write data to it
+* append -- open an existing file and append data to it 
+* delete -- delete a file 
+* rename -- rename a file 
+* delete_renamed -- delete a file that had previously been renamed
+* read -- read an existing file 
+* stat -- just read metadata from an existing file 
+* chmod -- change protection mask for file
+* setxattr -- set extended attribute values in each file 
+* getxattr - read extended attribute values in each file 
+* symlink -- create a symlink pointing to each file (create must be run
+beforehand) 
+* mkdir -- create a subdirectory with 1 file in it 
+* rmdir -- remove a subdirectory and its 1 file
+* readdir – scan directories only, don't read files or their metadata
+* ls-l – scan directories and read basic file metadata
+* cleanup -- delete any pre-existing files from a previous run 
+* swift-put – simulates OpenStack Swift behavior when doing PUT operation
+* swift-get -- simulates OpenStack Swift behavior for each GET operation. 
 
 For example, if you want to run smallfile_cli.py on 1 host with 8 threads
 each creating 2 GB of 1-MB files, you can use these options:
