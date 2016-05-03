@@ -45,15 +45,15 @@ What it can do
 * async replication support - can measure time required for files to appear in a directory tree
 * fs coherency test - in multi-host tests, can force all clients to read files written by different client
 
-both python 2.7 and python 3 are supported.   Limited support is available for
-pypy.
+Both python 2.7 and python 3 are supported.   Limited support is available for
+pypy, this can be useful for reducing interpreter overhead.
 
 Restrictions
 -----------
 
 * for a multi-host test, all workload generators and the test driver must provide access to the same shared directory
 * does not support mixed workloads (mixture of different operation types)
-* is not accurate on memory resident filesystem 
+* is not accurate on single-threaded tests in memory resident filesystem 
 * requires all hosts to have the same DNS domain name (plan to remove this
   restriction)
 * does not support HTTP access (use COSBench/ssbench for this)
@@ -62,7 +62,7 @@ Restrictions
   is a high probability that it would work with Apple OS and other UNIXes.
 * Have only tested Windows XP and Windows 7, but any Win32-compatible Windows would probably work with this.
 
-How to run
+How to specify test
 ============
 
 You must have password-less ssh access between the test driver node and the
@@ -88,15 +88,14 @@ The parameters are:
  * --host-set -- comma-separated set of hosts used for this test, no domain
   names allowed. Default: non-distributed test.
  * --files -- how many files should each thread process? 
- * --threads -- how many workload generator threads should each invocation_cli
-  process create? 
+ * --threads -- how many workload generator threads should each smallfile_cli.py process create? 
  * --file-size -- total amount of data accessed per file.   If zero then no
   reads or writes are performed. 
  * --file-size-distribution – only supported value today is exponential.
   Default: fixed file size.
  * --record-size -- record size in KB, how much data is transferred in a single
   read or write system call.  If 0 then it is set to the minimum of the file
-  size and 1-MB record size limit. Default: 0
+  size and 1-MiB record size limit. Default: 0
  * --files-per-dir -- maximum number of files contained in any one directory.
   Default: 200
  * --dirs-per-dir -- maximum number of subdirectories contained in any one
@@ -154,26 +153,26 @@ Operation types are:
 * stat -- just read metadata from an existing file 
 * chmod -- change protection mask for file
 * setxattr -- set extended attribute values in each file 
-* getxattr - read extended attribute values in each file 
+* getxattr -- read extended attribute values in each file 
 * symlink -- create a symlink pointing to each file (create must be run
 beforehand) 
 * mkdir -- create a subdirectory with 1 file in it 
 * rmdir -- remove a subdirectory and its 1 file
-* readdir – scan directories only, don't read files or their metadata
-* ls-l – scan directories and read basic file metadata
+* readdir -- scan directories only, don't read files or their metadata
+* ls-l -- scan directories and read basic file metadata
 * cleanup -- delete any pre-existing files from a previous run 
-* swift-put – simulates OpenStack Swift behavior when doing PUT operation
+* swift-put -- simulates OpenStack Swift behavior when doing PUT operation
 * swift-get -- simulates OpenStack Swift behavior for each GET operation. 
 
 For example, if you want to run smallfile_cli.py on 1 host with 8 threads
-each creating 2 GB of 1-MB files, you can use these options:
+each creating 2 GB of 1-MiB files, you can use these options:
 
  # python smallfile_cli.py --operation create --threads 8 \
    --file-size 1024 --files 2048 --top /mnt/gfs/smf
 
 To run a 4-host test doing same thing:
 
- # python smallfile_cli.py --operation create --threads 8 \
+ # python smallfile_cli.py --operation create --threads 8 
    --file-size 1024 --files 2048 --top /mnt/gfs/smf \
    --host-set host1,host2,host3,host4 
 
@@ -181,7 +180,7 @@ Errors encountered by worker threads will be saved in /var/tmp/invoke-N.log wher
 
  * files/sec – most relevant for smaller file sizes
  * IOPS -- application I/O operations per sec, rate of read()/write()
- * MB/s -- megabytes/sec, data transfer rate
+ * MB/s -- megabytes/sec (really MiB/sec), data transfer rate
 
 Users should never need to run smallfile.py -- this is the python class which
 implements the workload generator. Developers can run this module to invoke its
@@ -192,6 +191,65 @@ unit test however:
 To run just one unit test module, for example:
 
  # python -m unittest smallfile.Test.test_c3_Symlink
+
+Results
+=======
+
+All tests display a "files/sec" result.  If the test performs reads or writes,
+then a "MB/sec" data transfer rate and an "IOPS" result (i.e. total read or
+write calls/sec) are also displayed.  Each thread participating in the test
+keeps track of total number of files and I/O requests that it processes during
+the test measurement interval.  These results are rolled up per host if it is a
+single-host test.  For a multi-host test, the per-thread results for each host
+are saved in a file within the --top directory, and the test master then reads
+in all of the saved results from its slaves to compute the aggregate result
+across all client hosts.  The percentage of requested files which were
+processed in the measurement interval is also displayed, and if the number is
+lower than a threshold (default 70%) then an error is raised.
+
+response times for operations on each file are saved by thread in .csv form in
+the shared directory.  For example, you can turn these into an X-Y scatterplot so that you can see how response time varies over time.   For example:
+
+ # python smallfile_cli.py --response-times Y
+
+ # ls -ltr /var/tmp/rsptimes\*.csv
+
+You should see 1 .csv file per thread.  These files can be loaded into any
+spreadsheet application and graphed.  An x-y scatterplot can be useful to see
+changes over time in response time.
+
+How to run correctly
+=============
+
+Here are some things you need to know in order to get valid results - it is not
+enough to just specify the workload that you want.
+
+Avoiding caching effects
+==========
+
+THere are two types of caching effects that we wish to avoid, data caching and
+metadata caching.  If the average object size is sufficiently large, we need
+only be concerned about data caching effects.  In order to avoid data caching
+effects during a large-object read test, the Linux buffer cache on all servers
+must be cleared. In part this is done using the command: "echo 1 > /proc/sys/vm/drop_caches" on all hosts.  However, some filesystems such as
+Gluster have their own internal caches - in that case you might even need to
+remount the filesystem or even restart the storage pool/volume.
+
+Use of --pause in multi-thread tests
+==========
+
+Normally, smallfile stops the throughput measurement for the test as soon as
+the first thread finishes processing all its files.  In some filesystems, the first thread that starts running will be operating at much higher speed (example: NFS writes) and can easily finish before other threads have a chance to get started.  This immediately invalidates the test.  To make this less likely, it is possible to insert a per-file delay into each
+thread with the --pause option so that the other threads have a chance to
+participate in the test during the measurement interval.    It is preferable to
+run a longer test instead, because in some cases you might otherwise restrict
+throughput unintentionally.  But if you know that your throughput upper bound
+is X files/sec and you have N threads running, then your per-thread throughput
+should be no more than N/X, so a reasonable pause would be something like 3X/N
+microseconds.  For  example, if you know that you cannot do better than 100000
+files/sec and you have 20 threads running,try a 60/100000 = 600 microsecond
+pause.  Verify that this isn't affecting throughput by reducing the pause and
+running a longer test.
 
 Use with distributed filesystems
 ---------
@@ -209,17 +267,17 @@ default this is the network_shared/ subdirectory of the –top directory, but yo
 can override this default by specifying the –network-sync-dir directory
 parameter, see the next section for why this is useful.
 
-Some distributed filesystems, such as NFS and Gluster, have relaxed,
+Some distributed filesystems, such as NFS, have relaxed,
 eventual-consistency caching of directories; this will cause problems for the
-shared directory. To work around this problem, you can use a separate NFS
+smallfile benchmark. To work around this problem, you can use a separate NFS
 mountpoint exported from a Linux NFS server, mounted with the option actimeo=1
 (to limit duration of time NFS will cache directory entries and metadata). You
 then reference this mountpoint using the –network-sync-dir option of smallfile.
 For example:
 
- mount -t nfs -o actimeo=1 your-linux-server:/your/nfs/export /mnt/nfs
+ # mount -t nfs -o actimeo=1 your-linux-server:/your/nfs/export /mnt/nfs
 
- ./smallfile_cli.py –top /your/distributed/filesystem \
+ # ./smallfile_cli.py –top /your/distributed/filesystem \
     –network-sync-dir /mnt/nfs/smf-shared
 
 For non-Windows tests, the user must set up password-less ssh between the test
@@ -232,11 +290,14 @@ StrictHostKeyChecking=no option in the ssh command.
 For Windows tests, each worker host must be running the launch_smf_host.py
 program that polls the shared network directory for a file that contains the
 command to launch smallfile_remote.py in the same way that would happen with
-ssh on non-Windows tests. The command-line parameters are:
+ssh on non-Windows tests. The command-line parameters on each Windows host
+would be something like this:
 
- start python launch_smf_host.py –shared z:\smf\network_shared –as-host gprfc023
+ > start python launch_smf_host.py –shared z:\smf\network_shared –as-host %hostname%
 
- python smallfile_cli.py –top z:\smf –host-set gprfc023
+Then from the test driver, you could run specifying your hosts:
+
+ > python smallfile_cli.py –top z:\smf –host-set gprfc023,gprfc024
 
 
 Use with non-networked filesystems
@@ -340,41 +401,6 @@ for this information. The append operation works in the same way. All other
 operations are metadata operations and do not require that the file size be
 known in advance.
 
-Avoiding caching effects
----------
-
-THere are two types of caching effects that we wish to avoid, data caching and
-metadata caching.  If the average object size is sufficiently large, we need
-only be concerned about data caching effects.  In order to avoid data caching
-effects during a large-object read test, the Linux buffer cache on all servers
-must be cleared. In part this is done using the command: "echo 1 >
-/proc/sys/vm/drop_caches" on all hosts.  However, gluster has its own internal
-caches.   To evict all prior data from the cache, the simplest method is to
-just use iozone to write a large amount of data into some files in the gluster
-filesystem, then delete them.  For example, if the gluster 3.2 server caches 1
-GB of data then the amount of data written should be roughly 2 GB/server and
-the number of files used should be roughly 8 times the number of servers.  Use
-of many separate files ensures that this cache eviction data is spread across
-all servers approximately equally. 
-
-
-Use of --pause in multi-thread tests
----------
-
-In some filesystems, the first thread that starts running will be operating
-at memory speed (example: NFS writes) and can easily finish before other
-threads have a chance to get started.  This immediately invalidates the test.
-To make this less likely, it is possible to insert a per-file delay into each
-thread with the --pause option so that the other threads have a chance to
-participate in the test during the measurement interval.    It is preferable to
-run a longer test instead, because in some cases you might otherwise restrict
-throughput unintentionally.  But if you know that your throughput upper bound
-is X files/sec and you have N threads running, then your per-thread throughput
-should be no more than N/X, so a reasonable pause would be something like 3X/N
-microseconds.  For  example, if you know that you cannot do better than 100000
-files/sec and you have 20 threads running,try a 60/100000 = 600 microsecond
-pause.  Verify that this isn't affecting throughput by reducing the pause and
-running a longer test.
 
 How to measure asynchronous file copy performance
 ---------
@@ -386,7 +412,7 @@ to appear at the file copy destination. To do this, we need to specify a
 separate network sync directory. So for example, to create the original
 directory tree, we could use a command like:
 
- ./smallfile_cli.py --top /mnt/glusterfs-master/smf \
+ # ./smallfile_cli.py --top /mnt/glusterfs-master/smf \
 
     --threads 16 --files 2000 --file-size 1024 \
 
@@ -397,13 +423,13 @@ being geo-replicated to a “slave” volume in a remote site asynchronously. We
 can measure the performance of this process using a command like this, where
 /mnt/glusterfs-slave is a read-only mountpoint accessing the slave volume.
 
- ./smallfile_cli.py --top /mnt/glusterfs-slave/smf \
+ # ./smallfile_cli.py --top /mnt/glusterfs-slave/smf \
 
-   --threads 16 --files 2000 --file-size 1024 \
+     --threads 16 --files 2000 --file-size 1024 \
 
-   --operation await-create –incompressible Y
+     --operation await-create –incompressible Y
 
-   --network-sync-dir /tmp/other
+     --network-sync-dir /tmp/other
 
 Requirements:
 
@@ -412,32 +438,6 @@ Requirements:
 * The first command must use the –record-ctime-size Y option so that the await-create operation knows when the original file was created and how big it was.
 
 How does this work? The first command records information in a user-defined xattr for each file so that the second command, the await-create operation can calculate time required to copy the file, which is recorded as a “response time”, and so that it knows that the entire file reached the destination.
-
-Results
-=======
-
-All tests display a "files/sec" result.  If the test performs reads or writes,
-then a "MB/sec" data transfer rate and an "IOPS" result (i.e. total read or
-write calls/sec) are also displayed.  Each thread participating in the test
-keeps track of total number of files and I/O requests that it processes during
-the test measurement interval.  These results are rolled up per host if it is a
-single-host test.  For a multi-host test, the per-thread results for each host
-are saved in a file within the --top directory, and the test master then reads
-in all of the saved results from its slaves to compute the aggregate result
-across all client hosts.  The percentage of requested files which were
-processed in the measurement interval is also displayed, and if the number is
-lower than a threshold (default 70%) then an error is raised.
-
-response times for operations on each file are saved by thread in .csv form in
-the shared directory.  For example, you can turn these into an X-Y scatterplot so that you can see how response time varies over time.   For example:
-
- python smallfile_cli.py --response-times Y
-
- ls -ltr /var/tmp/rsptimes\*.csv
-
-You should see 1 .csv file per thread.  These files can be loaded into any
-spreadsheet application and graphed.  An x-y scatterplot can be useful to see
-changes over time in response time.
 
 Comparable Benchmarks
 ==============
