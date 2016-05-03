@@ -73,7 +73,7 @@ distributed test.
 
 To see what parameters are supported by smallfile_cli.py, do 
 
- python smallfile_cli.py -h
+    # python smallfile_cli.py -h
 
 Boolean true/false parameters can be set to either Y
 (true) or N (false). Every command consists of a sequence of parameter
@@ -167,17 +167,14 @@ beforehand)
 For example, if you want to run smallfile_cli.py on 1 host with 8 threads
 each creating 2 GB of 1-MiB files, you can use these options:
 
-  # python smallfile_cli.py --operation create --threads 8 \
-
-   --file-size 1024 --files 2048 --top /mnt/gfs/smf
+    # python smallfile_cli.py --operation create --threads 8 \  
+       --file-size 1024 --files 2048 --top /mnt/gfs/smf
 
 To run a 4-host test doing same thing:
 
-  # python smallfile_cli.py --operation create --threads 8 \
-
-   --file-size 1024 --files 2048 --top /mnt/gfs/smf \
-
-   --host-set host1,host2,host3,host4 
+    # python smallfile_cli.py --operation create --threads 8 \  
+       --file-size 1024 --files 2048 --top /mnt/gfs/smf \  
+       --host-set host1,host2,host3,host4 
 
 Errors encountered by worker threads will be saved in /var/tmp/invoke-N.log where N is the thread number. After each test, a summary of thread results is displayed, and overall test results are aggregated for you, in three ways:
 
@@ -189,11 +186,11 @@ Users should never need to run smallfile.py -- this is the python class which
 implements the workload generator. Developers can run this module to invoke its
 unit test however:
 
-  # python smallfile.py 
+    # python smallfile.py 
 
 To run just one unit test module, for example:
 
-  # python -m unittest smallfile.Test.test_c3_Symlink
+    # python -m unittest smallfile.Test.test_c3_Symlink
 
 Results
 =======
@@ -213,8 +210,8 @@ lower than a threshold (default 70%) then an error is raised.
 response times for operations on each file are saved by thread in .csv form in
 the shared directory.  For example, you can turn these into an X-Y scatterplot so that you can see how response time varies over time.   For example:
 
-  # python smallfile_cli.py --response-times Y
-  # ls -ltr /var/tmp/rsptimes\*.csv
+    # python smallfile_cli.py --response-times Y
+    # ls -ltr /var/tmp/rsptimes\*.csv
 
 You should see 1 .csv file per thread.  These files can be loaded into any
 spreadsheet application and graphed.  An x-y scatterplot can be useful to see
@@ -294,11 +291,11 @@ command to launch smallfile_remote.py in the same way that would happen with
 ssh on non-Windows tests. The command-line parameters on each Windows host
 would be something like this:
 
-  start python launch_smf_host.py –shared z:\smf\network_shared –as-host %hostname%
+    start python launch_smf_host.py –shared z:\smf\network_shared –as-host %hostname%
 
 Then from the test driver, you could run specifying your hosts:
 
-  python smallfile_cli.py –top z:\smf –host-set gprfc023,gprfc024
+    python smallfile_cli.py –top z:\smf –host-set gprfc023,gprfc024
 
 
 Use with non-networked filesystems
@@ -388,7 +385,7 @@ there is a file size distribution with a majority of small files and a lesser
 number of larger files. This benchmark supports use of the random exponential
 distribution to approximate that behavior. If you specify
 
- --file-size-distribution exponential --file-size S
+     --file-size-distribution exponential --file-size S
 
 The meaning of the –file-size parameter changes to the maximum file size (S
 KB), and the mean file size becomes S/8. All file sizes are rounded down to the
@@ -413,24 +410,19 @@ to appear at the file copy destination. To do this, we need to specify a
 separate network sync directory. So for example, to create the original
 directory tree, we could use a command like:
 
-  # ./smallfile_cli.py --top /mnt/glusterfs-master/smf \
-
-    --threads 16 --files 2000 --file-size 1024 \
-
-    --operation create –incompressible Y --record-ctime-size Y
+    # ./smallfile_cli.py --top /mnt/glusterfs-master/smf \  
+        --threads 16 --files 2000 --file-size 1024 \  
+        --operation create –incompressible Y --record-ctime-size Y
 
 Suppose that this mountpoint is connected to a Gluster “master” volume which is
 being geo-replicated to a “slave” volume in a remote site asynchronously. We
 can measure the performance of this process using a command like this, where
 /mnt/glusterfs-slave is a read-only mountpoint accessing the slave volume.
 
-  # ./smallfile_cli.py --top /mnt/glusterfs-slave/smf \
-
-     --threads 16 --files 2000 --file-size 1024 \
-
-     --operation await-create –incompressible Y
-
-     --network-sync-dir /tmp/other
+    # ./smallfile_cli.py --top /mnt/glusterfs-slave/smf \  
+         --threads 16 --files 2000 --file-size 1024 \  
+         --operation await-create –incompressible Y \  
+         --network-sync-dir /tmp/other
 
 Requirements:
 
