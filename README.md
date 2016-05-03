@@ -29,7 +29,7 @@ of large-file workloads, and borrows concepts from iozone.
 and Ric Wheeler's fs_mark.  It was developed by Ben England starting in March 2009.
 
 What it can do
-----------
+========
 
 * multi-host - manages workload generators on multiple hosts
 * aggregates throughput - for entire set of hosts
@@ -49,7 +49,7 @@ both python 2.7 and python 3 are supported.   Limited support is available for
 pypy.
 
 Restrictions
---------
+-----------
 
 * for a multi-host test, all workload generators and the test driver must provide access to the same shared directory
 * does not support mixed workloads (mixture of different operation types)
@@ -63,7 +63,7 @@ Restrictions
 * Have only tested Windows XP and Windows 7, but any Win32-compatible Windows would probably work with this.
 
 How to run
------
+============
 
 You must have password-less ssh access between the test driver node and the
 workload generator hosts if you want to run a distributed (multi-host) test.
@@ -192,5 +192,379 @@ unit test however:
 To run just one unit test module, for example:
 
  # python -m unittest smallfile.Test.test_c3_Symlink
+
+Use with distributed filesystems
+---------
+
+With distributed filesystems, it is necessary to have multiple hosts
+simultaneously applying workload to measure the performance of a distributed
+filesystem. The –host-set parameter lets you specify a comma-separated list of
+hosts to use.
+
+For any distributed filesystem test, there must be a single directory which is
+shared across all hosts, both test driver and worker hosts, that can be used to
+pass test parameters, pass back results, and coordinate activity across the
+hosts. This is referred to below as the “shared directory” in what follows. By
+default this is the network_shared/ subdirectory of the –top directory, but you
+can override this default by specifying the –network-sync-dir directory
+parameter, see the next section for why this is useful.
+
+Some distributed filesystems, such as NFS and Gluster, have relaxed,
+eventual-consistency caching of directories; this will cause problems for the
+shared directory. To work around this problem, you can use a separate NFS
+mountpoint exported from a Linux NFS server, mounted with the option actimeo=1
+(to limit duration of time NFS will cache directory entries and metadata). You
+then reference this mountpoint using the –network-sync-dir option of smallfile.
+For example:
+
+ mount -t nfs -o actimeo=1 your-linux-server:/your/nfs/export /mnt/nfs
+
+ ./smallfile_cli.py –top /your/distributed/filesystem \
+    –network-sync-dir /mnt/nfs/smf-shared
+
+For non-Windows tests, the user must set up password-less ssh between the test
+driver and the host. If security is an issue, a non-root username can be used
+throughout, since smallfile requires no special privileges. Edit the
+$HOME/.ssh/authorized_keys file to contain the public key of the account on the
+test driver. The test driver will bypass the .ssh/known_hosts file by using -o
+StrictHostKeyChecking=no option in the ssh command.
+
+For Windows tests, each worker host must be running the launch_smf_host.py
+program that polls the shared network directory for a file that contains the
+command to launch smallfile_remote.py in the same way that would happen with
+ssh on non-Windows tests. The command-line parameters are:
+
+ start python launch_smf_host.py –shared z:\smf\network_shared –as-host gprfc023
+
+ python smallfile_cli.py –top z:\smf –host-set gprfc023
+
+
+Use with non-networked filesystems
+-----------
+
+There are cases where you want to use a distributed filesystem test on
+host-local filesystems. One such example is virtualization, where the “local”
+filesystem is really layered on a virtual disk image which may be stored in a
+network filesystem. The benchmark needs to share certain files across hosts to
+return results and synchronize threads. In such a case, you specify the
+–network-sync-dir directory-pathname parameter to have the benchmark use a
+directory in some shared filesystem external to the test directory (specified
+with –top parameter). By default, if this parameter is not specified then the
+shared directory will be the subdirectory network-dir underneath the directory
+specified with the –top parameter.
+
+Use of subdirectories
+----------
+
+Before a test even starts, the smallfile benchmark ensures that the
+directories needed by that test already exist (there is a specific operation
+type for testing performance of subdirectory creation and deletion). If the top
+directory (specified by –top parameter) is D, then the top per-thread directory
+is D/host/dTT where TT is a 2-digit thread number and “host” is the hostname.
+If the test is not a distributed test, then it's just whatever host the
+benchmark command was issued on, otherwise it is each of the hosts specified by
+the –host-set parameter. The first F files (where F is the value of the
+–files-per-dir) parameter are placed in this top per-thread directory. If the
+test uses more than F files/thread, then at least one subdirectory from the
+first level of subdirectories must be used; these subdirectories have the path
+T/host/dTT/dNNN where NNN is the subdirectory number. Suppose the value of the
+parameter –subdirs-per-dir is D. Then there are at most D subdirectories of the
+top per-thread directory. If the test requires more than D(F+1) files per
+thread, then a second level of subdirectories will have to be created, with
+pathnames like T/host/dTT/dNNN/dMMM . This process of adding subdirectories
+continues in this fashion until there are sufficient subdirectories to hold all
+the files. The purpose of this approach is to simulate a mixture of directories
+and files, and to not require the user to specify how many levels of
+directories are required.
+
+The use of multiple mountpoints is supported. This features is useful for
+testing NFS, etc.
+
+Note that the test harness does not have to scan the directories to figure out
+which files to read or write – it simply generates the filename sequence
+itself. If you want to test directory scanning speed, use readdir or ls-l
+operations. 
+
+Sharing directories across threads
+---------
+
+Some applications require that many threads, possibly spread across many host
+machines, need to share a set of directories. The --same-dir parameter makes it
+possible for the benchmark to test this situation. By default this parameter is
+set to N, which means each thread has its own non-overlapping directory tree.
+This setting provides the best performance and scalability. However, if the
+user sets this parameter to Y, then the top per-thread directory for all
+threads will be T instead of T/host/dTT as described in preceding section.
+
+Hashing files into directory tree
+----------
+
+For applications which create very large numbers of small files (millions for
+example), it is impossible or at the very least impractical to place them all
+in the same directory, whether or not the filesystem supports so many files in
+a single directory. There are two ways which applications can use to solve this
+problem:
+
+ * insert files into 1 directory at a time – can create I/O and lock contention for the directory metadata
+ * insert files into many directories at the same time – relieves I/O and lock contention for directory metadata, but increases the amount of metadata caching needed to avoid cache misses
+
+The –hash-into-dirs parameter is intended to enable simulation of this latter
+mode of operation. By default, the value of this parameter is N, and in this
+case a smallfile thread will sequentially access directories one at a time. In
+other words, the first D (where D = value of –files-per-dir parameter) files
+will be assigned to the top per-thread directory, then the next D files will be
+assigned to the next per-thread directory, and so on. However, if the
+–hash-into-dirs parameter is set to Y, then the number of the file being
+accessed by the thread will be hashed into the set of directories that are
+being used by this thread. 
+
+Random file size distribution option
+-------------
+
+In real life, users don't create files that all have the same size. Typically
+there is a file size distribution with a majority of small files and a lesser
+number of larger files. This benchmark supports use of the random exponential
+distribution to approximate that behavior. If you specify
+
+ --file-size-distribution exponential --file-size S
+
+The meaning of the –file-size parameter changes to the maximum file size (S
+KB), and the mean file size becomes S/8. All file sizes are rounded down to the
+nearest kilobyte boundary, and the smallest allowed file size is 1 KB. When
+this option is used, the smallfile benchmark saves the seed for each thread's
+random number generator object in a .seed file stored in the TMPDIR directory
+(typically /var/tmp). This allows the file reader to recreate the sequence of
+random numbers used by the file writer to generate file sizes, so that the
+reader knows exactly how big each file should be without asking the file system
+for this information. The append operation works in the same way. All other
+operations are metadata operations and do not require that the file size be
+known in advance.
+
+Avoiding caching effects
+---------
+
+THere are two types of caching effects that we wish to avoid, data caching and
+metadata caching.  If the average object size is sufficiently large, we need
+only be concerned about data caching effects.  In order to avoid data caching
+effects during a large-object read test, the Linux buffer cache on all servers
+must be cleared. In part this is done using the command: "echo 1 >
+/proc/sys/vm/drop_caches" on all hosts.  However, gluster has its own internal
+caches.   To evict all prior data from the cache, the simplest method is to
+just use iozone to write a large amount of data into some files in the gluster
+filesystem, then delete them.  For example, if the gluster 3.2 server caches 1
+GB of data then the amount of data written should be roughly 2 GB/server and
+the number of files used should be roughly 8 times the number of servers.  Use
+of many separate files ensures that this cache eviction data is spread across
+all servers approximately equally. 
+
+
+Use of --pause in multi-thread tests
+---------
+
+In some filesystems, the first thread that starts running will be operating
+at memory speed (example: NFS writes) and can easily finish before other
+threads have a chance to get started.  This immediately invalidates the test.
+To make this less likely, it is possible to insert a per-file delay into each
+thread with the --pause option so that the other threads have a chance to
+participate in the test during the measurement interval.    It is preferable to
+run a longer test instead, because in some cases you might otherwise restrict
+throughput unintentionally.  But if you know that your throughput upper bound
+is X files/sec and you have N threads running, then your per-thread throughput
+should be no more than N/X, so a reasonable pause would be something like 3X/N
+microseconds.  For  example, if you know that you cannot do better than 100000
+files/sec and you have 20 threads running,try a 60/100000 = 600 microsecond
+pause.  Verify that this isn't affecting throughput by reducing the pause and
+running a longer test.
+
+How to measure asynchronous file copy performance
+---------
+
+When we want to measure performance of an asynchronous file copy (example:
+Gluster geo-replication), we can use smallfile to create the original directory
+tree, but then we can use the new await-create operation type to wait for files
+to appear at the file copy destination. To do this, we need to specify a
+separate network sync directory. So for example, to create the original
+directory tree, we could use a command like:
+
+ ./smallfile_cli.py --top /mnt/glusterfs-master/smf \
+
+    --threads 16 --files 2000 --file-size 1024 \
+
+    --operation create –incompressible Y --record-ctime-size Y
+
+Suppose that this mountpoint is connected to a Gluster “master” volume which is
+being geo-replicated to a “slave” volume in a remote site asynchronously. We
+can measure the performance of this process using a command like this, where
+/mnt/glusterfs-slave is a read-only mountpoint accessing the slave volume.
+
+ ./smallfile_cli.py --top /mnt/glusterfs-slave/smf \
+
+   --threads 16 --files 2000 --file-size 1024 \
+
+   --operation await-create –incompressible Y
+
+   --network-sync-dir /tmp/other
+
+Requirements:
+
+* The parameters controlling file sizes, directory tree, and number of files must match in the two commands.
+* The --incompressible option must be set if you want to avoid situation where async copy software can compress data to exceed network bandwidth.
+* The first command must use the –record-ctime-size Y option so that the await-create operation knows when the original file was created and how big it was.
+
+How does this work? The first command records information in a user-defined xattr for each file so that the second command, the await-create operation can calculate time required to copy the file, which is recorded as a “response time”, and so that it knows that the entire file reached the destination.
+
+Results
+=======
+
+All tests display a "files/sec" result.  If the test performs reads or writes,
+then a "MB/sec" data transfer rate and an "IOPS" result (i.e. total read or
+write calls/sec) are also displayed.  Each thread participating in the test
+keeps track of total number of files and I/O requests that it processes during
+the test measurement interval.  These results are rolled up per host if it is a
+single-host test.  For a multi-host test, the per-thread results for each host
+are saved in a file within the --top directory, and the test master then reads
+in all of the saved results from its slaves to compute the aggregate result
+across all client hosts.  The percentage of requested files which were
+processed in the measurement interval is also displayed, and if the number is
+lower than a threshold (default 70%) then an error is raised.
+
+response times for operations on each file are saved by thread in .csv form in
+the shared directory.  For example, you can turn these into an X-Y scatterplot so that you can see how response time varies over time.   For example:
+
+ python smallfile_cli.py --response-times Y
+
+ ls -ltr /var/tmp/rsptimes\*.csv
+
+You should see 1 .csv file per thread.  These files can be loaded into any
+spreadsheet application and graphed.  An x-y scatterplot can be useful to see
+changes over time in response time.
+
+Comparable Benchmarks
+==============
+
+There are many existing performance test benchmarks. I have tried just about
+all the ones that I've heard of. Here are the ones I have looked at, I'm sure
+there are many more that I failed to include here.
+
+* Bonnie++ -- works well for a single host, but you cannot generate load from multiple hosts because the benchmark will not synchronize its activities, so different phases of the benchmark will be running at the same time, whether you want them to or not.
+
+* iozone -- this is a great tool for large-file testing, but it can only do 1 file/thread in its current form.
+
+* postmark -- works fine for a single client, not as useful for multi-client tests
+
+* grinder -- has not to date been useful for filesystem testing, though it works well for web services testing.
+
+* JMeter – has been used successfully by others in the past.
+
+* fs_mark -- Ric Wheeler's filesystem benchmark, is very good at creating files
+
+* fio -- Linux test tool -- broader coverage of Linux system calls particularly around async. and direct I/O.  Now has multi-host capabilities
+
+* diskperf – open-source tool that generates limited small-file workloads for a single host.
+
+* dbench – developed by samba team
+
+* SPECsfs – not open-source, but "netmist" component has some mixed-workload, multi-host workload generation capabilities, configured similarly to iozone, but with a wider range of workloads.
+
+Design principles
+=============
+
+A cluster-aware test tool ideally should:
+
+* start threads on all hosts at same time
+* stop measurement of throughput for all threads at the same time
+* be easy to use in all file system environments
+* be highly portable and be trivial to install
+* have very low overhead
+* not require threads to synchronize (be embarrassingly parallel) 
+
+Although there may be some useful tests that involve thread synchronization or contention, we don't want the tool to force thread synchronization or contention for resources. 
+
+In order to run prolonged small-file tests (which is a requirement for scalability to very large clusters), each thread has to be able to use more than one directory.   Since some filesystems perform very differently as the files/directory ratio increases, and most applications and users do not rely on having huge file/directory ratios, this is also important for testing the filesystem with a realistic use case.  This benchmark does something similar to Ric Wheeler's fs_mark benchmark with multiple directory levels.   This benchmark imposes no hard limit on how many directories can be used and how deep the directory tree can go.  Instead, it creates directories according to these constraints:
+
+* files (and directories) are placed as close to the root of the directory hierarchy as possible
+* no directory contains more than the number of files specified in the --files-per-dir test parameter
+* no directory contains more than number of subdirectories specified in the --dirs-per-dir test parameter
+
+
+Synchronization
+--------------
+
+A single directory is used to synchronize the threads and hosts. This may seem
+problematic, but we assume here that the file system is not very busy when the
+test is run (otherwise why would you run a load test on it?). So if a file is
+created by one thread, it will quickly be visible on the others, as long as the
+filesystem is not heavily loaded.
+
+If it's a single-host test, any directory is sharable amongst threads, but in a
+multi-host test only a directory shared by all participating hosts can be used.
+If the –top test directory is in a network-accessible file system (could be NFS
+or Gluster for example), then the synchronization directory is by default in
+the network_shared subdirectory by default and need not be specified. If the
+–top directory is in a host-local filesystem, then the –network-sync-dir option
+must be used to specify the synchronization directory. When a network directory
+is used, change propagation between hosts cannot be assumed to occur in under
+two seconds.
+
+We use the concept of a "starting gate" -- each thread does all preparation for
+test, then waits for a special file, the "starting gate", to appear in the
+shared area. When a thread arrives at the starting gate, it announces its
+arrival by creating a filename with the host and thread ID embedded in it. When
+all threads have arrived, the controlling process will see all the expected
+"thread ready" files, and will then create the starting gate file. When the
+starting gate is seen, the thread pauses for a couple of seconds, then
+commences generating workload. This initial pause reduces time required for all
+threads to see the starting gate, thereby minimizing chance of some threads
+being unable to start on time. Synchronous thread startup reduces the "warmup
+time" of the system significantly.
+
+We also need a checkered flag (borrowing from car racing metaphor). Once test
+starts, each thread looks for a stonewall file in the synchronization
+directory. If this file exists, then the thread stops measuring throughput at
+this time (but can (and does by default) optionally continue to perform
+requested number of operations). Consequently throughput measurements for each
+thread may be added to obtain an accurate aggregate throughput number. This
+practice is sometimes called "stonewalling" in the performance testing world.
+
+Synchronization operations in theory do not require the worker threads to read
+the synchronization directory. For distributed tests, the test driver host has
+to check whether the various per-host synchronization files exist, but this
+does not require a readdir operation. The test driver does this check in such a
+way that the number of file lookups is only slightly more than the number of
+hosts, and this does not require reading the entire directory, only doing a set
+of lookup operations on individual files, so it's O(n) scalable as well.
+
+The bad news is that some filesystems do not synchronize directories quickly
+without an explicit readdir() operation, so we are at present doing
+os.listdir() as a workaround -- this may have to be revisited for very large
+tests.
+
+
+How test parameters are transmitted to worker threads
+--------
+
+The results of the command line parse are saved in a smf_test_params object and
+stored in a python pickle file, which is a representation independent of CPU
+architecture or operating system. The file is placed in the shared network
+directory. Remote worker processes are invoked via the smallfile_remote.py
+command and read this file to discover test parameters.
+
+How remote worker threads are launched
+----------
+
+For Linux or other non-Windows environments, the test driver launches worker threads using parallel ssh commands to invoke the smallfile_remote.py program, and when this program exits, that is how the test driver discovers that the remote threads on this host have completed.
+
+For Windows environments, ssh usage is more problematic. Sshd requires installation of cygwin, a Windows app that emulates a Linux-like environment, but we really want to test with native win32 environment instead. So a different launching method is used (and this method works on non-Windows environments as well). 
+
+How results are returned to master process
+-----------------
+
+For either single-host or multi-host tests, each test thread is implemented as
+a smf_invocation object and all thread state is kept there.  Results are
+returned by using python "pickle" files to serialize the state of these
+per-thread objects containing details of each thread's progress during the
+test.  The pickle files are stored in the shared synchronization directory.
+
+
 
 
