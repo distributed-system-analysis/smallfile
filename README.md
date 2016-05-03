@@ -293,11 +293,11 @@ command to launch smallfile_remote.py in the same way that would happen with
 ssh on non-Windows tests. The command-line parameters on each Windows host
 would be something like this:
 
- > start python launch_smf_host.py –shared z:\smf\network_shared –as-host %hostname%
+ start python launch_smf_host.py –shared z:\smf\network_shared –as-host %hostname%
 
 Then from the test driver, you could run specifying your hosts:
 
- > python smallfile_cli.py –top z:\smf –host-set gprfc023,gprfc024
+ python smallfile_cli.py –top z:\smf –host-set gprfc023,gprfc024
 
 
 Use with non-networked filesystems
