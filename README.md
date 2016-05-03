@@ -81,85 +81,85 @@ name-value pairs with the format --name value .
 
 The parameters are:
 
-# --operation -- operation name, one of the following: 
-## create -- create a file and write data to it
-## append -- open an existing file and append data to it 
-## delete -- delete a file 
-## rename -- rename a file 
-## delete_renamed -- delete a file that had previously been renamed
-## read -- read an existing file 
-## stat -- just read metadata from an existing file 
-## chmod -- change protection mask for file
-## setxattr -- set extended attribute values in each file 
-## getxattr - read extended attribute values in each file 
-## symlink -- create a symlink pointing to each file (create must be run
+ * --operation -- operation name, one of the following: 
+ ** create -- create a file and write data to it
+ ** append -- open an existing file and append data to it 
+ ** delete -- delete a file 
+ ** rename -- rename a file 
+ ** delete_renamed -- delete a file that had previously been renamed
+ ** read -- read an existing file 
+ ** stat -- just read metadata from an existing file 
+ ** chmod -- change protection mask for file
+ ** setxattr -- set extended attribute values in each file 
+ ** getxattr - read extended attribute values in each file 
+ ** symlink -- create a symlink pointing to each file (create must be run
 beforehand) 
-## mkdir -- create a subdirectory with 1 file in it 
-## rmdir -- remove a subdirectory and its 1 file
-## readdir – scan directories only, don't read files or their metadata
-## ls-l – scan directories and read basic file metadata
-## cleanup -- delete any pre-existing files from a previous run 
-## swift-put – simulates OpenStack Swift behavior when doing PUT operation
-## swift-get -- simulates OpenStack Swift behavior for each GET operation. 
-# --top -- top-level directory, all file accesses are done inside this
+ ** mkdir -- create a subdirectory with 1 file in it 
+ ** rmdir -- remove a subdirectory and its 1 file
+ ** readdir – scan directories only, don't read files or their metadata
+ ** ls-l – scan directories and read basic file metadata
+ ** cleanup -- delete any pre-existing files from a previous run 
+ ** swift-put – simulates OpenStack Swift behavior when doing PUT operation
+ ** swift-get -- simulates OpenStack Swift behavior for each GET operation. 
+ * --top -- top-level directory, all file accesses are done inside this
   directory tree. If you wish to use multiple mountpoints,provide a list of
   top-level directories separated by comma (no whitespace).
-# --host-set -- comma-separated set of hosts used for this test, no domain
+ * --host-set -- comma-separated set of hosts used for this test, no domain
   names allowed. Default: non-distributed test.
-# --files -- how many files should each thread process? 
-# --threads -- how many workload generator threads should each invocation_cli
+ * --files -- how many files should each thread process? 
+ * --threads -- how many workload generator threads should each invocation_cli
   process create? 
-# --file-size -- total amount of data accessed per file.   If zero then no
+ * --file-size -- total amount of data accessed per file.   If zero then no
   reads or writes are performed. 
-# --file-size-distribution – only supported value today is exponential.
+ * --file-size-distribution – only supported value today is exponential.
   Default: fixed file size.
-# --record-size -- record size in KB, how much data is transferred in a single
+ * --record-size -- record size in KB, how much data is transferred in a single
   read or write system call.  If 0 then it is set to the minimum of the file
   size and 1-MB record size limit. Default: 0
-# --files-per-dir -- maximum number of files contained in any one directory.
+ * --files-per-dir -- maximum number of files contained in any one directory.
   Default: 200
-# --dirs-per-dir -- maximum number of subdirectories contained in any one
+ * --dirs-per-dir -- maximum number of subdirectories contained in any one
   directory. Default: 20
-# --hash-into-dirs – if Y then assign next file to a directory using a hash
+ * --hash-into-dirs – if Y then assign next file to a directory using a hash
   function, otherwise assign next –files-per-dir files to next directory.
   Default: N
-# --permute-host-dirs – if Y then have each host process a different
+ * --permute-host-dirs – if Y then have each host process a different
   subdirectory tree than it otherwise would (see below for directory tree
   structure). Default: N
-# --same-dir -- if Y then threads will share a single directory. Default: N
-# --network-sync-dir – don't need to specify unless you run a multi-host test
+ * --same-dir -- if Y then threads will share a single directory. Default: N
+ * --network-sync-dir – don't need to specify unless you run a multi-host test
   and the –top parameter points to a non-shared directory (see discussion
   below). Default: network_shared subdirectory under –top dir.
-# --xattr-size -- size of extended attribute value in bytes (names begin with
+ * --xattr-size -- size of extended attribute value in bytes (names begin with
   'user.smallfile-') 
-# --xattr-count -- number of extended attributes per file
-# --prefix -- a string prefix to prepend to files (so they don't collide with
+ * --xattr-count -- number of extended attributes per file
+ * --prefix -- a string prefix to prepend to files (so they don't collide with
 previous runs for example)
-# --suffix -- a string suffix to append to files (so they don't collide with
+ * --suffix -- a string suffix to append to files (so they don't collide with
   previous runs for example)
-# --incompressible – (default N) if Y then generate a pure-random file that
+ * --incompressible – (default N) if Y then generate a pure-random file that
   will not be compressible (useful for tests where intermediate network or file
   copy utility attempts to compress data
-# --record-ctime-size -- default N, if Y then label each created file with an
+ * --record-ctime-size -- default N, if Y then label each created file with an
   xattr containing a time of creation and a file size. This will be used by
   –await-create operation to compute performance of asynchonous file
   replication/copy.
-# --finish -- if Y, thread will complete all requested file operations even if
+ * --finish -- if Y, thread will complete all requested file operations even if
   measurement has finished. Default: Y
-# --stonewall -- if Y then thread will measure throughput as soon as it detects
+ * --stonewall -- if Y then thread will measure throughput as soon as it detects
   that another thread has finished. Default: N
-# --verify-read – if Y then smallfile will verify read data is correct.
+ * --verify-read – if Y then smallfile will verify read data is correct.
   Default: Y
-# --response-times – if Y then save response time for each file operation in a
+ * --response-times – if Y then save response time for each file operation in a
   rsptimes\*csv file in the shared network directory. Record format is
   operation-type, start-time, response-time. The operation type is included so
   that you can run different workloads at the same time and easily merge the
   data from these runs. The start-time field is the time that the file
   operation started, down to microsecond resolution. The response time field is
   the file operation duration down to microsecond resolution.
-# --remote-pgm-dir – don't need to specify this unless the smallfile software
+ * --remote-pgm-dir – don't need to specify this unless the smallfile software
   lives in a different directory on the target hosts and the test-driver host. 
-# --pause -- integer (microseconds) each thread will wait before starting next
+ * --pause -- integer (microseconds) each thread will wait before starting next
   file. Default: 0
 
 For example, if you want to run smallfile_cli.py on 1 host with 8 threads
