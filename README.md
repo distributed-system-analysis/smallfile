@@ -176,9 +176,9 @@ To run a 4-host test doing same thing:
 
 Errors encountered by worker threads will be saved in /var/tmp/invoke-N.log where N is the thread number. After each test, a summary of thread results is displayed, and overall test results are aggregated for you, in three ways:
 
-# files/sec – most relevant for smaller file sizes
-# IOPS -- application I/O operations per sec, rate of read()/write()
-# MB/s -- megabytes/sec, data transfer rate
+ * files/sec – most relevant for smaller file sizes
+ * IOPS -- application I/O operations per sec, rate of read()/write()
+ * MB/s -- megabytes/sec, data transfer rate
 
 Users should never need to run smallfile.py -- this is the python class which
 implements the workload generator. Developers can run this module to invoke its
