@@ -82,7 +82,9 @@ name-value pairs with the format --name value .
 The parameters are:
 
 * --operation -- operation name, one of the following: 
+
 ** create -- create a file and write data to it
+
 ** append -- open an existing file and append data to it 
 ** delete -- delete a file 
 ** rename -- rename a file 
