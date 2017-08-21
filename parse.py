@@ -13,17 +13,7 @@ import os
 import smallfile
 from smallfile import SmallfileWorkload, NOTOK
 import smf_test_params
-
-version = '3.0'  # bumped to 3 since major code changes for PEP8 and python3
-
-
-# convert boolean value into 'Y' or 'N'
-
-def bool2YN(boolval):
-    if boolval:
-        return 'Y'
-    return 'N'
-
+from smf_test_params import bool2YN
 
 def usage(msg):  # call if CLI syntax error or invalid parameter
     opnames = '  --operation '
@@ -126,24 +116,13 @@ def parse():
     # store as much as you can in SmallfileWorkload object
     # so per-thread invocations inherit
 
-    inv = SmallfileWorkload()
-
-    # parameters that can't be stored in a SmallfileWorkload
-    # describe how the SmallfileWorkload threads work together
-
-    prm_thread_count = 2
-    prm_host_set = None
-    prm_slave = False
-    prm_permute_host_dirs = False
-    prm_remote_pgm_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
-    prm_top_dirs = None
-    prm_network_sync_dir = None
+    test_params = smf_test_params.smf_test_params()
+    inv = test_params.master_invoke  # for convenience
 
     # parse command line
 
     argc = len(sys.argv)
 
-    pass_on_prm_list = ''  # parameters passed to remote hosts if needed
     if argc == 1:
         print('''
 for additional help add the parameter "--help" to the command
@@ -168,7 +147,7 @@ for additional help add the parameter "--help" to the command
             inv.iterations = int(val)
         elif prm == 'threads':
             chkPositiveInt(val, rawprm)
-            prm_thread_count = int(val)
+            test_params.thread_count = int(val)
         elif prm == 'files-per-dir':
             chkPositiveInt(val, rawprm)
             inv.files_per_dir = int(val)
@@ -186,6 +165,7 @@ for additional help add the parameter "--help" to the command
                 usage('unrecognized file size distribution: %s' % val)
             inv.filesize_distr = \
                 SmallfileWorkload.fsdistr_random_exponential
+            test_params.size_distribution = 'random exponential'
         elif prm == 'xattr-size':
             chkNonNegInt(val, rawprm)
             inv.xattr_size = int(val)
@@ -203,8 +183,8 @@ for additional help add the parameter "--help" to the command
                 usage('unrecognized operation name: %s' % val)
             inv.opname = val
         elif prm == 'top':
-            prm_top_dirs = [os.path.abspath(p) for p in val.split(',')]
-            for p in prm_top_dirs:
+            test_params.top_dirs = [os.path.abspath(p) for p in val.split(',')]
+            for p in test_params.top_dirs:
                 if not os.path.isdir(p):
                     usage('you must ensure that shared directory' +
                           ('%s ' % p) +
@@ -222,7 +202,7 @@ for additional help add the parameter "--help" to the command
         elif prm == 'record-ctime-size':
             inv.record_ctime_size = str2bool(val, rawprm)
         elif prm == 'permute-host-dirs':
-            prm_permute_host_dirs = str2bool(val, rawprm)
+            test_params.permute_host_dirs = str2bool(val, rawprm)
             pass_on_prm = ''
         elif prm == 'response-times':
             inv.measure_rsptimes = str2bool(val, rawprm)
@@ -238,129 +218,61 @@ for additional help add the parameter "--help" to the command
             inv.log_to_stderr = str2bool(val, rawprm)
         elif prm == 'host-set':
             if os.path.isfile(val):
-                f = open(val, 'r')
-                prm_host_set = [record.strip() for record in
-                                f.readlines()]
+                with open(val, 'r') as f:
+                    test_params.host_set = [
+                        record.strip() for record in f.readlines()]
             else:
-                prm_host_set = val.split(',')
-                if len(prm_host_set) < 2:
-                    prm_host_set = val.strip().split()
-                if len(prm_host_set) == 0:
+                test_params.host_set = val.split(',')
+                if len(test_params.host_set) < 2:
+                    test_params.host_set = val.strip().split()
+                if len(test_params.host_set) == 0:
                     usage('host list must be non-empty when ' +
                           '--host-set option used')
             pass_on_prm = ''
         elif prm == 'remote-pgm-dir':
-            prm_remote_pgm_dir = val
+            test_params.remote_pgm_dir = val
         elif prm == 'network-sync-dir':
-            prm_network_sync_dir = val
+            test_params.network_sync_dir = val
         elif prm == 'slave':
             # --slave should not be used by end-user
-            prm_slave = str2bool(val, rawprm)
+            test_params.is_slave = str2bool(val, rawprm)
         elif prm == 'as-host':
             # --ashost should not be used by end-user
             inv.onhost = smallfile.get_hostname(val)
         else:
             usage('unrecognized parameter name: %s' % prm)
 
-        # parameter options that workload generators will need
-
-        pass_on_prm_list += ' ' + pass_on_prm
-
     # validate parameters further now that we know what they all are
 
     if inv.record_sz_kb > inv.total_sz_kb and inv.total_sz_kb != 0:
         usage('record size cannot exceed file size')
 
-    if prm_top_dirs:
-        for d in prm_top_dirs:
+    if inv.record_sz_kb == 0 and inv.verbose:
+        print(('record size not specified, ' +
+               'large files will default to record size %d KB') %
+               (SmallfileWorkload.biggest_buf_size / inv.BYTES_PER_KB))
+
+    if test_params.top_dirs:
+        for d in test_params.top_dirs:
             if len(d) < 6:
                 usage('directory less than 6 characters, ' +
                       'cannot use top of filesystem, too dangerous')
-    if prm_top_dirs:
-        inv.set_top(prm_top_dirs)
+    if test_params.top_dirs:
+        inv.set_top(test_params.top_dirs)
     else:
-        prm_top_dirs = inv.top_dirs
-    if prm_network_sync_dir:
-        inv.network_dir = prm_network_sync_dir
+        test_params.top_dirs = inv.top_dirs
+    if test_params.network_sync_dir:
+        inv.network_dir = test_params.network_sync_dir
     else:
-        prm_network_sync_dir = inv.network_dir
+        test_params.network_sync_dir = inv.network_dir
     inv.starting_gate = os.path.join(inv.network_dir, 'starting_gate.tmp')
 
     if inv.iterations < 10:
         inv.stonewall = False
 
-    # display results of parse so user knows what default values are
-    # most important parameters come first
-    # display host set first because this can be very long,
-    # this way the rest of the parameters appear together on the screen
-
-    size_distribution_string = 'fixed'
-    if inv.filesize_distr == SmallfileWorkload.fsdistr_random_exponential:
-        size_distribution_string = 'random exponential'
-
-    prm_list = [
-        ('hosts in test', '%s' % prm_host_set),
-        ('top test directory(s)', str(prm_top_dirs)),
-        ('operation', inv.opname),
-        ('files/thread', '%d' % inv.iterations),
-        ('threads', '%d' % prm_thread_count),
-        ('record size (KB, 0 = maximum)', '%d' % inv.record_sz_kb),
-        ('file size (KB)', '%d' % inv.total_sz_kb),
-        ('file size distribution', size_distribution_string),
-        ('files per dir', '%d' % inv.files_per_dir),
-        ('dirs per dir', '%d' % inv.dirs_per_dir),
-        ('threads share directories?', '%s'
-         % bool2YN(inv.is_shared_dir)),
-        ('filename prefix', inv.prefix),
-        ('filename suffix', inv.suffix),
-        ('hash file number into dir.?', bool2YN(inv.hash_to_dir)),
-        ('fsync after modify?', bool2YN(inv.fsync)),
-        ('pause between files (microsec)', '%d'
-         % inv.pause_between_files),
-        ('finish all requests?', '%s' % bool2YN(inv.finish_all_rq)),
-        ('stonewall?', '%s' % bool2YN(inv.stonewall)),
-        ('measure response times?', '%s'
-         % bool2YN(inv.measure_rsptimes)),
-        ('verify read?', '%s' % bool2YN(inv.verify_read)),
-        ('verbose?', inv.verbose),
-        ('log to stderr?', inv.log_to_stderr),
-        ]
-    if smallfile.xattr_installed:
-        prm_list.extend([('ext.attr.size', '%d' % inv.xattr_size),
-                        ('ext.attr.count', '%d' % inv.xattr_count)])
-    if prm_host_set:
-        prm_list.extend([('permute host directories?', '%s'
-                        % bool2YN(prm_permute_host_dirs))])
-        if prm_remote_pgm_dir:
-            prm_list.append(('remote program directory',
-                            prm_remote_pgm_dir))
-        if prm_network_sync_dir:
-            prm_list.append(('network thread sync. dir.',
-                            prm_network_sync_dir))
-    if inv.record_sz_kb == 0 and inv.verbose:
-        print(('record size not specified, ' +
-               'large files will default to record size %d KB') %
-              (SmallfileWorkload.biggest_buf_size / inv.BYTES_PER_KB))
-    if not prm_slave:
-        print('smallfile version %s' % version)
+    if not test_params.is_slave:
+        prm_list = test_params.human_readable()
         for (prm_name, prm_value) in prm_list:
             print('%40s : %s' % (prm_name, prm_value))
 
-    # construct command to run remote slave process using CLI parameters
-
-    if not prm_remote_pgm_dir:
-        prm_remote_pgm_dir = os.getcwd()
-
-    # "inv" contains all per-thread parameters
-
-    params = smf_test_params.smf_test_params(
-        prm_host_set,
-        prm_thread_count,
-        inv,
-        prm_remote_pgm_dir,
-        prm_top_dirs,
-        prm_network_sync_dir,
-        prm_slave,
-        prm_permute_host_dirs,
-        )
-    return params
+    return test_params
