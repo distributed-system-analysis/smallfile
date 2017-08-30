@@ -24,8 +24,10 @@ class smf_test_params:
                  network_sync_dir = None, 
                  slave = False, 
                  size_distribution = 'fixed',
-                 permute_host_dirs = False):
+                 permute_host_dirs = False,
+                 output_json = None):
 
+        self.output_json = output_json
         self.version = '3.1'
         self.as_host = None
         self.host_set = host_set
@@ -56,11 +58,13 @@ class smf_test_params:
             self.host_startup_timeout += 5 + dirs * len(self.host_set) // 3
 
     def __str__(self):
-        fmt = 'smf_test_params: as_host=%s host_set=%s '
+        fmt = 'smf_test_params: version=%s json=%s as_host=%s host_set=%s '
         fmt += 'thread_count=%d remote_pgm_dir=%s'
         fmt += 'slave=%s permute_host_dirs=%s startup_timeout=%d '
         fmt += 'host_timeout=%d smf_invoke=%s '
         return fmt % (
+            str(self.version),
+            str(self.output_json),
             str(self.as_host),
             str(self.host_set),
             self.thread_count,
@@ -76,6 +80,7 @@ class smf_test_params:
     # most important parameters come first
     # display host set first because this can be very long,
     # this way the rest of the parameters appear together on the screen
+    # this function returns a list of (name, value) pairs for each param.
 
     def human_readable(self):
         inv = self.master_invoke
@@ -121,3 +126,47 @@ class smf_test_params:
                                 self.network_sync_dir))
         return prm_list
 
+    # add any parameters that might be relevant to 
+    # data analysis here, can skip parameters that
+    # don't affect test results
+    # don't convert to JSON here, so that caller
+    # can insert test results before conversion
+
+    def to_json(self):
+
+        # put params a level down so results can be 
+        # inserted at same level
+
+        json_dictionary = {}
+        p = {}
+        json_dictionary['params'] = p
+
+        inv = self.master_invoke
+
+        # put host-set at top because it can be very long
+        # and we want rest of parameters to be grouped together
+
+        p['host-set'] = self.host_set
+        p['version'] = self.version
+        p['top'] = ','.join(self.top_dirs)
+        p['operation'] = inv.opname
+        p['files-per-thread'] = inv.iterations
+        p['threads'] = self.thread_count
+        p['file-size'] = inv.total_sz_kb
+        p['file-size-distr'] = self.size_distribution
+        p['files-per-dir'] = inv.files_per_dir
+        p['share-dir'] = bool2YN(inv.is_shared_dir)
+        p['fname-prefix'] = inv.prefix
+        p['fname-suffix'] = inv.suffix
+        p['hash-to-dir'] = bool2YN(inv.hash_to_dir)
+        p['fsync-after-modify'] = bool2YN(inv.fsync)
+        p['pause-between-files'] = str(inv.pause_between_files)
+        p['finish-all-requests'] = bool2YN(inv.finish_all_rq)
+        p['stonewall'] = bool2YN(inv.stonewall)
+        p['verify-read'] = bool2YN(inv.verify_read)
+        p['xattr-size'] = str(inv.xattr_size)
+        p['xattr-count'] = str(inv.xattr_count)
+        p['permute-host-dirs'] = bool2YN(self.permute_host_dirs)
+        p['network-sync-dir'] = self.network_sync_dir
+
+        return json_dictionary

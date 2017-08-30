@@ -163,10 +163,7 @@ def run_multi_thread_workload(prm):
     if not prm_slave:
         try:
             invoke_list = [t.invoke for t in thread_list]
-            output_results.output_results(invoke_list,
-                                          ['localhost'],
-                                          prm.thread_count,
-                                          smallfile.pct_files_min)
+            output_results.output_results(invoke_list, prm)
         except SMFResultException as e:
             print('ERROR: ' + str(e))
             exit_status = NOTOK

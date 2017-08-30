@@ -195,7 +195,10 @@ assertfail $?
 cleanup
 mkdir -p $nfsdir/smf
 scmd="$PYTHON smallfile_cli.py --top $nfsdir/smf "
-$scmd --verify-read N --response-times Y --finish N --stonewall N --permute-host-dirs Y --same-dir Y --operation cleanup --threads 5 --files 20 --files-per-dir 5 --dirs-per-dir 3 --record-size 6 --file-size 30 --file-size-distribution exponential --prefix a --suffix b --hash-into-dirs Y --pause 5 --host-set $localhost_name >> $f
+$scmd --verify-read N --response-times Y --finish N --stonewall N --permute-host-dirs Y \
+	--same-dir Y --operation cleanup --threads 5 --files 20 --files-per-dir 5 --dirs-per-dir 3 \
+	--record-size 6 --file-size 30 --file-size-distribution exponential --prefix a --suffix b \
+	--hash-into-dirs Y --pause 5 --host-set $localhost_name --output-json /var/tmp/smf.json >> $f
 assertok $?
 expect_strs=( 'verify read? : N' \
         "hosts in test : \['$localhost_name'\]" \
@@ -235,6 +238,29 @@ for j in `seq 1 $expect_ct` ; do
   assertok $s $f
 done
 
+echo "parsing JSON output"
+python -m json.tool < /var/tmp/smf.json > /var/tmp/smfpretty.json
+json_strs=( 'params' 'file-size' 'file-size-distr' 'files-per-dir' \
+	    'files-per-thread' 'finish-all-requests' 'fname-prefix' \
+	    'fname-suffix' 'fsync-after-modify' 'hash-to-dir' 'host-set' \
+	    'network-sync-dir' 'operation' 'pause-between-files' \
+	    'permute-host-dirs' 'share-dir' 'stonewall' 'threads' \
+	    'top' 'verify-read' 'xattr-count' 'xattr-size' \
+	    'elapsed-time' 'files-per-sec' 'pct-files-done' \
+	    'per-thread' '00' 'elapsed' 'filenum-final' \
+	    'onhost' 'records' 'status' 'total-files' \
+	    'total-io-requests' 'total-threads')
+expect_ct=${#json_strs[*]}
+for j in `seq 1 $expect_ct` ; do
+  (( k = $j + 1 ))
+  expected_str="${json_strs[$k]}"
+  $GREP "$expected_str" /var/tmp/smfpretty.json
+  s=$?
+  if [ $s != $OK ] ; then 
+    echo "expecting: $expected_str"
+  fi
+  assertok $s $f
+done
 
 supported_ops()
 {

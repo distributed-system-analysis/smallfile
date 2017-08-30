@@ -239,8 +239,7 @@ def run_multi_host_workload(prm):
                     raise e
                 print('  pickle file %s not found' % pickle_fn)
 
-        output_results.output_results(invoke_list, prm_host_set,
-                                      prm.thread_count, pct_files_min)
+        output_results.output_results(invoke_list, prm)
         all_ok = OK
     except IOError as e:
 

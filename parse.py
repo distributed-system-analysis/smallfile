@@ -62,6 +62,7 @@ def usage(msg):  # call if CLI syntax error or invalid parameter
           bool2YN(dflts.verify_read))
     print('  --verify-read Y|N                                (default: %s)' %
           bool2YN(dflts.verify_read))
+    print('  --output-json pathname                           (default: None)')
     print('  --response-times Y|N                             (default: %s)' %
           bool2YN(dflts.measure_rsptimes))
     print('  --same-dir Y|N                                   (default: %s)' %
@@ -204,6 +205,8 @@ for additional help add the parameter "--help" to the command
         elif prm == 'permute-host-dirs':
             test_params.permute_host_dirs = str2bool(val, rawprm)
             pass_on_prm = ''
+        elif prm == 'output-json':
+            test_params.output_json = val
         elif prm == 'response-times':
             inv.measure_rsptimes = str2bool(val, rawprm)
         elif prm == 'incompressible':
