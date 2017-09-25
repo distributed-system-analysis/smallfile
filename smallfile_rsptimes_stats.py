@@ -31,20 +31,12 @@ from sys import argv
 percentiles = [ 50, 90, 95, 99 ]
 min_rsptime_samples = 10
  
-#### WARNING #####
-# this regular expression may have to be adjusted
-# this regex plucks out a tuple of 3 values:
-## thread number
-## short hostname
-## operation name
-
-regex = \
- 'rsptimes_([0-9]{2})_([a-z]{1}[0-9]{2}-[a-z]{1}[0-9]{2}-r620).rdu.openstack.engineering.redhat.com_[-,a-z]*_[.,0-9]*.csv'
 
 def usage( msg ):
   print('ERROR: %s' % msg)
-  print('usage: python smallfile_rsptimes_stats.py directory' )
+  print('usage: python smallfile_rsptimes_stats.py [ --common-hostname-suffix my.suffix ] directory' )
   sys.exit(1)
+
 
 # generate stats for a set of threads (could be just 1)
 
@@ -70,13 +62,15 @@ def reduce_thread_set( result_dir, csv_pathname_list ):
     record += '%f, ' % sorted_times[int(samples * (p/100.0))]
   return record
 
+
 # define default parameter values
 
 hosts = {}
+suffix = ''
 argindex = 1
 argcount = len(argv)
 
-# parse any optional parameters (none yet)
+# parse any optional parameters
 
 while argindex < argcount:
   pname = argv[argindex]
@@ -87,7 +81,27 @@ while argindex < argcount:
   pval = argv[argindex + 1]
   argindex += 2
   pname = pname[2:]
-  usage('--%s: no such optional parameter defined' % pname)
+  if pname == 'common-hostname-suffix':
+    suffix = pval
+    if not suffix.startswith('.'):
+      suffix = '.' + pval
+  else:
+    usage('--%s: no such optional parameter defined' % pname)
+
+if suffix != '':
+  print('filtering out suffix %s from hostnames' % suffix)
+
+# this regex plucks out a tuple of 2 values:
+#
+## thread number
+## hostname
+
+regex = \
+ 'rsptimes_([0-9]{2})_([a-z]{1}[0-9,a-z,\-,\.]*)%s_[-,a-z]*_[.,0-9]*.csv'
+
+# filter out redundant suffix, if any, in hostname
+
+new_regex = regex % suffix
 
 # now parse hostnames and files
 
@@ -105,7 +119,7 @@ hosts = {}
 pathnames = filter(lambda path : path.endswith('.csv'), os.listdir(directory))
 max_thread = 0
 for p in pathnames:
-  m = re.match(regex, p)
+  m = re.match(new_regex, p)
   if not m:
     sys.stderr.write("warning: pathname could not be matched by regex: %s\n" % p)
     continue
@@ -134,9 +148,11 @@ with open(summary_pathname, 'w') as outf:
     for per_host_dict in hosts.values():
       all_pathnames.extend(per_host_dict.values())
     outf.write('all:all,' + reduce_thread_set(directory, sorted(all_pathnames)) + '\n')
+  outf.write('\n')
   for h in sorted(hosts.keys()):
     if len(hosts[h].keys()) > 1:
       outf.write(h + ':' + 'all' + ',' + reduce_thread_set(directory, hosts[h].values()) + '\n')
+  outf.write('\n')
   for h in sorted(hosts.keys()):
     for t in sorted(hosts[h].keys()):
       outf.write(h + ':' + t + ',' + reduce_thread_set(directory, [hosts[h][t]]) + '\n')
