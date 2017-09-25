@@ -1,9 +1,9 @@
 #!/bin/bash
 # script to generate artificial response time files for regression test
 
-dir=`dirname $0`/..
+dir=`dirname $0`
 if [ -z "$dir" ] ; then
-	dir='..'
+	dir='.'
 fi
 RSPTIMES_POSTPROCESSOR=$dir/smallfile_rsptimes_stats.py
 rspdir=/tmp/$$.tmp
