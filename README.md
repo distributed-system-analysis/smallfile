@@ -207,15 +207,54 @@ across all client hosts.  The percentage of requested files which were
 processed in the measurement interval is also displayed, and if the number is
 lower than a threshold (default 70%) then an error is raised.
 
-response times for operations on each file are saved by thread in .csv form in
-the shared directory.  For example, you can turn these into an X-Y scatterplot so that you can see how response time varies over time.   For example:
+Postprocessing of response time data
+--------
+
+If you specify **--response-times Y** in the command, smallfile will save response time of each operation in per-thread output files in the shared directory as rsptimes*.csv.   For example, you can turn these into an X-Y scatterplot so that you can see how response time varies over time.   For example:
 
     # python smallfile_cli.py --response-times Y
-    # ls -ltr /var/tmp/rsptimes\*.csv
+    # ls -ltr /var/tmp/smf/network_shared/rsptimes\*.csv
 
 You should see 1 .csv file per thread.  These files can be loaded into any
 spreadsheet application and graphed.  An x-y scatterplot can be useful to see
 changes over time in response time.
+
+But if you just want statistics, you can generate these using the postprocessing command:
+
+   python smallfile_rsptimes_stats.py /var/tmp/smf/network_shared
+
+This will generate statistics summary in ../rsptimes-summary.csv , in this example you would find it in /var/tmp/smf/.  The file is in a form suitable for loading into a spreadsheet and graphing.  A simple example is generated using the regression test **gen-fake-rsptimes.sh** .  The result of this test is output like this:
+
+```
+filtering out suffix .foo.com from hostnames
+rsp. time result summary at: /tmp/12573.tmp/../rsptime-summary.csv
+```
+The first line illustrates that you can remove a common hostname suffix in the output so that it is easier to read and graph.  In this test we pass the optional parameter **--common-hostname-suffix foo.com** to smallfile_rsptimes_stats.py.  The inputs to smallfile_rsptimes_stats.py are contained in ```/tmp/12573.tmp/``` and the output looks like this:
+```
+
+$ more /tmp/12573.tmp/../rsptime-summary.csv
+host:thread, samples, min, max, mean, %dev, 50 %ile, 90 %ile, 95 %ile, 99 %ile, 
+all:all,320, 1.000000, 40.000000, 20.500000, 56.397441, 20.500000, 36.100000, 38.050000, 40.000000, 
+
+host-21:all,160, 1.000000, 40.000000, 20.500000, 56.486046, 20.500000, 36.100000, 38.050000, 40.000000, 
+host-22:all,160, 1.000000, 40.000000, 20.500000, 56.486046, 20.500000, 36.100000, 38.050000, 40.000000, 
+
+host-21:01,40, 1.000000, 40.000000, 20.500000, 57.026595, 20.500000, 36.100000, 38.050000, 39.610000, 
+host-21:02,40, 1.000000, 40.000000, 20.500000, 57.026595, 20.500000, 36.100000, 38.050000, 39.610000, 
+host-21:03,40, 1.000000, 40.000000, 20.500000, 57.026595, 20.500000, 36.100000, 38.050000, 39.610000, 
+host-21:04,40, 1.000000, 40.000000, 20.500000, 57.026595, 20.500000, 36.100000, 38.050000, 39.610000, 
+host-22:01,40, 1.000000, 40.000000, 20.500000, 57.026595, 20.500000, 36.100000, 38.050000, 39.610000, 
+host-22:02,40, 1.000000, 40.000000, 20.500000, 57.026595, 20.500000, 36.100000, 38.050000, 39.610000, 
+host-22:03,40, 1.000000, 40.000000, 20.500000, 57.026595, 20.500000, 36.100000, 38.050000, 39.610000, 
+host-22:04,40, 1.000000, 40.000000, 20.500000, 57.026595, 20.500000, 36.100000, 38.050000, 39.610000, 
+
+```
+* record 1 - contains headers for each column
+* record 2 - contains aggregate response time statistics for the entire distributed system, if it consists of more than 1 host
+* record 4-5 - contains per-host aggregate statistics
+* record 7-end - contains per-thread stats, sorted by host then thread
+
+You'll notice that even though all the threads have the same simulated response times, the 99th percentile values for each thread are different than the aggregate stats per host or for the entire test!  How can this be?  Percentiles are computed using the [numpy.percentiles](https://docs.scipy.org/doc/numpy/reference/generated/numpy.percentile.html) function, which linearly interpolates to obtain percentile values.  In the aggregate stats, the 99th percentile is linearly interpolated between two samples of 40 seconds, whereas in the per-thread results the 99th percentile is interpolated between samples of 40 and 39 seconds.  
 
 How to run correctly
 =============
@@ -249,6 +288,7 @@ microseconds.  For  example, if you know that you cannot do better than 100000
 files/sec and you have 20 threads running,try a 60/100000 = 600 microsecond
 pause.  Verify that this isn't affecting throughput by reducing the pause and
 running a longer test.
+
 
 Use with distributed filesystems
 ---------
