@@ -264,7 +264,7 @@ Postprocessing of response time data
 If you specify **--response-times Y** in the command, smallfile will save response time of each operation in per-thread output files in the shared directory as rsptimes*.csv.   For example, you can turn these into an X-Y scatterplot so that you can see how response time varies over time.   For example:
 
     # python smallfile_cli.py --response-times Y
-    # ls -ltr /var/tmp/smf/network_shared/rsptimes\*.csv
+    # ls -ltr /var/tmp/smf/network_shared/rsptimes*.csv
 
 You should see 1 .csv file per thread.  These files can be loaded into any
 spreadsheet application and graphed.  An x-y scatterplot can be useful to see
