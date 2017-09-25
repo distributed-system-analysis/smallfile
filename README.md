@@ -3,6 +3,10 @@ smallfile
 
 A distributed workload generator for POSIX-like filesystems.
 
+New features:
+* JSON output format
+* response time post-processing
+
 # Table of contents
 
 [License](#license)
@@ -188,6 +192,7 @@ previous runs for example)
   data from these runs. The start-time field is the time that the file
   operation started, down to microsecond resolution. The response time field is
   the file operation duration down to microsecond resolution.
+ * --output-json - if specified then write results in JSON format to the specified pathname for easier postprocessing.
  * --remote-pgm-dir – don't need to specify this unless the smallfile software
   lives in a different directory on the target hosts and the test-driver host. 
  * --pause -- integer (microseconds) each thread will wait before starting next
