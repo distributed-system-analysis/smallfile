@@ -5,6 +5,8 @@ A distributed workload generator for POSIX-like filesystems.
 
 # Table of contents
 
+[License](#license)
+
 [Introduction](#introduction)
 
 [__What it can do](#what-it-can-do)
@@ -50,8 +52,8 @@ A distributed workload generator for POSIX-like filesystems.
 [__Returning results](#returning-results)
 
 
-license
--------
+License
+=========
 Copyright [2012] [Ben England]
 
 Licensed under the Apache License, Version 2.0 (the "License");
