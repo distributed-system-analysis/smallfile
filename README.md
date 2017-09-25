@@ -272,7 +272,7 @@ changes over time in response time.
 
 But if you just want statistics, you can generate these using the postprocessing command:
 
-   python smallfile_rsptimes_stats.py /var/tmp/smf/network_shared
+    # python smallfile_rsptimes_stats.py /var/tmp/smf/network_shared
 
 This will generate statistics summary in ../rsptimes-summary.csv , in this example you would find it in /var/tmp/smf/.  The file is in a form suitable for loading into a spreadsheet and graphing.  A simple example is generated using the regression test **gen-fake-rsptimes.sh** .  The result of this test is output like this:
 
