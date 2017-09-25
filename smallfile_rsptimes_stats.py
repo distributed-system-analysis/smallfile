@@ -57,9 +57,10 @@ def reduce_thread_set( result_dir, csv_pathname_list ):
   mean = scipy.stats.tmean(sorted_times)
   stdev = scipy.stats.tstd(sorted_times)
   pctdev = 100.0*stdev/mean
-  record = '%d, %f, %f, %f, %f,' % (samples, mintime, maxtime, mean, pctdev)
+  record = '%d, %f, %f, %f, %f, ' % (samples, mintime, maxtime, mean, pctdev)
   for p in percentiles:
-    record += '%f, ' % sorted_times[int(samples * (p/100.0))]
+    pctile = numpy.percentile(sorted_times, float(p), overwrite_input=True)
+    record += '%f, ' % pctile
   return record
 
 
