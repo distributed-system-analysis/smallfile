@@ -3,6 +3,55 @@ smallfile
 
 A distributed workload generator for POSIX-like filesystems.
 
+# Table of contents
+
+[Introduction](#introduction)
+
+[__What it can do](#what-it-can-do)
+
+[__Restrictions](#restrictions)
+
+[How to specify test](#how-to-specify-test)
+
+[Results](#results)
+
+[__Postprocessing of response time data](#postprocessing-of-response-time-data)
+
+[How to run correctly](#how-to-run-correctly)
+
+[__Avoiding caching effects](#avoiding-caching-effects)
+
+[__Use of pause option](#use-of-pause-option)
+
+[Use with distributed filesystems](#use-with-distributed-filesystems)
+
+[Use with local filesystems](#use-with-local-filesystems)
+
+[Use of subdirectories](#use-of-subdirectories)
+
+[Sharing directories across threads](#sharing-directories-across-threads)
+
+[Hashing files into directory tree](#hashing-files-into-directory-tree)
+
+[Random file size distribution option](#random-file-size-distribution-option)
+
+[Asynchronous file copy performance](#asynchronous-file-copy-performance)
+
+[Comparable Benchmarks](#comparable-benchmarks)
+
+[Design principles](#design-principles)
+
+[Synchronization](#synchronization)
+
+[__Test parameter transmission](#test-parameter-transmission)
+
+[__Launching remote worker threads](#launching-remote-worker-threads)
+
+[__Returning results](#returning-results)
+
+
+license
+-------
 Copyright [2012] [Ben England]
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,12 +73,12 @@ smallfile is a python-based distributed POSIX workload generator
 which can be used to quickly measure performance for a
 variety of metadata-intensive workloads across an entire
 cluster.  It has no dependencies on any specific filesystem or implementation 
-It was written to complement use of iozone benchmark for measuring performance 
-of large-file workloads, and borrows concepts from iozone.
+It was written to complement use of fio and iozone benchmark for measuring performance 
+of large-file workloads, and borrows some concepts from iozone.
 and Ric Wheeler's fs_mark.  It was developed by Ben England starting in March 2009.
 
 What it can do
-========
+--------
 
 * multi-host - manages workload generators on multiple hosts
 * aggregates throughput - for entire set of hosts
@@ -273,12 +322,12 @@ must be cleared. In part this is done using the command: "echo 1 > /proc/sys/vm/
 Gluster have their own internal caches - in that case you might even need to
 remount the filesystem or even restart the storage pool/volume.
 
-Use of --pause in multi-thread tests
+Use of pause option
 ==========
 
 Normally, smallfile stops the throughput measurement for the test as soon as
 the first thread finishes processing all its files.  In some filesystems, the first thread that starts running will be operating at much higher speed (example: NFS writes) and can easily finish before other threads have a chance to get started.  This immediately invalidates the test.  To make this less likely, it is possible to insert a per-file delay into each
-thread with the --pause option so that the other threads have a chance to
+thread with the **--pause** option so that the other threads have a chance to
 participate in the test during the measurement interval.    It is preferable to
 run a longer test instead, because in some cases you might otherwise restrict
 throughput unintentionally.  But if you know that your throughput upper bound
@@ -314,9 +363,11 @@ mountpoint exported from a Linux NFS server, mounted with the option actimeo=1
 then reference this mountpoint using the –network-sync-dir option of smallfile.
 For example:
 
-  # mount -t nfs -o actimeo=1 your-linux-server:/your/nfs/export /mnt/nfs
-  # ./smallfile_cli.py –top /your/distributed/filesystem \
+```
+# mount -t nfs -o actimeo=1 your-linux-server:/your/nfs/export /mnt/nfs
+# ./smallfile_cli.py –top /your/distributed/filesystem \
     –network-sync-dir /mnt/nfs/smf-shared
+```
 
 For non-Windows tests, the user must set up password-less ssh between the test
 driver and the host. If security is an issue, a non-root username can be used
@@ -338,7 +389,7 @@ Then from the test driver, you could run specifying your hosts:
     python smallfile_cli.py –top z:\smf –host-set gprfc023,gprfc024
 
 
-Use with non-networked filesystems
+Use with local filesystems
 -----------
 
 There are cases where you want to use a distributed filesystem test on
@@ -440,7 +491,7 @@ operations are metadata operations and do not require that the file size be
 known in advance.
 
 
-How to measure asynchronous file copy performance
+Asynchronous file copy performance
 ---------
 
 When we want to measure performance of an asynchronous file copy (example:
@@ -573,7 +624,7 @@ os.listdir() as a workaround -- this may have to be revisited for very large
 tests.
 
 
-How test parameters are transmitted to worker threads
+Test parameter transmission
 --------
 
 The results of the command line parse are saved in a smf_test_params object and
@@ -582,14 +633,14 @@ architecture or operating system. The file is placed in the shared network
 directory. Remote worker processes are invoked via the smallfile_remote.py
 command and read this file to discover test parameters.
 
-How remote worker threads are launched
+Launching remote worker threads
 ----------
 
 For Linux or other non-Windows environments, the test driver launches worker threads using parallel ssh commands to invoke the smallfile_remote.py program, and when this program exits, that is how the test driver discovers that the remote threads on this host have completed.
 
 For Windows environments, ssh usage is more problematic. Sshd requires installation of cygwin, a Windows app that emulates a Linux-like environment, but we really want to test with native win32 environment instead. So a different launching method is used (and this method works on non-Windows environments as well). 
 
-How results are returned to master process
+Returning results
 -----------------
 
 For either single-host or multi-host tests, each test thread is implemented as
