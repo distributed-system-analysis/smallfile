@@ -780,6 +780,8 @@ class SmallfileWorkload:
             os.sep,
             self.prefix,
             '_',
+            self.onhost,
+            '_',
             self.tid,
             '_',
             str(filenum),
@@ -1725,8 +1727,10 @@ class Test(unittest_class):
         lastfn = ivk.mk_file_nm(ivk.src_dirs, ivk.iterations)
 
         expectedFn = join(join(self.invok.src_dirs[0], 'd_000'),
-                          ivk.prefix + '_' + ivk.tid + '_1_'
-                          + ivk.suffix)
+                          ivk.prefix + '_' + 
+                          ivk.onhost + '_' + 
+                          ivk.tid + '_1_' + 
+                          ivk.suffix)
         self.assertTrue(fn == expectedFn)
         self.assertTrue(exists(fn))
         self.assertTrue(exists(lastfn))
@@ -1986,7 +1990,7 @@ class Test(unittest_class):
         fn = self.lastFileNameInTest(self.invok.src_dirs)
         expectedFn = os.sep.join([self.invok.src_dirs[0], 'h_001',
                                   'h_000', 'h_001',
-                                  'p_regtest_499_deep_hashed'])
+                                  'p_%s_regtest_499_deep_hashed' % self.invok.onhost])
         self.assertTrue(fn == expectedFn)
         self.assertTrue(exists(fn))
         self.cleanup_files()
