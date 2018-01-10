@@ -351,12 +351,15 @@ echo "*** run one long test of creates and reads ***"
 xattrs=$save_xattrs
 for op in create read cleanup ; do
   rm -rf /var/tmp/invoke*.log
-  run_one_cmd "$common_params --top $testdir --files 2000 --stonewall Y --pause 1000"
+  run_one_cmd "$common_params --top $testdir --files 200000 --file-size 4 --record-size 4 --files-per-dir 3 --dirs-per-dir 2 --threads 10 --stonewall Y --pause 1000"
 done
 
 $GREP $nfsdir /proc/mounts
 if [ $? == $OK ] ; then
   sudo umount -v $nfsdir
+  sudo rm -rf $nfsdir
 fi
 sudo rm -rf $testdir
-
+sudo exportfs -uav
+sudo systemctl stop nfs
+sudo systemctl stop sshd
