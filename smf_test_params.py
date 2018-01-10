@@ -52,10 +52,12 @@ class smf_test_params:
         dirs = 1
         dirs += (self.master_invoke.iterations * self.thread_count
                  // self.master_invoke.files_per_dir)
-        self.startup_timeout += dirs // 3
+        # assumes 2 directories/sec min creation rate
+        self.startup_timeout += (dirs // 2)
         self.host_startup_timeout = self.startup_timeout
         if self.host_set:
-            self.host_startup_timeout += 5 + dirs * len(self.host_set) // 3
+            # allow extra time for inter-host synchronization
+            self.host_startup_timeout += 5 + len(self.host_set)
 
     def __str__(self):
         fmt = 'smf_test_params: version=%s json=%s as_host=%s host_set=%s '
