@@ -94,9 +94,9 @@ start_service()
 svcname=$1
 echo "attempting to start service $svcname"
 if [ $is_systemctl == 1 ] ; then
-  sudo systemctl start $svcname
+  sudo systemctl restart $svcname
 else
-  sudo service $svcname start
+  sudo service $svcname restart
 fi
 if [ $? != $OK ] ; then
   echo "FAILED to start service $svcname"
