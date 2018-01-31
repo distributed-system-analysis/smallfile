@@ -44,18 +44,17 @@ class smf_test_params:
         self.size_distribution = size_distribution
         self.permute_host_dirs = permute_host_dirs
 
-        # calculate timeouts
-        # make sure dirs is never zero
-        # or you will break host_startup_timeout calculation
-
+        # calculate timeouts assuming 2 directories per second
+      
         self.startup_timeout = 10
-        dirs = 1
-        dirs += (self.master_invoke.iterations * self.thread_count
-                 // self.master_invoke.files_per_dir)
+        total_files = self.master_invoke.iterations * self.thread_count
+        if self.host_set is not None:
+            total_files *= len(self.host_set)
+        dirs = total_files // self.master_invoke.files_per_dir
         # assumes 2 directories/sec min creation rate
-        self.startup_timeout += (dirs // 2)
+        self.startup_timeout += dirs // 2
         self.host_startup_timeout = self.startup_timeout
-        if self.host_set:
+        if self.host_set is not None:
             # allow extra time for inter-host synchronization
             self.host_startup_timeout += 5 + len(self.host_set)
 
