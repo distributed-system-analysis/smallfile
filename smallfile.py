@@ -92,6 +92,9 @@ O_BINARY = 0
 if is_windows_os:
     O_BINARY = os.O_BINARY
 
+# for timeout debugging
+
+debug_timeout = os.getenv('DEBUG_TIMEOUT')
 
 # FIXME: pass in file pathname instead of file number
 
@@ -161,6 +164,7 @@ def ensure_dir_exists(dirpath):
         ensure_dir_exists(parent_path)
         try:
             os.mkdir(dirpath)
+            if debug_timeout: time.sleep(1)
         except os.error as e:
             if e.errno != errno.EEXIST:  # workaround for filesystem bug
                 raise e
@@ -951,6 +955,7 @@ class SmallfileWorkload:
             if not exists(unique_dpath):
                 try:
                     os.makedirs(unique_dpath, 0o777)
+                    if debug_timeout: time.sleep(1)
                 except OSError as e:
                     if not (e.errno == errno.EEXIST
                             and self.is_shared_dir):
