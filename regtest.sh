@@ -195,7 +195,7 @@ assertfail $?
 cleanup
 mkdir -p $nfsdir/smf
 scmd="$PYTHON smallfile_cli.py --top $nfsdir/smf "
-$scmd --verify-read N --response-times Y --finish N --stonewall N --permute-host-dirs Y \
+$scmd --verify-read N --response-times Y --finish N --stonewall N --permute-host-dirs Y --verbose Y \
 	--same-dir Y --operation cleanup --threads 5 --files 20 --files-per-dir 5 --dirs-per-dir 3 \
 	--record-size 6 --file-size 30 --file-size-distribution exponential --prefix a --suffix b \
 	--hash-into-dirs Y --pause 5 --host-set $localhost_name --output-json /var/tmp/smf.json >> $f
@@ -213,7 +213,7 @@ expect_strs=( 'verify read? : N' \
         'measure response times? : Y' \
         'log to stderr? : False' \
         'permute host directories? : Y' \
-        'verbose? : False' \
+        'verbose? : True' \
         'response times? : Y' \
         'finish all requests? : N' \
         'threads share directories? : Y' \
@@ -351,7 +351,7 @@ echo "*** run one long test of creates and reads ***"
 xattrs=$save_xattrs
 for op in create read cleanup ; do
   rm -rf /var/tmp/invoke*.log
-  run_one_cmd "$common_params --top $testdir --files 200000 --file-size 4 --record-size 4 --files-per-dir 3 --dirs-per-dir 2 --threads 10 --stonewall Y --pause 1000"
+  run_one_cmd "$common_params --operation $op --top $testdir --files 200000 --file-size 4 --record-size 4 --files-per-dir 3 --dirs-per-dir 2 --threads 10 --stonewall Y --pause 1000"
 done
 
 $GREP $nfsdir /proc/mounts
