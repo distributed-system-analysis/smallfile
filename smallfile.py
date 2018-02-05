@@ -149,6 +149,8 @@ def touch(fn):
 def abort_test(abort_fn, thread_list):
     if not os.path.exists(abort_fn):
         touch(abort_fn)
+    for t in thread_list:
+        t.terminate()
 
 
 # create directory if it's not already there
