@@ -15,12 +15,20 @@ from smallfile import SmallfileWorkload, NOTOK
 import smf_test_params
 from smf_test_params import bool2YN
 
+# define parameter variables
+# default does short test in /var/tmp so you can see the program run
+# store as much as you can in SmallfileWorkload object
+# so per-thread invocations inherit
+
+test_params = smf_test_params.smf_test_params()
+inv = test_params.master_invoke  # for convenience
+
 def usage(msg):  # call if CLI syntax error or invalid parameter
     opnames = '  --operation '
     for op in SmallfileWorkload.all_op_names:
         opnames += op + '|'
     opnames = opnames[:-1]
-    dflts = SmallfileWorkload()
+    dflts = inv
     print('')
     print('ERROR: ' + msg)
     print('usage: smallfile_cli.py ')
@@ -62,6 +70,8 @@ def usage(msg):  # call if CLI syntax error or invalid parameter
           bool2YN(dflts.verify_read))
     print('  --verify-read Y|N                                (default: %s)' %
           bool2YN(dflts.verify_read))
+    print('  --min-dir-per-sec non-negative-integer           (default: %d)' %
+          test_params.min_directories_per_sec)
     print('  --output-json pathname                           (default: None)')
     print('  --response-times Y|N                             (default: %s)' %
           bool2YN(dflts.measure_rsptimes))
@@ -111,14 +121,6 @@ def chkPositiveInt(intval, prm):
 #   are we slave or master?
 
 def parse():
-
-    # define parameter variables
-    # default does short test in /var/tmp so you can see the program run
-    # store as much as you can in SmallfileWorkload object
-    # so per-thread invocations inherit
-
-    test_params = smf_test_params.smf_test_params()
-    inv = test_params.master_invoke  # for convenience
 
     # parse command line
 
@@ -212,6 +214,9 @@ for additional help add the parameter "--help" to the command
             inv.incompressible = str2bool(val, rawprm)
         elif prm == 'verify-read':
             inv.verify_read = str2bool(val, rawprm)
+        elif prm == 'min-dirs-per-sec':
+            chkPositiveInt(val, rawprm)
+            test_params.min_directories_per_sec = int(val)
         elif prm == 'same-dir':
             inv.is_shared_dir = str2bool(val, rawprm)
         elif prm == 'verbose':
