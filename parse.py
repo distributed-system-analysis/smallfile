@@ -187,9 +187,8 @@ for additional help add the parameter "--help" to the command
             test_params.top_dirs = [os.path.abspath(p) for p in val.split(',')]
             for p in test_params.top_dirs:
                 if not os.path.isdir(p):
-                    usage('you must ensure that shared directory' +
-                          ('%s ' % p) +
-                          'is accessible ' +
+                    usage('you must ensure that shared directory ' + p + 
+                          ' is accessible ' +
                           'from this host and every remote host in test')
         elif prm == 'pause':
             chkPositiveInt(val, rawprm)
@@ -278,4 +277,5 @@ for additional help add the parameter "--help" to the command
         for (prm_name, prm_value) in prm_list:
             print('%40s : %s' % (prm_name, prm_value))
 
+    test_params.recalculate_timeouts()
     return test_params
