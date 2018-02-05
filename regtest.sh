@@ -1,9 +1,6 @@
 #!/bin/bash
 # smallfile regression test
 #
-# NOTE: this expects you to have /var/tmp in a filesystem that 
-# supports extended attributes and it expects NFS to support extended attributes
-#
 # you can set the environment variable PYTHON_PROG 
 # to switch between python3 and python2
 # for example: # PYTHON_PROG=python3 bash regtest.sh
@@ -14,7 +11,12 @@
 # you can have it use a directory in a tmpfs mountpoint, 
 # this is recommended so as not to wear out laptop drive.
 # by default, newer distros have /run tmpfs mountpoint with sufficient space 
-# so this is default, but TMPDIR overrides
+# so this is default, but TMPDIR environment variable overrides
+# xattrs won't be tested if you use tmpfs for $testdir
+#
+# for really long runs you can't fit in tmpfs mountpoint so
+# $bigtmp defaults to /var/tmp, but you can override with BIGTMP
+# environment variable.  Recommend you use SSD for $bigtmp
 #
 # ext4 doesn't support xattrs by default.  
 # To run a test on xattr-related operation types,  
@@ -44,13 +46,17 @@
 localhost_name="$1"
 if [ -z "$localhost_name" ] ; then localhost_name="localhost" ; fi
 
-testdir="$TMPDIR/smfregtest"
-xattrs=1
-if [ "$TMPDIR" = "" ] ; then
-  # prefer to use tmpfs so we dont wear out disk on laptop or other system disk
-  testdir='/run/smfregtest'
-  xattrs=0
+# xattrs must be set to zero if using tmpfs, since tmpfs doesn't support xattrs
+
+testdir="${TMPDIR:-/run}/smf"
+xattrs=0
+if [ -d $testdir ] ; then
+	df $testdir | grep tmpfs
+	if [ $? != 0 ] ; then
+		xattrs=1
+	fi
 fi
+bigtmp="${BIGTMP:-/var/tmp}/smf"
 nfsdir=/var/tmp/smfnfs
 OK=0
 NOTOK=1
@@ -63,7 +69,7 @@ assertfail() {
   if [ $status == $OK ] ; then
     echo "ERROR: unexpected success status $status"
     echo "see end of $f for cause" 
-    exit $NOTOK
+    return $NOTOK
   fi
 }
 
@@ -194,11 +200,11 @@ assertfail $?
 
 cleanup
 mkdir -p $nfsdir/smf
-scmd="$PYTHON smallfile_cli.py --top $nfsdir/smf "
+scmd="$PYTHON smallfile_cli.py --top $nfsdir "
 $scmd --verify-read N --response-times Y --finish N --stonewall N --permute-host-dirs Y --verbose Y \
 	--same-dir Y --operation cleanup --threads 5 --files 20 --files-per-dir 5 --dirs-per-dir 3 \
 	--record-size 6 --file-size 30 --file-size-distribution exponential --prefix a --suffix b \
-	--hash-into-dirs Y --pause 5 --host-set $localhost_name --output-json /var/tmp/smf.json >> $f
+	--hash-into-dirs Y --pause 5 --host-set $localhost_name --output-json $nfsdir/smf.json >> $f
 assertok $?
 expect_strs=( 'verify read? : N' \
         "hosts in test : \['$localhost_name'\]" \
@@ -218,7 +224,7 @@ expect_strs=( 'verify read? : N' \
         'finish all requests? : N' \
         'threads share directories? : Y' \
         'pause between files (microsec) : 5' \
-        "top test directory(s) : \['$nfsdir/smf'\]" \
+        "top test directory(s) : \['$nfsdir'\]" \
         'operation : cleanup' \
         'threads : 5' \
         'files/thread : 20' \
@@ -239,7 +245,8 @@ for j in `seq 1 $expect_ct` ; do
 done
 
 echo "parsing JSON output"
-python -m json.tool < /var/tmp/smf.json > /var/tmp/smfpretty.json
+smfpretty=/var/tmp/smfpretty.json
+python -m json.tool < $nfsdir/smf.json > $smfpretty
 json_strs=( 'params' 'file-size' 'file-size-distr' 'files-per-dir' \
 	    'files-per-thread' 'finish-all-requests' 'fname-prefix' \
 	    'fname-suffix' 'fsync-after-modify' 'hash-to-dir' 'host-set' \
@@ -254,7 +261,7 @@ expect_ct=${#json_strs[*]}
 for j in `seq 1 $expect_ct` ; do
   (( k = $j + 1 ))
   expected_str="${json_strs[$k]}"
-  $GREP "$expected_str" /var/tmp/smfpretty.json
+  $GREP "$expected_str" $smfpretty
   s=$?
   if [ $s != $OK ] ; then 
     echo "expecting: $expected_str"
@@ -323,15 +330,15 @@ for d in $topdirlist_nocomma ; do sudo rm -rf $d ; done
 
 echo "******** testing distributed operations"
 
-mkdir -pv $nfsdir/smf
 # as long as we use NFS for regression tests, NFS does not support xattrs at present
 save_xattrs=$xattrs
 xattrs=0
+
 for op in `supported_ops $xattrs ''` ; do
   rm -rf /var/tmp/invoke*.log
   echo
   echo "testing distributed op $op"
-  run_one_cmd "$common_params --host-set $localhost_name --stonewall Y --pause 4000 --operation $op"
+  run_one_cmd "$common_params --host-set $localhost_name --stonewall Y --pause 400 --operation $op"
 done
 
 # we do these tests for virtualization (many KVM guests or containers, shared storage but no shared fs)
@@ -349,17 +356,25 @@ done
 echo "*** run one long test of creates and reads ***"
 
 xattrs=$save_xattrs
-for op in create read cleanup ; do
+rm -rf $bigtmp
+mkdir $bigtmp
+bigtest_params="$common_params --top $bigtmp --files 20000 --file-size 0 --record-size 4 "
+bigtest_params="$bigtest_params --files-per-dir 3 --dirs-per-dir 2 --threads 10 --stonewall Y --pause 10"
+for op in create read ; do
   rm -rf /var/tmp/invoke*.log
-  run_one_cmd "$common_params --operation $op --top $testdir --files 200000 --file-size 4 --record-size 4 --files-per-dir 3 --dirs-per-dir 2 --threads 10 --stonewall Y --pause 1000"
+  echo "big test with op $op"
+  run_one_cmd "$bigtest_params --operation $op "
 done
+# could be out of space on root filesystem, so cleanup
+rm -rf /var/tmp/invoke*.log
+run_one_cmd "$bigtest_params --operation cleanup "
 
 $GREP $nfsdir /proc/mounts
 if [ $? == $OK ] ; then
   sudo umount -v $nfsdir
   sudo rm -rf $nfsdir
 fi
-sudo rm -rf $testdir
 sudo exportfs -uav
+sudo rm -rf $testdir $bigtmp
 sudo systemctl stop nfs
 sudo systemctl stop sshd
