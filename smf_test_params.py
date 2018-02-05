@@ -27,6 +27,8 @@ class smf_test_params:
                  permute_host_dirs = False,
                  output_json = None):
 
+        # this field used to calculate timeouts
+        self.min_directories_per_sec = 50
         self.output_json = output_json
         self.version = '3.1'
         self.as_host = None
@@ -43,20 +45,25 @@ class smf_test_params:
         self.is_slave = slave
         self.size_distribution = size_distribution
         self.permute_host_dirs = permute_host_dirs
+        self.startup_timeout = 0
+        self.host_startup_timeout = 0
 
-        # calculate timeouts assuming 2 directories per second
-      
-        self.startup_timeout = 10
+    # calculate timeouts assuming 2 directories per second
+
+    def recalculate_timeouts(self):
         total_files = self.master_invoke.iterations * self.thread_count
         if self.host_set is not None:
             total_files *= len(self.host_set)
+        # ignore subdirs per dir, this is a good estimate
         dirs = total_files // self.master_invoke.files_per_dir
-        # assumes 2 directories/sec min creation rate
-        self.startup_timeout += dirs // 2
+        # assumes 100 directories/sec min creation rate
+        # we have to create both src_dir and dst_dir trees so times 2
+        # allow some time for thread synchronization
+        self.startup_timeout = 2 + (self.thread_count // 30) + ((dirs * 2) // self.min_directories_per_sec)
         self.host_startup_timeout = self.startup_timeout
         if self.host_set is not None:
             # allow extra time for inter-host synchronization
-            self.host_startup_timeout += 5 + len(self.host_set)
+            self.host_startup_timeout += 5 + (len(self.host_set) // 2)
 
     def __str__(self):
         fmt = 'smf_test_params: version=%s json=%s as_host=%s host_set=%s '
@@ -97,18 +104,17 @@ class smf_test_params:
             ('file size distribution', self.size_distribution),
             ('files per dir', '%d' % inv.files_per_dir),
             ('dirs per dir', '%d' % inv.dirs_per_dir),
-            ('threads share directories?', '%s'
-             % bool2YN(inv.is_shared_dir)),
+            ('threads share directories?', '%s' % bool2YN(inv.is_shared_dir)),
             ('filename prefix', inv.prefix),
             ('filename suffix', inv.suffix),
             ('hash file number into dir.?', bool2YN(inv.hash_to_dir)),
             ('fsync after modify?', bool2YN(inv.fsync)),
-            ('pause between files (microsec)', '%d'
-             % inv.pause_between_files),
+            ('pause between files (microsec)', '%d' % inv.pause_between_files),
+            ('minimum directories per sec', '%d' 
+             % int(self.min_directories_per_sec)),
             ('finish all requests?', '%s' % bool2YN(inv.finish_all_rq)),
             ('stonewall?', '%s' % bool2YN(inv.stonewall)),
-            ('measure response times?', '%s'
-             % bool2YN(inv.measure_rsptimes)),
+            ('measure response times?', '%s' % bool2YN(inv.measure_rsptimes)),
             ('verify read?', '%s' % bool2YN(inv.verify_read)),
             ('verbose?', inv.verbose),
             ('log to stderr?', inv.log_to_stderr),
@@ -169,5 +175,13 @@ class smf_test_params:
         p['xattr-count'] = str(inv.xattr_count)
         p['permute-host-dirs'] = bool2YN(self.permute_host_dirs)
         p['network-sync-dir'] = self.network_sync_dir
+        p['min-directories-per-sec'] = self.min_directories_per_sec
+
+        # include startup-timeout and host-timeout to make possible
+        # diagnosis of timeout problems, but we don't normally need them 
+        # so don't include in human-readable output
+
+        p['startup-timeout'] = self.startup_timeout
+        p['host-timeout'] = self.host_startup_timeout
 
         return json_dictionary
