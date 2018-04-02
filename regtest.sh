@@ -303,7 +303,7 @@ run_one_cmd()
 }
 
 common_params=\
-"$PYTHON smallfile_cli.py --files 100 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --verify-read Y --response-times N --xattr-count 9 --xattr-size 253 --stonewall N"
+"$PYTHON smallfile_cli.py --files 500 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --verify-read Y --response-times N --xattr-count 9 --xattr-size 253 --stonewall N"
 
 echo "******** testing non-distributed operations" | tee -a $f
 
@@ -345,7 +345,7 @@ for op in `supported_ops $xattrs ''` ; do
   rm -rf /var/tmp/invoke*.log
   echo
   echo "testing distributed op $op"
-  run_one_cmd "$common_params --host-set $localhost_name --stonewall Y --pause 2000 --operation $op"
+  run_one_cmd "$common_params --host-set $localhost_name --stonewall Y --pause 1000 --operation $op"
 done
 
 # we do these tests for virtualization (many KVM guests or containers, shared storage but no shared fs)
@@ -355,6 +355,7 @@ echo "******* testing distributed operation with a host-local fs" | tee -a $f
 for op in `supported_ops $xattrs ''` ; do
   rm -rf /var/tmp/invoke*.log
   rm -rf $nfsdir/sync
+  mkdir $nfsdir/sync
   echo
   echo "testing remote-but-local op $op"
   run_one_cmd "$common_params --top $testdir --network-sync-dir $nfsdir/sync --host-set $localhost_name --operation $op"
