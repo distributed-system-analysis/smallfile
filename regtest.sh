@@ -345,7 +345,7 @@ for op in `supported_ops $xattrs ''` ; do
   rm -rf /var/tmp/invoke*.log
   echo
   echo "testing distributed op $op"
-  run_one_cmd "$common_params --host-set $localhost_name --stonewall Y --pause 400 --operation $op"
+  run_one_cmd "$common_params --host-set $localhost_name --stonewall Y --pause 1000 --operation $op"
 done
 
 # we do these tests for virtualization (many KVM guests or containers, shared storage but no shared fs)
