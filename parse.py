@@ -187,11 +187,6 @@ for additional help add the parameter "--help" to the command
             inv.opname = val
         elif prm == 'top':
             test_params.top_dirs = [os.path.abspath(p) for p in val.split(',')]
-            for p in test_params.top_dirs:
-                if not os.path.isdir(p):
-                    usage('you must ensure that shared directory ' + p + 
-                          ' is accessible ' +
-                          'from this host and every remote host in test')
         elif prm == 'pause':
             chkPositiveInt(val, rawprm)
             inv.pause_between_files = int(val)
@@ -240,6 +235,10 @@ for additional help add the parameter "--help" to the command
             test_params.remote_pgm_dir = val
         elif prm == 'network-sync-dir':
             test_params.network_sync_dir = val
+            if not os.path.isdir(test_params.network_sync_dir):
+                usage('you must ensure that shared directory ' + 
+                      test_params.network_sync_dir + 
+                      ' exists on this host and every remote host in test')
         elif prm == 'slave':
             # --slave should not be used by end-user
             test_params.is_slave = str2bool(val, rawprm)
@@ -264,6 +263,10 @@ for additional help add the parameter "--help" to the command
             if len(d) < 6:
                 usage('directory less than 6 characters, ' +
                       'cannot use top of filesystem, too dangerous')
+            if not os.path.isdir(d) and not test_params.network_sync_dir:
+                usage('you must ensure that shared directory ' + d + 
+                      ' is accessible ' +
+                      'from this host and every remote host in test')
     if test_params.top_dirs:
         inv.set_top(test_params.top_dirs)
     else:
