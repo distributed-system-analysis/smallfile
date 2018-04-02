@@ -69,7 +69,7 @@ assertfail() {
   if [ $status == $OK ] ; then
     echo "ERROR: unexpected success status $status"
     echo "see end of $f for cause" 
-    return $NOTOK
+    exit $NOTOK
   fi
 }
 
@@ -78,6 +78,7 @@ assertok() {
   if [ $status != $OK ] ; then
     echo "ERROR: unexpected failure status $status"
     echo "see end of $f for cause"
+    # FIXME: why isn't shell status 1 after regtest.sh exits here?
     exit $NOTOK
   fi
 }
@@ -291,8 +292,14 @@ supported_ops()
 run_one_cmd()
 {
   cmd="$1"
-  ( echo "$cmd" ; $cmd ) | tee -a $f
-  assertok $?
+  echo "$cmd" | tee -a $f
+  $cmd > /tmp/onetest.tmp 2>&1
+  # capture exit status of command before you do anything else!
+  s=$?
+  # show what happened whether command succeeds or fails
+  cat /tmp/onetest.tmp | tee -a $f
+  # now check for error
+  assertok $s
 }
 
 common_params=\
@@ -378,3 +385,4 @@ sudo exportfs -uav
 sudo rm -rf $testdir $bigtmp
 sudo systemctl stop nfs
 sudo systemctl stop sshd
+echo 'SUCCESS!'
