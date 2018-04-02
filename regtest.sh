@@ -329,7 +329,7 @@ for op in `supported_ops $xattrs 'multitop'` ; do
   rm -rf /var/tmp/invoke*.log
   echo
   echo "testing local op $op"
-  run_one_cmd "$common_params --operation $op"
+  run_one_cmd "$common_params --top $topdirlist --operation $op"
 done
 for d in $topdirlist_nocomma ; do sudo rm -rf $d ; done
 
