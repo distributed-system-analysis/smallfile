@@ -31,6 +31,8 @@ New features:
 
 [Use with distributed filesystems](#use-with-distributed-filesystems)
 
+[__The dreaded startup timeout error](#the-dreaded-startup-timeout-error)
+
 [Use with local filesystems](#use-with-local-filesystems)
 
 [Use of subdirectories](#use-of-subdirectories)
@@ -128,11 +130,12 @@ distributed test.
 
 To see what parameters are supported by smallfile_cli.py, do 
 
-    # python smallfile_cli.py -h
+    # python smallfile_cli.py --help
 
 Boolean true/false parameters can be set to either Y
 (true) or N (false). Every command consists of a sequence of parameter
-name-value pairs with the format --name value .
+name-value pairs with the format --name value .  To see what default values are,
+use --help option.
 
 The parameters are:
 
@@ -147,21 +150,18 @@ The parameters are:
  * --file-size -- total amount of data accessed per file.   If zero then no
   reads or writes are performed. 
  * --file-size-distribution – only supported value today is exponential.
-  Default: fixed file size.
  * --record-size -- record size in KB, how much data is transferred in a single
   read or write system call.  If 0 then it is set to the minimum of the file
-  size and 1-MiB record size limit. Default: 0
+  size and 1-MiB record size limit.
  * --files-per-dir -- maximum number of files contained in any one directory.
-  Default: 200
  * --dirs-per-dir -- maximum number of subdirectories contained in any one
-  directory. Default: 20
+  directory.
  * --hash-into-dirs – if Y then assign next file to a directory using a hash
   function, otherwise assign next –files-per-dir files to next directory.
-  Default: N
  * --permute-host-dirs – if Y then have each host process a different
   subdirectory tree than it otherwise would (see below for directory tree
-  structure). Default: N
- * --same-dir -- if Y then threads will share a single directory. Default: N
+  structure).
+ * --same-dir -- if Y then threads will share a single directory.
  * --network-sync-dir – don't need to specify unless you run a multi-host test
   and the –top parameter points to a non-shared directory (see discussion
   below). Default: network_shared subdirectory under –top dir.
@@ -172,19 +172,18 @@ The parameters are:
 previous runs for example)
  * --suffix -- a string suffix to append to files (so they don't collide with
   previous runs for example)
- * --incompressible – (default N) if Y then generate a pure-random file that
+ * --incompressible – if Y then generate a pure-random file that
   will not be compressible (useful for tests where intermediate network or file
   copy utility attempts to compress data
- * --record-ctime-size -- default N, if Y then label each created file with an
+ * --record-ctime-size -- if Y then label each created file with an
   xattr containing a time of creation and a file size. This will be used by
   –await-create operation to compute performance of asynchonous file
   replication/copy.
  * --finish -- if Y, thread will complete all requested file operations even if
-  measurement has finished. Default: Y
+  measurement has finished.
  * --stonewall -- if Y then thread will measure throughput as soon as it detects
-  that another thread has finished. Default: N
+  that another thread has finished.
  * --verify-read – if Y then smallfile will verify read data is correct.
-  Default: Y
  * --response-times – if Y then save response time for each file operation in a
   rsptimes\*csv file in the shared network directory. Record format is
   operation-type, start-time, response-time. The operation type is included so
@@ -196,7 +195,7 @@ previous runs for example)
  * --remote-pgm-dir – don't need to specify this unless the smallfile software
   lives in a different directory on the target hosts and the test-driver host. 
  * --pause -- integer (microseconds) each thread will wait before starting next
-  file. Default: 0
+  file.
 
 Operation types are:
 
@@ -394,6 +393,11 @@ would be something like this:
 Then from the test driver, you could run specifying your hosts:
 
     python smallfile_cli.py –top z:\smf –host-set gprfc023,gprfc024
+
+The dreaded startup timeout error
+============
+
+If you get the error "Exception: starting signal not seen within 11 seconds" when running a distributed test with a lot of subdirectories, the problem may be caused by insufficient time for the worker threads to get ready to run the test.   In some cases, this was caused by a flaw in smallfile's timeout calculation (which we believe is fixed).  However, before smallfile actually starts a test, each worker thread must prepare a directory tree to hold the files that will be used in the test.   This ensures that we are not measuring directory creation overhead when running a file create test, for example.  For some filesystems, directory creation can be more expensive at scale.  We take this into account with the --min-dirs-per-sec parameter, which defaults to a value more appropriate for local filesystems.   If we are doing a large distributed filesystem test, it may be necessary to lower this parameter somewhat, based on the filesystem's performance, which you can measure using --operation mkdir, and then use a value of about half what you see there.  This will result in a larger timeout value, which you can obtain using "--output-json your-test.json" -- look for the 'startup-timeout' and 'host-timeout' parameters in this file to see what timeout is being calculated.
 
 
 Use with local filesystems
