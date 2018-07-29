@@ -305,6 +305,18 @@ run_one_cmd()
 common_params=\
 "$PYTHON smallfile_cli.py --files 500 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --verify-read Y --response-times N --xattr-count 9 --xattr-size 253 --stonewall N"
 
+echo "*** run one long cleanup test with huge directory and 1 thread ***"
+
+cleanup_test_params="$common_params --threads 1 --files 1000000 --files-per-dir 1000000 --file-size 0"
+run_one_cmd "$cleanup_test_params --top $testdir --operation create"
+run_one_cmd "$cleanup_test_params --top $testdir --operation cleanup"
+
+echo "*** run one test with many threads ***"
+
+many_thread_params="$common_params --threads 30 --files 10000 --files-per-dir 10 --file-size 0"
+run_one_cmd "$many_thread_params --top $testdir --operation create"
+run_one_cmd "$many_thread_params --top $testdir --operation cleanup"
+
 echo "******** testing non-distributed operations" | tee -a $f
 
 for op in `supported_ops $xattrs ''` ; do
@@ -360,6 +372,7 @@ for op in `supported_ops $xattrs ''` ; do
   echo "testing remote-but-local op $op"
   run_one_cmd "$common_params --top $testdir --network-sync-dir $nfsdir/sync --host-set $localhost_name --operation $op"
 done
+
 
 echo "*** run one long test of creates and reads ***" | tee -a $f
 
