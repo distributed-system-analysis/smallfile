@@ -52,14 +52,21 @@ class smf_test_params:
 
     def recalculate_timeouts(self):
         total_files = self.master_invoke.iterations * self.thread_count
+        # ignore subdirs per dir, this is a good estimate
         if self.host_set is not None:
             total_files *= len(self.host_set)
-        # ignore subdirs per dir, this is a good estimate
         dirs = total_files // self.master_invoke.files_per_dir
-        # assumes 100 directories/sec min creation rate
+
         # we have to create both src_dir and dst_dir trees so times 2
         # allow some time for thread synchronization
-        self.startup_timeout = 2 + (self.thread_count // 30) + ((dirs * 2) // self.min_directories_per_sec)
+        dir_creation_overhead = (self.thread_count // 30) + ((dirs * 2) // self.min_directories_per_sec)
+
+        # allow for creating list of pathnames if millions of files per dir
+        file_creation_overhead = max(1, self.master_invoke.files_per_dir // 300000)
+
+        # allow no less than 2 seconds to account for NTP inaccuracy
+        self.startup_timeout = 2 + file_creation_overhead + dir_creation_overhead
+        
         self.host_startup_timeout = self.startup_timeout
         if self.host_set is not None:
             # allow extra time for inter-host synchronization
