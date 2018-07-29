@@ -83,28 +83,29 @@ def run_multi_thread_workload(prm):
         print('adding time for Windows synchronization')
         startup_timeout += 30
     abort_fname = my_host_invoke.abort_fn()
-    threads_ready = False  # really just to set scope of variable
+    thread_count = len(thread_list)
+    thread_to_wait_for = 0
     for sec in range(0, startup_timeout * 2):
-        threads_ready = True
-        for t in thread_list:
+        for k in range(thread_to_wait_for, thread_count):
+            t = thread_list[k]
             fn = t.invoke.gen_thread_ready_fname(t.invoke.tid)
             if not os.path.exists(fn):
-                threads_ready = False
+                if verbose:
+                    print('thread %d thread-ready file %s not found...' % (k, fn))
                 break
-        if threads_ready:
+            thread_to_wait_for = k + 1
+        if thread_to_wait_for == thread_count:
             break
         if os.path.exists(abort_fname):
             break
-        if verbose:
-            print('threads not ready...')
         time.sleep(0.5)
 
     # if all threads didn't make it to the starting gate
 
-    if not threads_ready:
+    if thread_to_wait_for < thread_count:
         abort_test(abort_fname, thread_list)
-        raise Exception('threads did not reach starting gate within %d sec'
-                        % startup_timeout)
+        raise Exception('only %d threads reached starting gate within %d sec'
+                        % (thread_to_wait_for, startup_timeout))
 
     # declare that this host is at the starting gate
 
