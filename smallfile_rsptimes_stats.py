@@ -117,7 +117,7 @@ if not os.path.isdir(directory):
 # we show individual threads, per-host groupings and all threads together
 
 hosts = {}
-pathnames = filter(lambda path : path.endswith('.csv'), os.listdir(directory))
+pathnames = filter(lambda path : path.startswith('rsptimes') and path.endswith('.csv'), os.listdir(directory))
 max_thread = 0
 for p in pathnames:
   m = re.match(new_regex, p)
@@ -138,7 +138,7 @@ hostcount = len(hosts.keys())
 if hostcount == 0:
   usage('%s: no .csv response time log files were found' % directory)
 
-summary_pathname = os.path.join(directory, '../rsptime-summary.csv')
+summary_pathname = os.path.join(directory, 'stats-rsptimes.csv')
 header = 'host:thread, samples, min, max, mean, %dev, '
 for p in percentiles:
   header += '%d %%ile, ' % p
