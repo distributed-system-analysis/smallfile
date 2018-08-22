@@ -32,7 +32,7 @@ time_infinity = 1<<62
 # edit this list if you want additional percentiles
 
 percentiles = [ 50, 90, 95, 99 ]
-min_rsptime_samples = 10
+min_rsptime_samples = 5
 
 def usage( msg ):
   print('ERROR: %s' % msg)
@@ -112,6 +112,8 @@ def reduce_thread_set( sorted_samples_tuple, from_time=0, to_time=time_infinity 
         # replace sorted_times with just the response times in time interval
         sorted_times = sorted(map(get_rsp_time, sorted_samples[start_index:end_index]))
     sample_count = len(sorted_times)
+    if sample_count < min_rsptime_samples:
+	return None
     mintime = sorted_times[0]
     maxtime = sorted_times[-1]
     mean = scipy.stats.tmean(sorted_times)
@@ -126,6 +128,8 @@ def reduce_thread_set( sorted_samples_tuple, from_time=0, to_time=time_infinity 
 # format the stats for output to a csv file
 
 def format_stats(all_stats):
+    if all_stats == None:
+	return ' 0,,,,,' + ',,,,,,,,,,,,,,,,'[0:len(percentiles)-1]
     (sample_count, mintime, maxtime, mean, pctdev, pctiles) = all_stats
     partial_record = '%d, %f, %f, %f, %f, ' % (
             sample_count, mintime, maxtime, mean, pctdev)
@@ -279,7 +283,11 @@ with open(summary_pathname, 'w') as outf:
         threadset = hosts[h]
         for t in threadset.keys():
             (_, samples) = threadset[t]
-            (_, max_at_time,max_rsp_time) = samples[-1]
+            if len(samples) > 0:
+            	(_, max_at_time,max_rsp_time) = samples[-1]
+            else:
+                max_at_time = 0.0
+                max_rsp_time = 0.0
             end_time = max(end_time, max_at_time + max_rsp_time)
     quantized_end_time = (int(end_time) // time_interval) * time_interval
 
