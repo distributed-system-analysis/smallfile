@@ -302,7 +302,7 @@ with open(summary_pathname, 'w') as outf:
         # avoid re-sorting all response time samples 
         # if possible (and it often is)
 
-        if cluster_sample_set != None:
+        if cluster_sample_set == None:
             cluster_sample_set = []
             for per_host_dict in hosts.values():
                 for (_, samples) in per_host_dict.values():
