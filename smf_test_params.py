@@ -23,7 +23,6 @@ class smf_test_params:
                  top_dirs = None,
                  network_sync_dir = None, 
                  slave = False, 
-                 size_distribution = 'fixed',
                  permute_host_dirs = False,
                  output_json = None):
 
@@ -43,7 +42,6 @@ class smf_test_params:
         if network_sync_dir:
             self.master_invoke.network_dir = network_sync_dir
         self.is_slave = slave
-        self.size_distribution = size_distribution
         self.permute_host_dirs = permute_host_dirs
         self.startup_timeout = 0
         self.host_startup_timeout = 0
@@ -99,6 +97,10 @@ class smf_test_params:
 
     def human_readable(self):
         inv = self.master_invoke
+        if inv.filesize_distr == smallfile.SmallfileWorkload.fsdistr_fixed:
+            fsdistr_str = 'fixed'
+        else:
+            fsdistr_str = 'random exponential'
         prm_list = [
             ('version', self.version),
             ('hosts in test', '%s' % self.host_set),
@@ -108,7 +110,7 @@ class smf_test_params:
             ('threads', '%d' % self.thread_count),
             ('record size (KB, 0 = maximum)', '%d' % inv.record_sz_kb),
             ('file size (KB)', '%d' % inv.total_sz_kb),
-            ('file size distribution', self.size_distribution),
+            ('file size distribution', fsdistr_str),
             ('files per dir', '%d' % inv.files_per_dir),
             ('dirs per dir', '%d' % inv.dirs_per_dir),
             ('threads share directories?', '%s' % bool2YN(inv.is_shared_dir)),

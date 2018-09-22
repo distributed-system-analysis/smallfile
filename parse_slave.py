@@ -14,55 +14,24 @@ import errno
 import time
 import pickle
 import smallfile
+import argparse
 
-
-# convert boolean value into 'Y' or 'N'
-
-def usage(msg):  # call if CLI syntax error or invalid parameter
-    print('')
-    print('ERROR: ' + msg)
-    print('usage: smallfile_remote.py ' +
-          '[ --network-sync-dir path ] --as-host hostname ')
-    sys.exit(1)
-
-
-# parse command line and return tuple containing:
-#   network sync directory
-#   host identity of this remote invocation
+# parse command line and return unpickled test params
+# pass via --network-sync-dir option
+# optionally pass host identity of this remote invocation
 
 def parse():
 
-    prm_network_sync_dir = None
+    parser = argparse.ArgumentParser(
+            description='parse remote smallfile parameters')
+    parser.add_argument( '--network-sync-dir',
+            help='directory used to synchronize with test driver')
+    parser.add_argument( '--as-host',
+            default=smallfile.get_hostname(None),
+            help='directory used to synchronize with test driver')
+    args = parser.parse_args()
 
-    argc = len(sys.argv)
-    if argc == 1:
-        print('for additional help add the parameter "--help" to the command')
-        sys.exit(1)
-    j = 1
-    while j < argc:
-        rawprm = sys.argv[j]
-        if rawprm == '-h' or rawprm == '--help':
-            usage('normally this process is run automatically ' +
-                  'by smallfile_cli.py')
-        if rawprm[0:2] != '--':
-            usage('parameter names begin with "--"')
-        prm = rawprm[2:]
-        if j == argc - 1 and argc % 2 != 1:
-            usage('all parameters consist of a name and a value')
-        val = sys.argv[j + 1]
-        if len(rawprm) < 3:
-            usage('parameter name not long enough')
-        j += 2
-        if prm == 'network-sync-dir':
-            prm_network_sync_dir = val
-        elif prm == 'as-host':
-            # --ashost should not be used by end-user
-            prm_as_host = smallfile.get_hostname(val)
-        else:
-            usage('unrecognized parameter name')
-
-    param_pickle_fname = os.path.join(prm_network_sync_dir,
-                                      'param.pickle')
+    param_pickle_fname = os.path.join(args.network_sync_dir, 'param.pickle')
     if not os.path.exists(param_pickle_fname):
         time.sleep(1.1)
     params = None
@@ -70,8 +39,8 @@ def parse():
         with open(param_pickle_fname, 'rb') as pickled_params:
             params = pickle.load(pickled_params)
             params.is_slave = True
-            params.as_host = prm_as_host
-            params.master_invoke.onhost = prm_as_host
+            params.as_host = args.as_host
+            params.master_invoke.onhost = args.as_host
     except IOError as e:
         if e.errno != errno.ENOENT:
             raise e

@@ -14,241 +14,231 @@ import smallfile
 from smallfile import SmallfileWorkload, NOTOK
 import smf_test_params
 from smf_test_params import bool2YN
+import argparse
 
-# define parameter variables
+# if we throw exceptions, do it with this
+# so caller can specifically catch them
+
+class SmfParseException(Exception):
+    pass
+
+TypeExc = argparse.ArgumentTypeError
+
+# the next few routines implement data types
+# of smallfile parameters
+
+def boolean(boolstr):
+    b = boolstr.lower()
+    if b == 'y' or b == 'yes' or b == 't' or b == 'true':
+        bval = True
+    elif b == 'n' or b == 'no' or b == 'f' or b == 'false':
+        bval = False
+    else:
+        raise TypeExc('boolean value must be y|yes|t|true|n|no|f|false')
+    return bval
+
+def positive_integer(posint_str):
+    intval = int(posint_str)
+    if intval <= 0:
+        raise TypeExc( 'integer value greater than zero expected')
+    return intval
+
+def non_negative_integer(nonneg_str):
+    intval = int(nonneg_str)
+    if intval < 0:
+        raise TypeExc( 'non-negative integer value expected')
+    return intval
+
+def host_set(hostname_list_str):
+    if os.path.isfile(hostname_list_str):
+        with open(hostname_list_str, 'r') as f:
+            hostname_list = [ record.strip() for record in f.readlines() ]
+    else:
+        hostname_list = hostname_list_str.strip().split(',')
+        if len(hostname_list) < 2:
+            hostname_list = hostname_list_str.strip().split()
+        if len(hostname_list) == 0:
+            raise TypeExc('host list must be non-empty')
+    return hostname_list
+
+def directory_list(directory_list_str):
+    directory_list = directory_list_str.strip().split(',')
+    if len(directory_list) == 1:
+        directory_list = directory_list_str.strip().split()
+    if len(directory_list) == 0:
+        raise TypeExc('directory list must be non-empty')
+    return directory_list
+
+def file_size_distrib(fsdistrib_str):
+    # FIXME: should be a data type
+    if fsdistrib_str == 'exponential':
+        return SmallfileWorkload.fsdistr_random_exponential
+    elif fsdistrib_str == 'fixed':
+        return SmallfileWorkload.fsdistr_fixed
+    else:
+        # should never get here
+        raise TypeExc(
+            'file size distribution must be either "exponential" or "fixed"')
+
+# parse command line
+# return smf_test_params.smf_test_params instance
+# defining all test parameters.
 # default does short test in /var/tmp so you can see the program run
-# store as much as you can in SmallfileWorkload object
-# so per-thread invocations inherit
-
-test_params = smf_test_params.smf_test_params()
-inv = test_params.master_invoke  # for convenience
-
-def usage(msg):  # call if CLI syntax error or invalid parameter
-    opnames = '  --operation '
-    for op in SmallfileWorkload.all_op_names:
-        opnames += op + '|'
-    opnames = opnames[:-1]
-    dflts = inv
-    print('')
-    print('ERROR: ' + msg)
-    print('usage: smallfile_cli.py ')
-    print(opnames)
-    print('  --top top-dir | top-dir1,top-dir2,...,top-dirN   (default: %s)' %
-          SmallfileWorkload.tmp_dir)
-    print('  --host-set h1,h2,...,hN')
-    print('  --network-sync-dir directory-path                (default: %s' %
-          os.path.join(SmallfileWorkload.tmp_dir, 'network_shared'))
-    print('  --files positive-integer                         (default: %d)' %
-          dflts.iterations)
-    print('  --files-per-dir positive-integer                 (default: %d)' %
-          dflts.files_per_dir)
-    print('  --dirs-per-dir positive-integer                  (default: %d)' %
-          dflts.dirs_per_dir)
-    print('  --threads positive-integer                       (default: %d)' %
-          2)
-    print('  --record-size non-negative-integer-KB            (default: %d)' %
-          dflts.record_sz_kb)
-    print('  --record-ctime-size                              (default: N)')
-    print('  --xattr-size non-negative-integer-bytes          (default: %d)' %
-          dflts.xattr_size)
-    print('  --xattr-count non-negative-integer-bytes         (default: %d)' %
-          dflts.xattr_count)
-    print('  --file-size-distribution exponential             ' +
-          '(default: fixed-size)')
-    print('  --permute-host-dirs Y|N                          (default: N)')
-    print('  --hash-into-dirs Y|N                             (default: %s)' %
-          bool2YN(dflts.hash_to_dir))
-    print('  --file-size non-negative-integer-KB              (default: %d)' %
-          dflts.total_sz_kb)
-    print('  --prefix alphanumeric-string')
-    print('  --suffix alphanumeric-string')
-    print('  --fsync Y|N                                      (default: %s)' %
-          bool2YN(dflts.fsync))
-    print('  --finish Y|N                                     (default: %s)' %
-          bool2YN(dflts.finish_all_rq))
-    print('  --incompressible Y|N                             (default: %s)' %
-          bool2YN(dflts.verify_read))
-    print('  --verify-read Y|N                                (default: %s)' %
-          bool2YN(dflts.verify_read))
-    print('  --min-dir-per-sec non-negative-integer           (default: %d)' %
-          test_params.min_directories_per_sec)
-    print('  --output-json pathname                           (default: None)')
-    print('  --response-times Y|N                             (default: %s)' %
-          bool2YN(dflts.measure_rsptimes))
-    print('  --same-dir Y|N                                   (default: %s)' %
-          bool2YN(dflts.is_shared_dir))
-    print('  --pause microsec                                 (default: %d)' %
-          dflts.pause_between_files)
-    print('  --remote-pgm-dir directory-pathname              (default: %s)' %
-          os.getcwd())
-    sys.exit(NOTOK)
-
-
-# convert boolean command line parameter value into True/False
-
-def str2bool(val, prmname):
-    if val == 'y' or val == 'Y':
-        return True
-    if val == 'n' or val == 'N':
-        return False
-    usage('boolean parameter "%s" must be either Y or N' % prmname)
-
-
-# ensure that input integer is non-negative
-
-def chkNonNegInt(intval, prm):
-    try:
-        v = int(intval)
-    except ValueError:
-        usage('parameter "%s" must be an integer' % prm)
-    if v < 0:
-        usage('integer parameter "%s" must be non-negative' % prm)
-
-
-# ensure that input integer is positive
-
-def chkPositiveInt(intval, prm):
-    chkNonNegInt(intval, prm)
-    if int(intval) == 0:
-        usage('integer parameter "%s" must be positive' % prm)
-
-
-# return tuple containing:
-#   list of hosts participating in test
-#   list of subprocess instances initialized with test parameters
-#   top directory
-#   remote command to pass to client host via ssh
-#   are we slave or master?
 
 def parse():
+    # store as much as you can in SmallfileWorkload object
+    # so per-thread invocations inherit
 
-    # parse command line
+    test_params = smf_test_params.smf_test_params()
+    inv = test_params.master_invoke  # for convenience
 
-    argc = len(sys.argv)
+    parser = argparse.ArgumentParser(
+            description='parse smallfile CLI parameters')
+    add = parser.add_argument
+    add('--output-json',
+            default=test_params.output_json,
+            help='if true then output JSON-format version of results')
+    add('--response-times',
+            type=boolean, default=inv.measure_rsptimes,
+            help='if true then record response time of each file op')
+    add('--network-sync-dir',
+            default=inv.network_dir,
+            help='if --top not shared filesystem, provide shared filesystem directory')
+    add('--operation',
+            default='cleanup', choices=SmallfileWorkload.all_op_names,
+            help='type of operation to perform on each file')
+    add('--top',
+            type=directory_list, default=inv.top_dirs,
+            help='top directory or directories used by smallfile')
+    add('--host-set',
+            type=host_set, default=test_params.host_set,
+            help='list of workload generator hosts (or file containing it) ')
+    add('--files',
+            type=positive_integer, default=inv.iterations, 
+            help='files processed per thread')
+    add('--threads',
+            type=positive_integer, default=test_params.thread_count, 
+            help='threads per client')
+    add('--files-per-dir',
+            type=positive_integer, default=inv.files_per_dir, 
+            help='files per (sub)directory')
+    add('--dirs-per-dir',
+            type=positive_integer, default=inv.dirs_per_dir, 
+            help='subdirectories per directory')
+    add('--record-size',
+            type=positive_integer, default=inv.record_sz_kb, 
+            help='record size (KB)')
+    add('--file-size',
+            type=non_negative_integer, default=inv.total_sz_kb, 
+            help='subdirectories per directory')
+    add('--file-size-distribution',
+            type=file_size_distrib, default=inv.filesize_distr,
+            help='file size can be constant ("fixed") or random ("exponential")')
+    add('--fsync',
+            type=boolean, default=inv.fsync,
+            help='call fsync() after each file is written/modified')
+    add('--xattr-size',
+            type=non_negative_integer, default=inv.xattr_size, 
+            help='extended attribute size (bytes)')
+    add('--xattr-count',
+            type=non_negative_integer, default=inv.xattr_count, 
+            help='number of extended attributes per file')
+    add('--pause',
+            type=non_negative_integer, default=inv.pause_between_files,
+            help='pause between each file (microsec)')
+    add('--stonewall',
+            type=boolean, default=inv.stonewall,
+            help='stop measuring as soon as first thread is done')
+    add('--finish',
+            type=boolean, default=inv.finish_all_rq,
+            help='stop processing files as soon as first thread is done')
+    add('--prefix',
+            default=inv.prefix,
+            help='filename prefix')
+    add('--suffix',
+            default=inv.suffix,
+            help='filename suffix')
+    add('--hash-into-dirs',
+            type=boolean, default=inv.hash_to_dir,
+            help='if true then pseudo-randomly place files into directories')
+    add('--same-dir',
+            type=boolean, default=inv.is_shared_dir,
+            help='if true then all threads share the same directories')
+    add('--verbose',
+            type=boolean, default=inv.verbose,
+            help='if true then log extra messages about test')
+    add('--permute-host-dirs',
+            type=boolean, default=test_params.permute_host_dirs,
+            help='if true then shift clients to different host directories')
+    add('--record-ctime-size',
+            type=boolean, default=inv.record_ctime_size,
+            help='if true then update file xattr with ctime+size')
+    add('--verify-read',
+            type=boolean, default=inv.verify_read,
+            help='if true then check that data read = data written')
+    add('--incompressible',
+            type=boolean, default=inv.incompressible,
+            help='if true then non-compressible data written')
 
-    if argc == 1:
-        print('''
-for additional help add the parameter "--help" to the command
-''')
-    j = 1
-    while j < argc:
-        rawprm = sys.argv[j]
-        if rawprm == '-h' or rawprm == '--help':
-            usage('ok, so you need help, we all knew that ;-)')
-        if rawprm[0:2] != '--':
-            usage('parameter names begin with "--"')
-        prm = rawprm[2:]
-        if j == argc - 1 and argc % 2 != 1:
-            usage('all parameters consist of a name and a value')
-        val = sys.argv[j + 1]
-        if len(rawprm) < 3:
-            usage('parameter name not long enough')
-        pass_on_prm = rawprm + ' ' + val
-        j += 2
-        if prm == 'files':
-            chkPositiveInt(val, rawprm)
-            inv.iterations = int(val)
-        elif prm == 'threads':
-            chkPositiveInt(val, rawprm)
-            test_params.thread_count = int(val)
-        elif prm == 'files-per-dir':
-            chkPositiveInt(val, rawprm)
-            inv.files_per_dir = int(val)
-        elif prm == 'dirs-per-dir':
-            chkPositiveInt(val, rawprm)
-            inv.dirs_per_dir = int(val)
-        elif prm == 'record-size':
-            chkNonNegInt(val, rawprm)
-            inv.record_sz_kb = int(val)
-        elif prm == 'file-size':
-            chkNonNegInt(val, rawprm)
-            inv.total_sz_kb = int(val)
-        elif prm == 'file-size-distribution':
-            if val != 'exponential':
-                usage('unrecognized file size distribution: %s' % val)
-            inv.filesize_distr = \
-                SmallfileWorkload.fsdistr_random_exponential
-            test_params.size_distribution = 'random exponential'
-        elif prm == 'xattr-size':
-            chkNonNegInt(val, rawprm)
-            inv.xattr_size = int(val)
-        elif prm == 'xattr-count':
-            chkNonNegInt(val, rawprm)
-            inv.xattr_count = int(val)
-        elif prm == 'prefix':
-            inv.prefix = val
-        elif prm == 'suffix':
-            inv.suffix = val
-        elif prm == 'hash-into-dirs':
-            inv.hash_to_dir = str2bool(val, rawprm)
-        elif prm == 'operation':
-            if not SmallfileWorkload.all_op_names.__contains__(val):
-                usage('unrecognized operation name: %s' % val)
-            inv.opname = val
-        elif prm == 'top':
-            test_params.top_dirs = [os.path.abspath(p) for p in val.split(',')]
-        elif prm == 'pause':
-            chkPositiveInt(val, rawprm)
-            inv.pause_between_files = int(val)
-        elif prm == 'stonewall':
-            inv.stonewall = str2bool(val, rawprm)
-        elif prm == 'finish':
-            inv.finish_all_rq = str2bool(val, rawprm)
-        elif prm == 'fsync':
-            inv.fsync = str2bool(val, rawprm)
-        elif prm == 'record-ctime-size':
-            inv.record_ctime_size = str2bool(val, rawprm)
-        elif prm == 'permute-host-dirs':
-            test_params.permute_host_dirs = str2bool(val, rawprm)
-            pass_on_prm = ''
-        elif prm == 'output-json':
-            test_params.output_json = val
-        elif prm == 'response-times':
-            inv.measure_rsptimes = str2bool(val, rawprm)
-        elif prm == 'incompressible':
-            inv.incompressible = str2bool(val, rawprm)
-        elif prm == 'verify-read':
-            inv.verify_read = str2bool(val, rawprm)
-        elif prm == 'min-dirs-per-sec':
-            chkPositiveInt(val, rawprm)
-            test_params.min_directories_per_sec = int(val)
-        elif prm == 'same-dir':
-            inv.is_shared_dir = str2bool(val, rawprm)
-        elif prm == 'verbose':
-            inv.verbose = str2bool(val, rawprm)
-        elif prm == 'log-to-stderr':
-            inv.log_to_stderr = str2bool(val, rawprm)
-        elif prm == 'host-set':
-            if os.path.isfile(val):
-                with open(val, 'r') as f:
-                    test_params.host_set = [
-                        record.strip() for record in f.readlines()]
-            else:
-                test_params.host_set = val.split(',')
-                if len(test_params.host_set) < 2:
-                    test_params.host_set = val.strip().split()
-                if len(test_params.host_set) == 0:
-                    usage('host list must be non-empty when ' +
-                          '--host-set option used')
-            pass_on_prm = ''
-        elif prm == 'remote-pgm-dir':
-            test_params.remote_pgm_dir = val
-        elif prm == 'network-sync-dir':
-            test_params.network_sync_dir = val
-            if not os.path.isdir(test_params.network_sync_dir):
-                usage('you must ensure that shared directory ' + 
-                      test_params.network_sync_dir + 
-                      ' exists on this host and every remote host in test')
-        elif prm == 'slave':
-            # --slave should not be used by end-user
-            test_params.is_slave = str2bool(val, rawprm)
-        elif prm == 'as-host':
-            # --ashost should not be used by end-user
-            inv.onhost = smallfile.get_hostname(val)
-        else:
-            usage('unrecognized parameter name: %s' % prm)
+    # these parameters shouldn't be used by mere mortals
+
+    add('--min-dirs-per-sec',
+            type=positive_integer, default=test_params.min_directories_per_sec,
+            help=argparse.SUPPRESS)
+    add('--log-to-stderr', type=boolean, default=inv.log_to_stderr, 
+            help=argparse.SUPPRESS)
+    add('--remote-pgm-dir', default=test_params.remote_pgm_dir, 
+            help=argparse.SUPPRESS)
+    add('--slave',
+            help=argparse.SUPPRESS)
+    add('--as-host',
+            help=argparse.SUPPRESS)
+
+    args = parser.parse_args()
+
+    # FIXME: can we somehow get arg parser to 
+    # place results into inv and test_params?
+
+    inv.opname = args.operation
+    test_params.top_dirs = [ os.path.abspath(p) for p in args.top ]
+    inv.iterations = args.files
+    test_params.thread_count = args.threads
+    inv.files_per_dir = args.files_per_dir
+    inv.dirs_per_dir = args.dirs_per_dir
+    inv.record_sz_kb = args.record_size
+    inv.total_sz_kb = args.file_size
+    test_params.size_distribution = inv.filesize_distr = args.file_size_distribution
+    inv.xattr_size = args.xattr_size
+    inv.xattr_count = args.xattr_count
+    inv.prefix = args.prefix
+    inv.suffix = args.suffix
+    inv.hash_to_dir = args.hash_into_dirs
+    inv.pause_between_files = args.pause
+    inv.stonewall = args.stonewall
+    inv.finish_all_rq = args.finish
+    inv.measure_rsptimes = args.response_times
+    inv.fsync = args.fsync
+    inv.record_ctime_size = args.record_ctime_size
+    test_params.permute_host_dirs = args.permute_host_dirs
+    test_params.output_json = args.output_json
+    inv.incompressible = args.incompressible
+    inv.verify_read = args.verify_read
+    test_params.min_directories_per_sec = args.min_dirs_per_sec
+    inv.is_shared_dir = args.same_dir
+    inv.verbose = args.verbose
+    inv.log_to_stderr = args.log_to_stderr
+    test_params.remote_pgm_dir = args.remote_pgm_dir
+    test_params.network_sync_dir = args.network_sync_dir
+    test_params.is_slave = args.slave
+    inv.onhost = smallfile.get_hostname(args.as_host)
+    test_params.host_set = args.host_set
 
     # validate parameters further now that we know what they all are
+
+    sdmsg = 'directory %s containing network sync dir. must exist on all hosts (including this one)'
+    parentdir = os.path.dirname(test_params.network_sync_dir)
+    if not os.path.isdir(parentdir):
+        raise SmfParseException(sdmsg % parentdir)
 
     if inv.record_sz_kb > inv.total_sz_kb and inv.total_sz_kb != 0:
         usage('record size cannot exceed file size')
@@ -271,6 +261,7 @@ for additional help add the parameter "--help" to the command
         inv.set_top(test_params.top_dirs)
     else:
         test_params.top_dirs = inv.top_dirs
+
     if test_params.network_sync_dir:
         inv.network_dir = test_params.network_sync_dir
     else:
