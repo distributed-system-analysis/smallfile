@@ -148,8 +148,8 @@ assertfail $?
 # run the smallfile.py module's unit test
 
 echo "running smallfile.py unit test"
-#$PYTHON smallfile.py
-#assertok $?
+$PYTHON smallfile.py
+assertok $?
 
 # run the invoke_process.py unit test
 
