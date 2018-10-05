@@ -237,7 +237,7 @@ def parse():
 
     sdmsg = 'directory %s containing network sync dir. must exist on all hosts (including this one)'
     parentdir = os.path.dirname(test_params.network_sync_dir)
-    if not os.path.isdir(parentdir):
+    if not os.path.isdir(parentdir) and args.host_set != None:
         raise SmfParseException(sdmsg % parentdir)
 
     if inv.record_sz_kb > inv.total_sz_kb and inv.total_sz_kb != 0:
