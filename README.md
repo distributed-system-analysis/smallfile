@@ -110,7 +110,7 @@ Restrictions
 
 * for a multi-host test, all workload generators and the test driver must provide access to the same shared directory
 * does not support mixed workloads (mixture of different operation types)
-* is not accurate on single-threaded tests in memory resident filesystem 
+* is not accurate on single-threaded tests in memory resident filesystem
 * requires all hosts to have the same DNS domain name (plan to remove this
   restriction)
 * does not support HTTP access (use COSBench/ssbench for this)
@@ -230,6 +230,8 @@ To run a 4-host test doing same thing:
     # python smallfile_cli.py --operation create --threads 8 \  
        --file-size 1024 --files 2048 --top /mnt/gfs/smf \  
        --host-set host1,host2,host3,host4 
+
+Note: You can only perform a read operation on files that were generated with smallfile (using same parameters).
 
 Errors encountered by worker threads will be saved in /var/tmp/invoke-N.log where N is the thread number. After each test, a summary of thread results is displayed, and overall test results are aggregated for you, in three ways:
 
