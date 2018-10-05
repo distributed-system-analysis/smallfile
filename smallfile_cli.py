@@ -261,7 +261,12 @@ def run_workload():
     # each remote instance will wait
     # until all instances have reached starting gate
 
-    params = parse.parse()
+    try:
+        params = parse.parse()
+    except parse.SmfParseException as e:
+        print('ERROR: ' + str(e))
+        print('use --help option to get CLI syntax')
+        sys.exit(NOTOK)
 
     # for multi-host test
 
