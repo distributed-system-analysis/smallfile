@@ -203,20 +203,26 @@ assertfail $?
 runsmf "$scmd --finish foo"
 assertfail $?
 
+cat > $nfsdir/bad.yaml <<EOF
+--file-size 30
+EOF
+runsmf "python --yaml-input $nfsdir/bad.yaml"
+assertfail $?
+
 # run a command with all CLI options and verify that they were successfully parsed
 
 cleanup
+rm -rf $nfsdir/smf
 mkdir -p $nfsdir/smf
-scmd="$PYTHON smallfile_cli.py --top $nfsdir "
+scmd="$PYTHON smallfile_cli.py --top $nfsdir/smf "
 scmd="$scmd --verify-read N --response-times Y --finish N --stonewall N --permute-host-dirs Y --verbose Y"
-scmd="$scmd --same-dir Y --operation cleanup --threads 5 --files 20 --files-per-dir 5 --dirs-per-dir 3"
+scmd="$scmd --same-dir Y --operation create --threads 5 --files 20 --files-per-dir 5 --dirs-per-dir 3"
 scmd="$scmd --record-size 6 --file-size 30 --file-size-distribution exponential --prefix a --suffix b"
 scmd="$scmd --hash-into-dirs Y --pause 5 --host-set $localhost_name --output-json $nfsdir/smf.json"
 runsmf "$scmd"
 assertok $?
 expect_strs=( 'verify read? : N' \
         "hosts in test : \['$localhost_name'\]" \
-        'top test directory(s) : ' \
         'file size distribution : random exponential'\
         'filename prefix : a' \
         'filename suffix : b' \
@@ -232,8 +238,8 @@ expect_strs=( 'verify read? : N' \
         'finish all requests? : N' \
         'threads share directories? : Y' \
         'pause between files (microsec) : 5' \
-        "top test directory(s) : \['$nfsdir'\]" \
-        'operation : cleanup' \
+        "top test directory(s) : \['$nfsdir/smf'\]" \
+        'operation : create' \
         'threads : 5' \
         'files/thread : 20' \
         'files per dir : 5' \
@@ -251,6 +257,54 @@ for j in `seq 1 $expect_ct` ; do
   fi
   assertok $s $f
 done
+
+# now do same thing in YAML to verify 
+
+cleanup
+rm -rf $nfsdir/smf
+mkdir -p $nfsdir/smf
+yamlfile=$testdir/regtest.yaml
+
+cat > $yamlfile <<EOF
+top: $nfsdir/smf
+verify-read: N
+response-times: Y
+finish: n
+stonewall: false
+permute-host-dirs: y
+verbose: yes
+same-dir: Y
+operation: create
+threads: 5
+files: 20
+files-per-dir: 5
+dirs-per-dir: 3
+record-size: 6
+file-size: 30
+file-size-distribution: exponential
+prefix: a
+suffix: b
+hash-into-dirs:   yes
+pause: 5
+host-set: $localhost_name
+output-json: $nfsdir/smf.json
+EOF
+
+# argparse recognizes unambiguous abbreviations of param. names
+scmd="$PYTHON smallfile_cli.py --yaml-input $yamlfile"
+runsmf "$scmd"
+assertok $?
+for j in `seq 1 $expect_ct` ; do 
+  ((k = $j - 1))
+  expected_str="${expect_strs[$k]}"
+  $GREP "$expected_str" $f
+  s=$?
+  if [ $s != $OK ] ; then 
+    echo "expecting: $expected_str"
+  fi
+  assertok $s $f
+done
+
 
 echo "parsing JSON output"
 smfpretty=/var/tmp/smfpretty.json
