@@ -15,70 +15,12 @@ from smallfile import SmallfileWorkload, NOTOK
 import smf_test_params
 from smf_test_params import bool2YN
 import argparse
-
-# if we throw exceptions, do it with this
-# so caller can specifically catch them
-
-class SmfParseException(Exception):
-    pass
-
-TypeExc = argparse.ArgumentTypeError
-
-# the next few routines implement data types
-# of smallfile parameters
-
-def boolean(boolstr):
-    b = boolstr.lower()
-    if b == 'y' or b == 'yes' or b == 't' or b == 'true':
-        bval = True
-    elif b == 'n' or b == 'no' or b == 'f' or b == 'false':
-        bval = False
-    else:
-        raise TypeExc('boolean value must be y|yes|t|true|n|no|f|false')
-    return bval
-
-def positive_integer(posint_str):
-    intval = int(posint_str)
-    if intval <= 0:
-        raise TypeExc( 'integer value greater than zero expected')
-    return intval
-
-def non_negative_integer(nonneg_str):
-    intval = int(nonneg_str)
-    if intval < 0:
-        raise TypeExc( 'non-negative integer value expected')
-    return intval
-
-def host_set(hostname_list_str):
-    if os.path.isfile(hostname_list_str):
-        with open(hostname_list_str, 'r') as f:
-            hostname_list = [ record.strip() for record in f.readlines() ]
-    else:
-        hostname_list = hostname_list_str.strip().split(',')
-        if len(hostname_list) < 2:
-            hostname_list = hostname_list_str.strip().split()
-        if len(hostname_list) == 0:
-            raise TypeExc('host list must be non-empty')
-    return hostname_list
-
-def directory_list(directory_list_str):
-    directory_list = directory_list_str.strip().split(',')
-    if len(directory_list) == 1:
-        directory_list = directory_list_str.strip().split()
-    if len(directory_list) == 0:
-        raise TypeExc('directory list must be non-empty')
-    return directory_list
-
-def file_size_distrib(fsdistrib_str):
-    # FIXME: should be a data type
-    if fsdistrib_str == 'exponential':
-        return SmallfileWorkload.fsdistr_random_exponential
-    elif fsdistrib_str == 'fixed':
-        return SmallfileWorkload.fsdistr_fixed
-    else:
-        # should never get here
-        raise TypeExc(
-            'file size distribution must be either "exponential" or "fixed"')
+import yaml_parser
+from yaml_parser import parse_yaml
+import parser_data_types
+from parser_data_types import SmfParseException
+from parser_data_types import boolean, positive_integer, non_negative_integer
+from parser_data_types import host_set, directory_list, file_size_distrib
 
 # parse command line
 # return smf_test_params.smf_test_params instance
@@ -95,6 +37,8 @@ def parse():
     parser = argparse.ArgumentParser(
             description='parse smallfile CLI parameters')
     add = parser.add_argument
+    add('--yaml-input-file',
+            help='input YAML file containing all parameters below')
     add('--output-json',
             default=test_params.output_json,
             help='if true then output JSON-format version of results')
@@ -195,9 +139,6 @@ def parse():
 
     args = parser.parse_args()
 
-    # FIXME: can we somehow get arg parser to 
-    # place results into inv and test_params?
-
     inv.opname = args.operation
     test_params.top_dirs = [ os.path.abspath(p) for p in args.top ]
     inv.iterations = args.files
@@ -234,6 +175,12 @@ def parse():
     test_params.is_slave = args.slave
     inv.onhost = smallfile.get_hostname(args.as_host)
     test_params.host_set = args.host_set
+
+    # if YAML input was used, update test_params object with this
+    # YAML parameters override CLI parameters
+
+    if args.yaml_input_file:
+        yaml_parser.parse_yaml(test_params, args.yaml_input_file)
 
     # validate parameters further now that we know what they all are
 
