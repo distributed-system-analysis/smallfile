@@ -89,10 +89,12 @@ runsmf() {
 }
 
 cleanup() {
-  rm -rf /var/tmp/invoke*.log $testdir/*
+  rm -rf /var/tmp/invoke*.log $testdir/* *.pyc
   sudo mkdir -p $testdir
   grep $nfsdir /proc/mounts 
   if [ $? = $OK ] ; then sudo umount -v $nfsdir ; fi
+  rm -rf $nfsdir
+  mkdir -p $nfsdir
 }
 
 is_systemctl=1
@@ -161,6 +163,38 @@ assertok $?
 
 echo "running drop_buffer_cache.py unit test"
 $PYTHON drop_buffer_cache.py
+assertok $?
+
+# test simplest smallfile_cli commands, using non-default dirs
+
+echo "simplest smallfile_cli.py commands"
+
+scmd="$PYTHON smallfile_cli.py "
+cleanup
+ls -l /var/tmp/smf/{starting_gate,stonewall}.tmp 2>/tmp/e
+assertfail $?
+runsmf "$scmd"
+assertok $?
+ls -l /var/tmp/smf/{starting_gate,stonewall}.tmp
+
+non_dflt_dir=/var/tmp/foo
+scmd="$PYTHON smallfile_cli.py --top $non_dflt_dir "
+cleanup
+rm -rf $non_dflt_dir
+mkdir $non_dflt_dir
+runsmf "$scmd"
+assertok $?
+(cd $non_dflt_dir/network_shared ; ls -l {starting_gate,stonewall}.tmp)
+assertok $?
+
+scmd="$scmd --host-set localhost"
+cleanup
+rm -rf $non_dflt_dir
+mkdir $non_dflt_dir
+runsmf "$scmd"
+assertok $?
+(cd $non_dflt_dir/network_shared ; \
+ ls -l {starting_gate,stonewall}.tmp param.pickle host_ready.localhost.tmp)
 assertok $?
 
 # test parsing
