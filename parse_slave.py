@@ -35,15 +35,9 @@ def parse():
     if not os.path.exists(param_pickle_fname):
         time.sleep(1.1)
     params = None
-    try:
-        with open(param_pickle_fname, 'rb') as pickled_params:
-            params = pickle.load(pickled_params)
-            params.is_slave = True
-            params.as_host = args.as_host
-            params.master_invoke.onhost = args.as_host
-    except IOError as e:
-        if e.errno != errno.ENOENT:
-            raise e
-        usage('could not read parameter pickle file %s'
-              % param_pickle_fname)
+    with open(param_pickle_fname, 'rb') as pickled_params:
+        params = pickle.load(pickled_params)
+    params.is_slave = True
+    params.as_host = args.as_host
+    params.master_invoke.onhost = args.as_host
     return params
