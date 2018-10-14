@@ -102,7 +102,6 @@ def parse():
             type=boolean, default=inv.measure_rsptimes,
             help='if true then record response time of each file op')
     add('--network-sync-dir',
-            default=inv.network_dir,
             help='if --top not shared filesystem, provide shared filesystem directory')
     add('--operation',
             default='cleanup', choices=SmallfileWorkload.all_op_names,
@@ -228,7 +227,10 @@ def parse():
     inv.verbose = args.verbose
     inv.log_to_stderr = args.log_to_stderr
     test_params.remote_pgm_dir = args.remote_pgm_dir
-    test_params.network_sync_dir = args.network_sync_dir
+    if args.network_sync_dir:
+        test_params.network_sync_dir = args.network_sync_dir
+    else:
+        test_params.network_sync_dir = os.path.join(test_params.top_dirs[0], 'network_shared')
     test_params.is_slave = args.slave
     inv.onhost = smallfile.get_hostname(args.as_host)
     test_params.host_set = args.host_set
