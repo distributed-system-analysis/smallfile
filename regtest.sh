@@ -344,7 +344,7 @@ run_one_cmd()
 }
 
 common_params=\
-"$PYTHON smallfile_cli.py --files 500 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --verify-read Y --response-times N --xattr-count 9 --xattr-size 253 --stonewall N"
+"$PYTHON smallfile_cli.py --files 1000 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --verify-read Y --response-times N --xattr-count 9 --xattr-size 253 --stonewall N"
 
 echo "*** run one long cleanup test with huge directory and 1 thread ***"
 
