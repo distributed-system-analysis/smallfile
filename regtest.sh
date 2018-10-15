@@ -94,7 +94,16 @@ cleanup() {
   grep $nfsdir /proc/mounts 
   if [ $? = $OK ] ; then sudo umount -v $nfsdir ; fi
   rm -rf $nfsdir
-  mkdir -p $nfsdir
+  sudo mkdir -p $nfsdir
+  sudo chown $USER $nfsdir
+  sudo exportfs -uav
+  sudo exportfs -v -o rw,no_root_squash,sync,fsid=15 localhost:$testdir
+  sleep 1
+  sudo mount -v -t nfs -o nfsvers=3,tcp,actimeo=1 $localhost_name:$testdir $nfsdir
+  if [ $? != $OK ] ; then 
+    echo "NFS mount failed!"
+    exit $NOTOK
+  fi
 }
 
 is_systemctl=1
@@ -123,24 +132,10 @@ start_service nfs
 
 # set up NFS mountpoint
 
+sudo mkdir -p $testdir
+sudo chown $USER $testdir
+sudo chmod 777 $testdir
 cleanup
-$GREP $nfsdir /proc/mounts
-if [ $? != $OK ] ; then
-  sudo mkdir -pv $nfsdir
-  sudo chown $USER $nfsdir
-  sudo rm -rf $testdir
-  sudo mkdir -p $testdir
-  sudo chown $USER $testdir
-  sudo chmod 777 $testdir
-  sleep 1
-  sudo exportfs -v -o rw,no_root_squash,sync,fsid=15 localhost:$testdir
-  sleep 1
-  sudo mount -v -t nfs -o nfsvers=3,tcp,actimeo=1 $localhost_name:$testdir $nfsdir
-  if [ $? != $OK ] ; then 
-    echo "NFS mount failed!"
-    exit $NOTOK
-  fi
-fi
 
 # test assertion mechanism
 
@@ -194,7 +189,7 @@ mkdir $non_dflt_dir
 runsmf "$scmd"
 assertok $?
 (cd $non_dflt_dir/network_shared ; \
- ls -l {starting_gate,stonewall}.tmp param.pickle host_ready.localhost.tmp)
+ ls -l {starting_gate,stonewall}.tmp param.pickle host_ready.localhost.tmp) 2>/tmp/e
 assertok $?
 
 # test parsing
@@ -414,8 +409,8 @@ run_one_cmd "$many_thread_params --top $testdir --operation cleanup"
 
 echo "******** testing non-distributed operations" | tee -a $f
 
+cleanup
 for op in `supported_ops $xattrs ''` ; do
-  rm -rf /var/tmp/invoke*.log
   echo
   echo "testing local op $op"
   run_one_cmd "$common_params --operation $op"
@@ -432,8 +427,8 @@ for d in $topdirlist_nocomma ; do
   sudo mkdir -pv $d
   sudo chmod 777 $d
 done
+cleanup
 for op in `supported_ops $xattrs 'multitop'` ; do
-  rm -rf /var/tmp/invoke*.log
   echo
   echo "testing local op $op"
   run_one_cmd "$common_params --top $topdirlist --operation $op"
@@ -448,8 +443,8 @@ echo "******** testing distributed operations" | tee -a $f
 save_xattrs=$xattrs
 xattrs=0
 
+cleanup
 for op in `supported_ops $xattrs ''` ; do
-  rm -rf /var/tmp/invoke*.log
   echo
   echo "testing distributed op $op"
   run_one_cmd "$common_params --host-set $localhost_name --stonewall Y --pause 1000 --operation $op"
@@ -459,8 +454,8 @@ done
 
 echo "******* testing distributed operation with a host-local fs" | tee -a $f
 
+cleanup
 for op in `supported_ops $xattrs ''` ; do
-  rm -rf /var/tmp/invoke*.log
   rm -rf $nfsdir/sync
   mkdir $nfsdir/sync
   echo
@@ -471,13 +466,13 @@ done
 
 echo "*** run one long test of creates and reads ***" | tee -a $f
 
+cleanup
 xattrs=$save_xattrs
 rm -rf $bigtmp
 mkdir $bigtmp
 bigtest_params="$common_params --top $bigtmp --files 20000 --file-size 0 --record-size 4 "
 bigtest_params="$bigtest_params --files-per-dir 3 --dirs-per-dir 2 --threads 10 --stonewall Y --pause 10"
 for op in create read ; do
-  rm -rf /var/tmp/invoke*.log
   echo "big test with op $op"
   run_one_cmd "$bigtest_params --operation $op "
 done
