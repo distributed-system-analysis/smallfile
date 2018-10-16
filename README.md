@@ -4,8 +4,7 @@ smallfile
 A distributed workload generator for POSIX-like filesystems.
 
 New features:
-* JSON output format
-* response time post-processing
+* YAML input format for parameters
 
 # Table of contents
 
@@ -137,12 +136,21 @@ Boolean true/false parameters can be set to either Y
 name-value pairs with the format --name value .  To see what default values are,
 use --help option.
 
-The parameters are:
+The parameters are (from most useful to least useful):
 
+ * --yaml-input-file -- specify parameters in YAML instead of on command line
  * --operation -- operation type (see list below for choices)
  * --top -- top-level directory, all file accesses are done inside this
   directory tree. If you wish to use multiple mountpoints,provide a list of
   top-level directories separated by comma (no whitespace).
+ * --response-times – if Y then save response time for each file operation in a
+  rsptimes\*csv file in the shared network directory. Record format is
+  operation-type, start-time, response-time. The operation type is included so
+  that you can run different workloads at the same time and easily merge the
+  data from these runs. The start-time field is the time that the file
+  operation started, down to microsecond resolution. The response time field is
+  the file operation duration down to microsecond resolution.
+ * --output-json - if specified then write results in JSON format to the specified pathname for easier postprocessing.
  * --host-set -- comma-separated set of hosts used for this test, no domain
   names allowed. Default: non-distributed test.
  * --files -- how many files should each thread process? 
@@ -158,13 +166,13 @@ The parameters are:
   directory.
  * --hash-into-dirs – if Y then assign next file to a directory using a hash
   function, otherwise assign next –files-per-dir files to next directory.
- * --permute-host-dirs – if Y then have each host process a different
-  subdirectory tree than it otherwise would (see below for directory tree
-  structure).
  * --same-dir -- if Y then threads will share a single directory.
  * --network-sync-dir – don't need to specify unless you run a multi-host test
   and the –top parameter points to a non-shared directory (see discussion
   below). Default: network_shared subdirectory under –top dir.
+ * --permute-host-dirs – if Y then have each host process a different
+  subdirectory tree than it otherwise would (see below for directory tree
+  structure).
  * --xattr-size -- size of extended attribute value in bytes (names begin with
   'user.smallfile-') 
  * --xattr-count -- number of extended attributes per file
@@ -184,14 +192,6 @@ previous runs for example)
  * --stonewall -- if Y then thread will measure throughput as soon as it detects
   that another thread has finished.
  * --verify-read – if Y then smallfile will verify read data is correct.
- * --response-times – if Y then save response time for each file operation in a
-  rsptimes\*csv file in the shared network directory. Record format is
-  operation-type, start-time, response-time. The operation type is included so
-  that you can run different workloads at the same time and easily merge the
-  data from these runs. The start-time field is the time that the file
-  operation started, down to microsecond resolution. The response time field is
-  the file operation duration down to microsecond resolution.
- * --output-json - if specified then write results in JSON format to the specified pathname for easier postprocessing.
  * --remote-pgm-dir – don't need to specify this unless the smallfile software
   lives in a different directory on the target hosts and the test-driver host. 
  * --pause -- integer (microseconds) each thread will wait before starting next
@@ -249,6 +249,16 @@ To run just one unit test module, for example:
 
     # python -m unittest smallfile.Test.test_c3_Symlink
 
+How to specify parameters in YAML
+=============
+
+Sometimes it's more convenient to specify inputs in a YAML file when using a CI system such as Jenkins.  Smallfile has a flat YAML file format where the parameter name in yaml is the same as on the CLI except that the leading "--" is removed.  For example:
+```
+top: /mnt/xfs1/smf
+host-set: host1,host2
+```
+
+
 Results
 =======
 
@@ -304,7 +314,6 @@ host-22:01,40, 1.000000, 40.000000, 20.500000, 57.026595, 20.500000, 36.100000, 
 host-22:02,40, 1.000000, 40.000000, 20.500000, 57.026595, 20.500000, 36.100000, 38.050000, 39.610000, 
 host-22:03,40, 1.000000, 40.000000, 20.500000, 57.026595, 20.500000, 36.100000, 38.050000, 39.610000, 
 host-22:04,40, 1.000000, 40.000000, 20.500000, 57.026595, 20.500000, 36.100000, 38.050000, 39.610000, 
-
 ```
 * record 1 - contains headers for each column
 * record 2 - contains aggregate response time statistics for the entire distributed system, if it consists of more than 1 host
@@ -312,6 +321,7 @@ host-22:04,40, 1.000000, 40.000000, 20.500000, 57.026595, 20.500000, 36.100000, 
 * record 7-end - contains per-thread stats, sorted by host then thread
 
 You'll notice that even though all the threads have the same simulated response times, the 99th percentile values for each thread are different than the aggregate stats per host or for the entire test!  How can this be?  Percentiles are computed using the [numpy.percentiles](https://docs.scipy.org/doc/numpy/reference/generated/numpy.percentile.html) function, which linearly interpolates to obtain percentile values.  In the aggregate stats, the 99th percentile is linearly interpolated between two samples of 40 seconds, whereas in the per-thread results the 99th percentile is interpolated between samples of 40 and 39 seconds.  
+
 
 How to run correctly
 =============
