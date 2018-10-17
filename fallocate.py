@@ -59,3 +59,4 @@ if __name__ == '__main__':
     ret = os.write(fd, 'hi there')
     assert ret == 8
     os.close(fd)
+    print('SUCCESS')
