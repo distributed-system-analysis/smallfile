@@ -3,9 +3,10 @@ smallfile
 
 A distributed workload generator for POSIX-like filesystems.
 
-NOTE: Ben has just moved this repo from https://github.com/bengland2/smallfile to 
+NOTE: **Ben has just moved this repo** from https://github.com/bengland2/smallfile to 
 https://github.com/distributed-system-analysis/smallfile as part of a change 
-in its management.  Please update any scripts, etc. that clone it to 
+in its management.  Please update any scripts, etc. that clone it to point 
+to this new location.
 
 New features:
 * YAML input format for parameters
