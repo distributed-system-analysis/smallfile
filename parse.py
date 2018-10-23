@@ -168,10 +168,7 @@ def parse():
     inv.verbose = args.verbose
     inv.log_to_stderr = args.log_to_stderr
     test_params.remote_pgm_dir = args.remote_pgm_dir
-    if args.network_sync_dir:
-        test_params.network_sync_dir = args.network_sync_dir
-    else:
-        test_params.network_sync_dir = os.path.join(test_params.top_dirs[0], 'network_shared')
+    test_params.network_sync_dir = args.network_sync_dir
     test_params.is_slave = args.slave
     inv.onhost = smallfile.get_hostname(args.as_host)
     test_params.host_set = args.host_set
@@ -181,6 +178,8 @@ def parse():
 
     if args.yaml_input_file:
         yaml_parser.parse_yaml(test_params, args.yaml_input_file)
+    if not test_params.network_sync_dir:
+        test_params.network_sync_dir = os.path.join(test_params.top_dirs[0], 'network_shared')
 
     # validate parameters further now that we know what they all are
 
