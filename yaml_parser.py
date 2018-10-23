@@ -6,6 +6,7 @@ from parser_data_types import SmfParseException, TypeExc
 from parser_data_types import boolean, positive_integer, non_negative_integer
 from parser_data_types import host_set, directory_list, file_size_distrib
 import smf_test_params
+import os
 
 # module to parse YAML input file containing smallfile parameters
 # YAML parameter names are identical to CLI parameter names
@@ -97,57 +98,54 @@ def parse_yaml(test_params, input_yaml_file):
         raise SmfParseException(emsg)
 
 
-import unittest2
-import os
-
-class YamlParseTest(unittest2.TestCase):
-    def setUp(self):
-        self.params = smf_test_params.smf_test_params()
-
-    def tearDown(self):
-        self.params = None
-
-    def test_parse_all(self):
-        fn = '/tmp/sample_parse.yaml'
-        with open(fn, 'w') as f:
-            f.write('operation: create\n')
-        parse_yaml(self.params, fn)
-        assert(self.params.master_invoke.opname == 'create')
-
-    def test_parse_negint(self):
-        fn = '/tmp/sample_parse_negint.yaml'
-        with open(fn, 'w') as f:
-            f.write('files: -3\n')
-        try:
-            parse_yaml(self.params, fn)
-        except SmfParseException as e:
-            msg = str(e)
-            if not msg.__contains__('greater than zero'):
-                raise e
-
-    def test_parse_hostset(self):
-        fn = '/tmp/sample_parse_hostset.yaml'
-        with open(fn, 'w') as f:
-            f.write('host-set: host-foo,host-bar\n')
-        parse_yaml(self.params, fn)
-        assert(self.params.host_set == [ 'host-foo', 'host-bar' ])
-
-    def test_parse_fsdistr_exponential(self):
-        fn = '/tmp/sample_parse_fsdistr_exponential.yaml'
-        with open(fn, 'w') as f:
-            f.write('file-size-distribution: exponential\n')
-        parse_yaml(self.params, fn)
-        assert(self.params.master_invoke.filesize_distr == smallfile.SmallfileWorkload.fsdistr_random_exponential)
-
-    def test_parse_dir_list(self):
-        fn = '/tmp/sample_parse_dirlist.yaml'
-        with open(fn, 'w') as f:
-            f.write('top: foo,bar \n')
-        parse_yaml(self.params, fn)
-        mydir=os.getcwd()
-        topdirs = [ os.path.join(mydir, d) for d in [ 'foo', 'bar' ] ]
-        assert(self.params.top_dirs == topdirs)
-
-        
 if __name__ == '__main__':
+    import unittest2
+    class YamlParseTest(unittest2.TestCase):
+        def setUp(self):
+            self.params = smf_test_params.smf_test_params()
+
+        def tearDown(self):
+            self.params = None
+
+        def test_parse_all(self):
+            fn = '/tmp/sample_parse.yaml'
+            with open(fn, 'w') as f:
+                f.write('operation: create\n')
+            parse_yaml(self.params, fn)
+            assert(self.params.master_invoke.opname == 'create')
+
+        def test_parse_negint(self):
+            fn = '/tmp/sample_parse_negint.yaml'
+            with open(fn, 'w') as f:
+                f.write('files: -3\n')
+            try:
+                parse_yaml(self.params, fn)
+            except SmfParseException as e:
+                msg = str(e)
+                if not msg.__contains__('greater than zero'):
+                    raise e
+
+        def test_parse_hostset(self):
+            fn = '/tmp/sample_parse_hostset.yaml'
+            with open(fn, 'w') as f:
+                f.write('host-set: host-foo,host-bar\n')
+            parse_yaml(self.params, fn)
+            assert(self.params.host_set == [ 'host-foo', 'host-bar' ])
+
+        def test_parse_fsdistr_exponential(self):
+            fn = '/tmp/sample_parse_fsdistr_exponential.yaml'
+            with open(fn, 'w') as f:
+                f.write('file-size-distribution: exponential\n')
+            parse_yaml(self.params, fn)
+            assert(self.params.master_invoke.filesize_distr == smallfile.SmallfileWorkload.fsdistr_random_exponential)
+
+        def test_parse_dir_list(self):
+            fn = '/tmp/sample_parse_dirlist.yaml'
+            with open(fn, 'w') as f:
+                f.write('top: foo,bar \n')
+            parse_yaml(self.params, fn)
+            mydir=os.getcwd()
+            topdirs = [ os.path.join(mydir, d) for d in [ 'foo', 'bar' ] ]
+            assert(self.params.top_dirs == topdirs)
+
     unittest2.main()
