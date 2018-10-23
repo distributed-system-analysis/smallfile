@@ -142,6 +142,11 @@ cleanup
 cp -r /foo/bar/no-such-dir /tmp/ >> $f 2>&1
 assertfail $?
 
+# before running unit tests, install unittest2 python module
+
+sudo yum install -y python-unittest2 || sudo yum install -y python-unittest
+assertok $?
+
 # run the smallfile.py module's unit test
 
 echo "running smallfile.py unit test"
@@ -158,6 +163,17 @@ assertok $?
 
 echo "running drop_buffer_cache.py unit test"
 $PYTHON drop_buffer_cache.py
+assertok $?
+
+# run yaml parser unit test
+
+echo "running YAML parser unit test"
+$PYTHON yaml_parser.py
+assertok $?
+
+# now remove unittest python module, smallfile_cli.py should still run
+
+sudo yum remove python-unittest2 || sudo yum remove python-unittest
 assertok $?
 
 # test simplest smallfile_cli commands, using non-default dirs
