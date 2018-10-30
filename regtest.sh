@@ -173,7 +173,7 @@ assertok $?
 
 # now remove unittest python module, smallfile_cli.py should still run
 
-sudo yum remove python-unittest2 || sudo yum remove python-unittest
+sudo yum remove -y python-unittest2 || sudo yum remove -y python-unittest
 assertok $?
 
 # test simplest smallfile_cli commands, using non-default dirs
