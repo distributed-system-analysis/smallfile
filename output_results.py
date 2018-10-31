@@ -92,7 +92,7 @@ def output_results(invoke_list, test_params):
         json_obj = test_params.to_json()
         json_obj['results'] = rslt
         with open(test_params.output_json, 'w') as jsonf:
-            json.dump(json_obj, jsonf)
+            json.dump(json_obj, jsonf, indent=4)
 
     # finally, throw exceptions if something bad happened
     # wait until here to do it so we can see test results
