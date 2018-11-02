@@ -17,7 +17,8 @@ def output_results(invoke_list, test_params):
     max_elapsed_time = 0.0
     status = 'ok'
     rslt = {}
-    rslt['per-thread'] = {}
+    rslt['hosts'] = {}
+
     for invk in invoke_list:  # for each parallel SmallfileWorkload
 
         # add up work that it did
@@ -32,12 +33,19 @@ def output_results(invoke_list, test_params):
               (invk.onhost, invk.tid, invk.elapsed_time,
                invk.filenum_final, invk.rq_final, status))
         per_thread_obj = {}
-        per_thread_obj['onhost'] = invk.onhost
         per_thread_obj['elapsed'] = invk.elapsed_time,
         per_thread_obj['filenum-final'] = invk.filenum_final
         per_thread_obj['records'] = invk.rq_final
         per_thread_obj['status'] = status
-        rslt['per-thread'][invk.tid] = per_thread_obj
+
+        # for JSON, show nesting of threads within hosts
+
+        try:
+            per_host_results = rslt['hosts'][invk.onhost]
+        except KeyError:
+            per_host_results = { 'threads':{} }
+            rslt['hosts'][invk.onhost] = per_host_results
+        per_host_results['threads'][invk.tid] = per_thread_obj
 
         # aggregate to get stats for whole run
 
