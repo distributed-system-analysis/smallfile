@@ -47,7 +47,11 @@ import codecs
 OK = 0  # system call return code for success
 NOTOK = 1
 KB_PER_GB = 1 << 20
-pct_files_min = 90  # min % of files considered acceptable for a test run
+
+# min % of files processed considered acceptable for a test run
+# this should be a parameter but we'll just lower it to 70% for now
+# FIXME: should be able to calculate default based on thread count, etc.
+pct_files_min = 70
 
 # we have to support a variety of python environments,
 # so for optional features don't blow up if they aren't there, just remember
