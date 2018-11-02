@@ -99,11 +99,12 @@ cleanup() {
   sudo exportfs -uav
   sudo exportfs -v -o rw,no_root_squash,sync,fsid=15 localhost:$testdir
   sleep 1
-  sudo mount -v -t nfs -o nfsvers=3,tcp,actimeo=1 $localhost_name:$testdir $nfsdir
+  sudo mount -t nfs -o nfsvers=3,tcp,actimeo=1 $localhost_name:$testdir $nfsdir
   if [ $? != $OK ] ; then 
     echo "NFS mount failed!"
     exit $NOTOK
   fi
+  df $nfsdir
 }
 
 is_systemctl=1
@@ -362,7 +363,7 @@ json_strs=( 'params' 'file-size' 'file-size-distr' 'files-per-dir' \
 	    'top' 'verify-read' 'xattr-count' 'xattr-size' \
 	    'elapsed-time' 'files-per-sec' 'pct-files-done' \
 	    'per-thread' '00' 'elapsed' 'filenum-final' \
-	    'onhost' 'records' 'status' 'total-files' \
+	    'hosts' 'records' 'status' 'total-files' \
 	    'total-io-requests' 'total-threads')
 expect_ct=${#json_strs[*]}
 for j in `seq 1 $expect_ct` ; do
@@ -463,7 +464,7 @@ cleanup
 for op in `supported_ops $xattrs ''` ; do
   echo
   echo "testing distributed op $op"
-  run_one_cmd "$common_params --host-set $localhost_name --stonewall Y --pause 1000 --operation $op"
+  run_one_cmd "$common_params --host-set $localhost_name --stonewall Y --pause 500 --operation $op"
 done
 
 # we do these tests for virtualization (many KVM guests or containers, shared storage but no shared fs)
