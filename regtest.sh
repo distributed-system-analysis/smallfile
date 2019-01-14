@@ -252,7 +252,7 @@ assertfail $?
 cat > $nfsdir/bad.yaml <<EOF
 --file-size 30
 EOF
-runsmf "python --yaml-input $nfsdir/bad.yaml"
+runsmf "$PYTHON smallfile_cli.py --yaml-input $nfsdir/bad.yaml"
 assertfail $?
 
 # run a command with all CLI options and verify that they were successfully parsed
@@ -354,7 +354,7 @@ done
 
 echo "parsing JSON output"
 smfpretty=/var/tmp/smfpretty.json
-python -m json.tool < $nfsdir/smf.json > $smfpretty
+$PYTHON -m json.tool < $nfsdir/smf.json > $smfpretty
 json_strs=( 'params' 'file-size' 'file-size-distr' 'files-per-dir' \
 	    'files-per-thread' 'finish-all-requests' 'fname-prefix' \
 	    'fname-suffix' 'fsync-after-modify' 'hash-to-dir' 'host-set' \
