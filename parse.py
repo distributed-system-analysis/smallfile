@@ -15,8 +15,14 @@ from smallfile import SmallfileWorkload, NOTOK
 import smf_test_params
 from smf_test_params import bool2YN
 import argparse
-import yaml_parser
-from yaml_parser import parse_yaml
+yaml_parser_installed = False
+try:
+    import yaml_parser
+    from yaml_parser import parse_yaml
+    yaml_parser_installed = True
+except ImportError as e:
+    pass
+
 import parser_data_types
 from parser_data_types import SmfParseException
 from parser_data_types import boolean, positive_integer, non_negative_integer
@@ -177,6 +183,8 @@ def parse():
     # YAML parameters override CLI parameters
 
     if args.yaml_input_file:
+        if not yaml_parser_installed:
+            raise SmfParseException('python yaml module not available - is this PyPy?')
         yaml_parser.parse_yaml(test_params, args.yaml_input_file)
     if not test_params.network_sync_dir:
         test_params.network_sync_dir = os.path.join(test_params.top_dirs[0], 'network_shared')
