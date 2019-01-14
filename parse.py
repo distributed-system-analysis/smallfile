@@ -62,6 +62,9 @@ def parse():
     add('--host-set',
             type=host_set, default=test_params.host_set,
             help='list of workload generator hosts (or file containing it) ')
+    add('--launch-by-daemon',
+            type=boolean, default=test_params.launch_by_daemon,
+            help='use non-ssh launcher to get test running')
     add('--files',
             type=positive_integer, default=inv.iterations, 
             help='files processed per thread')
@@ -147,6 +150,7 @@ def parse():
 
     inv.opname = args.operation
     test_params.top_dirs = [ os.path.abspath(p) for p in args.top ]
+    test_params.launch_by_daemon = args.launch_by_daemon
     inv.iterations = args.files
     test_params.thread_count = args.threads
     inv.files_per_dir = args.files_per_dir
