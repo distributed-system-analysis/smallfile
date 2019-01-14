@@ -18,6 +18,8 @@ def parse_yaml(test_params, input_yaml_file):
     with open(input_yaml_file, 'r') as f:
         try:
             y = yaml.load(f)
+            if y == None:
+                y = {}
         except yaml.YAMLError as e:
             emsg = "YAML parse error: " + str(e)
             raise SmfParseException(emsg)
