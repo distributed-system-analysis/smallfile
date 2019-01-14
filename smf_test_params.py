@@ -41,6 +41,7 @@ class smf_test_params:
         self.network_sync_dir = network_sync_dir
         if network_sync_dir:
             self.master_invoke.network_dir = network_sync_dir
+        self.launch_by_daemon = False
         self.is_slave = slave
         self.permute_host_dirs = permute_host_dirs
         self.startup_timeout = 0
@@ -72,6 +73,7 @@ class smf_test_params:
 
     def __str__(self):
         fmt = 'smf_test_params: version=%s json=%s as_host=%s host_set=%s '
+        fmt += 'launch_by_daemon=%s'
         fmt += 'thread_count=%d remote_pgm_dir=%s'
         fmt += 'slave=%s permute_host_dirs=%s startup_timeout=%d '
         fmt += 'host_timeout=%d smf_invoke=%s '
@@ -80,6 +82,7 @@ class smf_test_params:
             str(self.output_json),
             str(self.as_host),
             str(self.host_set),
+            str(self.launch_by_daemon),
             self.thread_count,
             self.remote_pgm_dir,
             str(self.is_slave),
@@ -104,6 +107,7 @@ class smf_test_params:
         prm_list = [
             ('version', self.version),
             ('hosts in test', '%s' % self.host_set),
+            ('launch by daemon', '%s' % str(self.launch_by_daemon)),
             ('top test directory(s)', str(self.top_dirs)),
             ('operation', inv.opname),
             ('files/thread', '%d' % inv.iterations),
@@ -163,6 +167,7 @@ class smf_test_params:
         # and we want rest of parameters to be grouped together
 
         p['host-set'] = self.host_set
+        p['launch-by-daemon'] = self.launch_by_daemon
         p['version'] = self.version
         p['top'] = ','.join(self.top_dirs)
         p['operation'] = inv.opname
