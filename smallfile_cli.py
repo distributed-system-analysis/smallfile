@@ -94,7 +94,7 @@ def run_multi_host_workload(prm):
             this_remote_cmd += ' --as-host %s' % remote_host
         if verbose:
             print(this_remote_cmd)
-        if smallfile.is_windows_os:
+        if smallfile.is_windows_os or prm.launch_by_daemon:
             remote_thread_list.append(
                 launcher_thread.launcher_thread(prm,
                                                 remote_host,
