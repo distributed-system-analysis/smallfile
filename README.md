@@ -9,6 +9,7 @@ in its management.  Please update any scripts, etc. that clone it to point
 to this new location.
 
 New features:
+* support for docker containers
 * YAML input format for parameters
 
 # Table of contents
@@ -93,6 +94,7 @@ What it can do
 --------
 
 * multi-host - manages workload generators on multiple hosts
+* containers - can run on sets of docker containers
 * aggregates throughput - for entire set of hosts
 * synchronizes workload generation - can start and stop workload generator threads at approximately same time
 * pure workloads - only one kind of operation in each run (as opposed to mixed workloads)
@@ -158,6 +160,7 @@ The parameters are (from most useful to least useful):
  * --output-json - if specified then write results in JSON format to the specified pathname for easier postprocessing.
  * --host-set -- comma-separated set of hosts used for this test, no domain
   names allowed. Default: non-distributed test.
+ * --launch-by-daemon - if specified, then ssh will not be used to launch test, see section titled "launching remote worker threads"
  * --files -- how many files should each thread process? 
  * --threads -- how many workload generator threads should each smallfile_cli.py process create? 
  * --file-size -- total amount of data accessed per file.   If zero then no
@@ -664,9 +667,25 @@ command and read this file to discover test parameters.
 Launching remote worker threads
 ----------
 
-For Linux or other non-Windows environments, the test driver launches worker threads using parallel ssh commands to invoke the smallfile_remote.py program, and when this program exits, that is how the test driver discovers that the remote threads on this host have completed.
+For multi-host non-Windows environments, the test driver launches worker threads using parallel ssh commands to invoke the smallfile_remote.py program, and when this program exits, that is how the test driver discovers that the remote threads on this host have completed.  This works both for bare metal hosts and for virtual machines.
 
-For Windows environments, ssh usage is more problematic. Sshd requires installation of cygwin, a Windows app that emulates a Linux-like environment, but we really want to test with native win32 environment instead. So a different launching method is used (and this method works on non-Windows environments as well). 
+For Windows or containerized environments, ssh usage is more problematic. In Windows, ssh daemon "sshd" requires installation of cygwin, a Windows app that emulates a Linux-like environment, but we really want to test with native win32 environment instead. For containers, sshd is not typically available as a way to get inside the container.  So a different launching method is used (and this method works on non-Windows environments as well). 
+
+First you start launch_smf_host.py in each workload generator.    You must specify --top parameter for each remote host or container.  
+
+For Windows workload generators, if you are running smallfile_cli.py from a non-Windows host you may need --substitute-top parameter followed by the Windows path to the top directory, usually not the same as in Linux/Unix.  For example:
+
+    % start python launch_smf_host.py --top /mnt/cifs/smf --substitute-top z:\smf
+
+For containers, You must specify each daemon's unique ID in the command line - for example, if this is running in a container, then the hostname may not be unique.  This unique ID will be used by the launch_smf_host.py daemon in the container to search for requests from the test driver to run a test.  For example:
+
+    # ./launch_smf_host.py --top /mnt/sharedfs/smf --host-set container_2
+
+Next, you run smallfile_cli.py with "--launch-by-daemon Y" option and pass --host-set followed by a list of the Daemon IDs that you want to participate in the test.  For example:
+
+    # ./smallfile_cli.py --launch-by-daemon Y --host-set container_1,container_2
+
+This second step will result in a set of files being created in the shared network directory, 1 per daemon, that provide the daemon with the test parameters that it is to use.  The existence of this file will tell the daemon to start a test.  Everything else works the same as with ssh method.
 
 Returning results
 -----------------
