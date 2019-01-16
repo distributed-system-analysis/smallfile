@@ -41,8 +41,7 @@ function shutdown_containers()
 
 smallfile_cli=smallfile_cli.py
 
-# clean out any known_hosts entries for previous incarnations of containers
-# so we won't get error from ssh
+# create filesystem directory shared by containers
 
 sudo rm -rf $topdir
 mkdir -pv $topdir
