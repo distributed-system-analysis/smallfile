@@ -659,13 +659,26 @@ class SmallfileWorkload:
         if self.starting_gate:
             gateReady = self.gen_thread_ready_fname(self.tid)
             touch(gateReady)
+            delay_time = 0.1
             while not os.path.exists(self.starting_gate):
                 if os.path.exists(self.abort_fn()):
                     raise Exception('thread ' + str(self.tid)
                                     + ' saw abort flag')
                 # wait a little longer so that
                 # other clients have time to see that gate exists
-                time.sleep(0.3)
+                delay_time = delay_time * 1.5
+                if delay_time > 2.0: delay_time = 2.0
+                time.sleep(delay_time)
+            gateinfo = os.stat(self.starting_gate)
+            synch_time = gateinfo.st_mtime + 3.0 - time.time()
+            if synch_time > 0.0:
+                time.sleep(synch_time)
+            if synch_time < 0.0:
+                log.warn('other threads may have already started')
+            if self.verbose:
+                self.log.debug('started test at %f sec after waiting %f sec' % 
+                                (time.time(), synch_time))
+
 
     # record info needed to compute test statistics
 
@@ -2007,6 +2020,7 @@ class Test(unittest_class):
         self.cleanup_files()
 
     def test_z_multithr_stonewall(self):
+        self.invok.verbose = True
         self.invok.stonewall = True
         self.invok.finish = True
         self.invok.prefix = 'thr_'
