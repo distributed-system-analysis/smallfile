@@ -201,7 +201,7 @@ def parse():
         raise SmfParseException(sdmsg % parentdir)
 
     if inv.record_sz_kb > inv.total_sz_kb and inv.total_sz_kb != 0:
-        usage('record size cannot exceed file size')
+        raise SmfParseException('record size cannot exceed file size')
 
     if inv.record_sz_kb == 0 and inv.verbose:
         print(('record size not specified, ' +
@@ -211,12 +211,14 @@ def parse():
     if test_params.top_dirs:
         for d in test_params.top_dirs:
             if len(d) < 6:
-                usage('directory less than 6 characters, ' +
-                      'cannot use top of filesystem, too dangerous')
-            if not os.path.isdir(d) and not test_params.network_sync_dir:
-                usage('you must ensure that shared directory ' + d + 
-                      ' is accessible ' +
-                      'from this host and every remote host in test')
+                raise SmfParseException(
+                        'directory less than 6 characters, ' +
+                        'cannot use top of filesystem, too dangerous')
+            if not os.path.isdir(d) and test_params.network_sync_dir != None:
+                raise SmfParseException(
+                        'you must ensure that shared directory ' + d + 
+                        ' is accessible ' +
+                        'from this host and every remote host in test')
     if test_params.top_dirs:
         inv.set_top(test_params.top_dirs)
     else:
