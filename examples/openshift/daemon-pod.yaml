@@ -1,0 +1,54 @@
+# This pod is a crude example of how to get a smallfile pod running 
+# in an OpenShift environment.  
+# first you upload the docker image into quay.io public image,
+# and then you can reference it from your openshift cluster
+# For some reason I found it necessary to build off centos:7 not fedora:28
+# not sure why that is.
+# The fedora:28 backed image could not run a shell on RHEL7 OpenShift 3.11 site
+# containers aren't supposed to work like this
+# to run it, on one of the cluster hosts:
+#
+# <create your ceph secret first, name it ceph-secret-cephfs>
+# oc create -f daemon-pod.yaml
+# mount -t ceph -o name=admin,secretfile=/etc/ceph/cephfs.key 172.18.70.11:6789:/ /mnt/cephfs
+# cd /root
+# git clone https://github.com/distributed-system-analysis/smallfile
+# ln -sv /root/smallfile /
+# /smallfile/smallfile_cli.py --top /mnt/cephfs --host-set c1 --launch-by-daemon Y
+#
+# oc logs cephfs-smf
+# 
+# you should see a record of the daemon starting a run for this container.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cephfs-smf
+  #labels:
+  #  smf-hostset: 1
+spec:
+  containers:
+  - name: cephfs-rw
+    image: quay.io/bengland2/smallfile:20190205
+    securityContext:
+      privileged: true
+      runAsUser: 0
+    env:
+      - name: topdir
+        value: "/mnt/cephfs"
+      - name: smf_launch_id
+        value: "c1"
+    volumeMounts:
+    - mountPath: "/mnt/cephfs"
+      name: cephfs
+  volumes:
+  - name: cephfs
+    cephfs:
+      monitors:
+      - 172.18.70.11:6789
+      - 172.18.70.12:6789
+      - 172.18.70.13:6789
+      user: admin
+      secretRef:
+        name: ceph-secret-cephfs
+      readOnly: false
