@@ -1,5 +1,6 @@
 # This pod is a crude example of how to get a smallfile pod running 
 # in an OpenShift environment.  
+# NOTE: THIS IS TOTALLY INSECURE!!! IT RUNS AS ROOT!!
 # first you upload the docker image into quay.io public image,
 # and then you can reference it from your openshift cluster
 # For some reason I found it necessary to build off centos:7 not fedora:28
