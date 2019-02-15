@@ -45,10 +45,14 @@ class subprocess(multiprocessing.Process):
             self.status = self.invoke.NOTOK
         finally:
             self.rsptimes = None  # response time array already saved to file
+            # reduce amount of data returned from this thread
+            # by eliminating references objects that are no longer needed
             self.invoke.log = None  # log objects cannot be serialized
             self.invoke.buf = None
             self.invoke.biggest_buf = None
-            self.rsptimes = []
+            self.invoke.rsptimes = None
+            self.invoke.loggers = None
+            self.invoke.file_dirs = None
             self.sender.send(self.invoke)
 
 
