@@ -41,10 +41,7 @@ import socket
 OK = 0
 NOTOK = 1
 
-log = None
-
 def start_log(prefix = socket.gethostname()):
-    global log
     log = logging.getLogger(prefix)
     if os.getenv('LOGLEVEL_DEBUG') != None:
         log.setLevel(logging.DEBUG)
@@ -62,6 +59,7 @@ def start_log(prefix = socket.gethostname()):
     log.addHandler(h2)
 
     log.info('starting log')
+    return log
 
 def usage(msg):
     print(msg)
@@ -69,10 +67,6 @@ def usage(msg):
             '--top top-directory '
             '[ --substitute-top synonym-directory ]'
             '[ --as-host as-host-name ] ')
-    sys.exit(NOTOK)
-
-def myabort(msg):
-    log.error(msg)
     sys.exit(NOTOK)
 
 
@@ -104,7 +98,7 @@ while j < len(sys.argv):
         usage('unrecognized parameter --%s' % nm)
 if not top_dir:
     usage('you must specify --top directory')
-start_log(prefix=as_host)
+log = start_log(prefix=as_host)
 log.info('substitute-top %s, top directory %s, as-host %s' % 
         (substitute_dir, top_dir, as_host))
 
