@@ -674,7 +674,7 @@ class SmallfileWorkload:
             if synch_time > 0.0:
                 time.sleep(synch_time)
             if synch_time < 0.0:
-                log.warn('other threads may have already started')
+                self.log.warn('other threads may have already started')
             if self.verbose:
                 self.log.debug('started test at %f sec after waiting %f sec' % 
                                 (time.time(), synch_time))
