@@ -79,7 +79,7 @@ while [ $count -le $max_containers ] ; do
     mkdir -pv $rundir
     head -n $count $logdir/smf-servers.list > $rundir/smf-servers.list
     cmd="$smallfile_cli --top $topdir --output-json json.log "
-    cmd="$cmd --launch-by-daemon Y --host-set=$rundir/smf-servers.list"
+    cmd="$cmd --launch-by-daemon Y --host-set=$rundir/smf-servers.list --remote-pgm-dir /smallfile "
     cmd="$cmd --threads 1 --files $files_per_thread --file-size 4 --operation $op"
     echo "$cmd"
     ( cd $rundir ; nice $cmd 2>&1 | tee run.log ) || break
