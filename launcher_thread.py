@@ -23,7 +23,9 @@ from smallfile import ensure_deleted
 
 # this class is just used to create a python thread
 # for each remote host that we want to use as a workload generator
-# the thread just executes an ssh command to run this program on a remote host
+# the thread just saves a command in a shared directory
+# for the remote host or container to run,
+# then waits for the result to appear in the same shared directory
 
 class launcher_thread(threading.Thread):
 
@@ -42,9 +44,7 @@ class launcher_thread(threading.Thread):
         abortfn = master_invoke.abort_fn()
         ensure_deleted(launch_fn)
         ensure_deleted(pickle_fn)
-        with open(launch_fn, 'w') as launch_file:
-            launch_file.write(self.remote_cmd)
-            launch_file.close()
+        write_sync_file(launch_fn, self.remote_cmd)
         pickle_fn = master_invoke.host_result_filename(self.remote_host)
         # print('waiting for pickle file %s'%pickle_fn)
         self.status = master_invoke.NOTOK  # premature exit means failure
@@ -54,5 +54,5 @@ class launcher_thread(threading.Thread):
                 if master_invoke.verbose:
                     print('test abort seen by host ' + self.remote_host)
                 return
-            time.sleep(3)
+            time.sleep(1.0)
         self.status = master_invoke.OK  # success!
