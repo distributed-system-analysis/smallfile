@@ -7,20 +7,21 @@ import time
 
 import smallfile
 
+notyet = '.notyet'
 
 def write_sync_file(fpath, contents):
-    with open(fpath, 'w') as sgf:
+    with open(fpath+notyet, 'w') as sgf:
         sgf.write(contents)
         sgf.flush()
         os.fsync(sgf.fileno())  # file should close when you exit with block
-
+        os.rename(fpath+notyet, fpath)
 
 def write_pickle(fpath, obj):
-    with open(fpath, 'wb') as result_file:
+    with open(fpath+notyet, 'wb') as result_file:
         pickle.dump(obj, result_file)
         result_file.flush()
         os.fsync(result_file.fileno())  # or else reader may not see data
-
+        os.rename(fpath+notyet, fpath)
 
 def create_top_dirs(master_invoke, is_multi_host):
     if os.path.exists(master_invoke.network_dir):
