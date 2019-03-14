@@ -158,7 +158,7 @@ The parameters are (from most useful to least useful):
   operation started, down to microsecond resolution. The response time field is
   the file operation duration down to microsecond resolution.
  * --output-json - if specified then write results in JSON format to the specified pathname for easier postprocessing.
- * --host-set -- comma-separated set of hosts used for this test, no domain
+ * --host-set -- comma-separated set of hosts used for this test, or file containing list of hosts
   names allowed. Default: non-distributed test.
  * --launch-by-daemon - if specified, then ssh will not be used to launch test, see section titled "launching remote worker threads"
  * --files -- how many files should each thread process? 
@@ -371,7 +371,8 @@ Use with distributed filesystems
 With distributed filesystems, it is necessary to have multiple hosts
 simultaneously applying workload to measure the performance of a distributed
 filesystem. The –host-set parameter lets you specify a comma-separated list of
-hosts to use.
+hosts to use, or you can just specify a filename containing a list of hosts, 1 host per record.  
+The latter is certainly the more convenient option for large clusters.
 
 For any distributed filesystem test, there must be a single directory which is
 shared across all hosts, both test driver and worker hosts, that can be used to
