@@ -19,7 +19,7 @@ import os
 import time
 import smallfile
 from smallfile import ensure_deleted
-
+from sync_files import write_sync_file
 
 # this class is just used to create a python thread
 # for each remote host that we want to use as a workload generator
@@ -44,6 +44,8 @@ class launcher_thread(threading.Thread):
         abortfn = master_invoke.abort_fn()
         ensure_deleted(launch_fn)
         ensure_deleted(pickle_fn)
+        if self.prm.master_invoke.verbose:
+            print('wrote command %s to launch file %s' % (self.remote_cmd, launch_fn))
         write_sync_file(launch_fn, self.remote_cmd)
         pickle_fn = master_invoke.host_result_filename(self.remote_host)
         # print('waiting for pickle file %s'%pickle_fn)
