@@ -5,21 +5,28 @@
 
 # parameter 1 is directory where smallfile lives on the test driver host
 # this is not the same as where it lives in the container (/)
-smallfile_dir=$1
+topdir=$1
 
-# parameter 2 is the docker image name for the container that 
+# parameter 2 is test directory where smallfile should access files
+# this should be same for both container and this script
+smallfile_dir=$2
+
+# parameter 3 is the docker image name for the container that 
 # you built with ./smallfile/Dockerfile
-image=$2
+image=$3
 
-if [ "$2" = "" ] ; then
-  echo 'usage: run-smallfile-docker-test.sh smallfile-dir image'
+if [ "$3" = "" ] ; then
+  echo 'usage: run-smallfile-docker-test.sh top-dir smallfile-dir image'
   exit 1
 fi
-export PATH=$PATH:$smallfile_dir
-topdir=/var/tmp/smfdocker
+
+smallfile_cli=$smallfile_dir/smallfile_cli.py
+
 # container counts should be powers of 2
 min_containers=1
 max_containers=4
+
+# workload parameters
 total_files=100000
 oplist='create read delete cleanup'
 
@@ -38,8 +45,6 @@ function shutdown_containers()
     $d rm smf-svr$n
   done
 }
-
-smallfile_cli=smallfile_cli.py
 
 # create filesystem directory shared by containers
 
