@@ -103,10 +103,12 @@ def run_multi_host_workload(prm):
             remote_thread_list.append(ssh_thread.ssh_thread(remote_host,
                                                             this_remote_cmd))
 
-    # start them, pacing starts so that we don't get ssh errors
+    # start them
 
     for t in remote_thread_list:
-        time.sleep(0.1)
+        if not prm.launch_by_daemon:
+            # pace starts so that we don't get ssh errors
+            time.sleep(0.1)
         t.start()
 
     # wait for hosts to arrive at starting gate
