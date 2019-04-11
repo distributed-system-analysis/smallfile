@@ -110,4 +110,4 @@ def output_results(invoke_list, test_params):
             'at least one thread encountered error, test may be incomplete')
     if status == 'ok' and pct_files < smallfile.pct_files_min:
         raise SMFResultException(
-            'not enough total files processed, change test parameters')
+            'not enough total files processed before 1st thread finished, change test parameters')
