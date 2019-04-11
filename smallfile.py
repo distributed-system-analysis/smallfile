@@ -1582,8 +1582,8 @@ class SmallfileWorkload:
                 max(10, self.max_files_between_checks - self.total_sz_kb / 100)
         try:
             self.end_time = 0.0
-            self.start_time = time.time()
             self.wait_for_gate()
+            self.start_time = time.time()
             o = self.opname
             try:
                 func = SmallfileWorkload.workloads[o]
