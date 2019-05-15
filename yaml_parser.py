@@ -17,7 +17,7 @@ def parse_yaml(test_params, input_yaml_file):
     inv = test_params.master_invoke
     with open(input_yaml_file, 'r') as f:
         try:
-            y = yaml.load(f)
+            y = yaml.safe_load(f)
             if y == None:
                 y = {}
         except yaml.YAMLError as e:
