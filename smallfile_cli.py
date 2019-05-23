@@ -192,6 +192,7 @@ def run_multi_host_workload(prm):
 
         try:
             sync_files.write_sync_file(starting_gate, 'hi')
+            prm.test_start_time = time.time()
             print('starting all threads by creating starting gate file %s' %
                   starting_gate)
         except IOError as e:

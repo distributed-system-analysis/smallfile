@@ -14,6 +14,15 @@
 # since there is no standard method for this yet,
 # this program has to be adjusted to parse the filenames
 # and extract 2 fields, thread number and short hostname
+#
+# the start-time parameter is optional but if it is specified
+# the percentiles-vs-time time column will have this added to it
+# this could be useful for ingesting data into a repository like
+# elastic search and displaying it side-by-side with other performance
+# data collected during a test run.  The default of 0 just outputs
+# time since start of test (like before).  The start time as
+# seconds since the epoch (1970) can be obtained from the JSON
+# output in the 'start-time' field.
 # 
 # 
 import sys
@@ -33,12 +42,14 @@ time_infinity = 1<<62
 
 percentiles = [ 50, 90, 95, 99 ]
 min_rsptime_samples = 5
+start_time = 0.0
 
 def usage( msg ):
   print('ERROR: %s' % msg)
   print('usage: python smallfile_rsptimes_stats.py ')
   print('           [ --common-hostname-suffix my.suffix ] ')
   print('           [ --time-interval positive-integer-seconds ] ')
+  print('           [ --start-time seconds-since-1970 ] ')
   print('           directory' )
   sys.exit(1)
 
@@ -55,6 +66,8 @@ def parse_rsptime_file( result_dir, csv_pathname ):
             components = sample.split(',')
             op = components[0]
             at_time = float(components[1])
+            if start_time > 0:
+                at_time += start_time
             rsp_time = float(components[2])
             samples.append( (op, at_time, rsp_time) )
     return samples
@@ -164,6 +177,8 @@ while argindex < argcount:
       suffix = '.' + pval
   elif pname == 'time-interval':
     time_interval = int(pval)
+  elif pname == 'start-time':
+    start_time = float(pval)
   else:
     usage('--%s: no such optional parameter defined' % pname)
 
@@ -308,7 +323,7 @@ with open(summary_pathname, 'w') as outf:
                 for (_, samples) in per_host_dict.values():
                     cluster_sample_set.extend(samples)
             sorted_cluster_tuple = do_sorting(cluster_sample_set)
-        for from_t in range(0,quantized_end_time,time_interval):
+        for from_t in range(int(start_time),quantized_end_time,time_interval):
             to_t = from_t + time_interval
             results_in_interval = reduce_thread_set(sorted_cluster_tuple, 
                                                     from_time=from_t, 

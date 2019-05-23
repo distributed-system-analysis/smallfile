@@ -46,6 +46,7 @@ class smf_test_params:
         self.permute_host_dirs = permute_host_dirs
         self.startup_timeout = 0
         self.host_startup_timeout = 0
+        self.test_start_time = None
 
     # calculate timeouts assuming 2 directories per second
 

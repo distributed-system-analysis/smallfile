@@ -124,6 +124,7 @@ def run_multi_thread_workload(prm):
                 print('wrote starting gate file')
         except IOError as e:
             print('error writing starting gate for threads: %s' % str(e))
+        prm.test_start_time = time.time()
 
     # wait for starting_gate file to be created by test driver
     # every second we resume scan from last host file not found

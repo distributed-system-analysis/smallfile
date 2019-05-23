@@ -82,6 +82,7 @@ def output_results(invoke_list, test_params):
     rslt['pct-files-done'] = pct_files
     print('elapsed time = %9.3f' % max_elapsed_time)
     rslt['elapsed-time'] = max_elapsed_time
+    rslt['start-time'] = test_params.test_start_time
     if max_elapsed_time > 0.001:  # can't compute rates if it ended too quickly
         files_per_sec = total_files / max_elapsed_time
         print('files/sec = %f' % files_per_sec)
