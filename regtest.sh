@@ -91,20 +91,22 @@ runsmf() {
 cleanup() {
   rm -rf /var/tmp/invoke*.log $testdir/* *.pyc
   sudo mkdir -p $testdir
-  grep $nfsdir /proc/mounts 
-  if [ $? = $OK ] ; then sudo umount -v $nfsdir ; fi
+  grep -q $nfsdir /proc/mounts 
+  if [ $? = $OK ] ; then sudo umount $nfsdir || exit $NOTOK ; fi
   rm -rf $nfsdir
   sudo mkdir -p $nfsdir
   sudo chown $USER $nfsdir
-  sudo exportfs -uav
-  sudo exportfs -v -o rw,no_root_squash,sync,fsid=15 localhost:$testdir
-  sleep 1
-  sudo mount -t nfs -o nfsvers=3,tcp,actimeo=1 $localhost_name:$testdir $nfsdir
+  sudo exportfs -v | grep -q $testdir 2>/tmp/ee
   if [ $? != $OK ] ; then 
-    echo "NFS mount failed!"
+    sudo exportfs -v -o rw,no_root_squash,sync,fsid=15 localhost:$testdir || exit $NOTOK
+  fi
+  sudo exportfs -v | grep -q $testdir 2>/tmp/ee
+  if [ $? != $OK ] ; then 
+    echo "$testdir should be exported at this point"
     exit $NOTOK
   fi
-  df $nfsdir
+  sleep 1
+  sudo mount -t nfs -o nfsvers=3,tcp,actimeo=1 $localhost_name:$testdir $nfsdir || exit $NOTOK
 }
 
 is_systemctl=1
@@ -412,10 +414,19 @@ run_one_cmd()
 common_params=\
 "$PYTHON smallfile_cli.py --files 1000 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --verify-read Y --response-times N --xattr-count 9 --xattr-size 253 --stonewall N"
 
+# also test response time percentile analysis
+
 echo "*** run one long cleanup test with huge directory and 1 thread ***"
 
 cleanup_test_params="$common_params --threads 1 --files 1000000 --files-per-dir 1000000 --file-size 0"
-run_one_cmd "$cleanup_test_params --top $testdir --operation create"
+rm -fv /tmp/smf.json $testdir/*rsptime*csv
+run_one_cmd "$cleanup_test_params --top $testdir --operation create --response-times Y --output-json /tmp/smf.json"
+start_time=$(tr '",' '  ' < /tmp/smf.json | awk '/start-time/{print $NF}')
+echo "start time was $start_time"
+$PYTHON smallfile_rsptimes_stats.py --start-time $start_time --time-interval 1 $testdir/network_shared
+int_start_time=$(echo $start_time | awk -F. '{ print $1 }')
+echo "rounded-down start time was $int_start_time"
+grep $int_start_time $testdir/network_shared/stats-rsptimes.csv || exit $NOTOK
 run_one_cmd "$cleanup_test_params --top $testdir --operation cleanup"
 
 echo "*** run one test with many threads ***"
