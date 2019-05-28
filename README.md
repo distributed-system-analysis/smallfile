@@ -128,11 +128,14 @@ Restrictions
 How to specify test
 ============
 
-You must have password-less ssh access between the test driver node and the
-workload generator hosts if you want to run a distributed (multi-host) test.
-
 You must use a directory visible to all participating hosts to run a
 distributed test.
+
+You can include multiple hosts in a test in 1 of 2 ways:
+* provide password-less ssh access to these hosts from the test driver
+* run the launcher daemon on each host (more about this below)
+
+This latter method is particularly useful for containers where we may not want to have each container running sshd.  To see more about this, look for the --launch-by-daemon parameter below.
 
 To see what parameters are supported by smallfile_cli.py, do 
 
