@@ -126,12 +126,12 @@ else
 fi
 if [ $? != $OK ] ; then
   echo "FAILED to start service $svcname"
-  exit $NOTOK
+  return $NOTOK
 fi
 }
 
-start_service sshd
-start_service nfs
+start_service sshd || exit $NOTOK
+start_service nfs || start_service nfs-server || exit $NOTOK
 
 # set up NFS mountpoint
 
