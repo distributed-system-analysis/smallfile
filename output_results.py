@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+from copy import deepcopy
 import os
 import json
 import smallfile
@@ -33,7 +34,7 @@ def output_results(invoke_list, test_params):
               (invk.onhost, invk.tid, invk.elapsed_time,
                invk.filenum_final, invk.rq_final, status))
         per_thread_obj = {}
-        per_thread_obj['elapsed'] = invk.elapsed_time,
+        per_thread_obj['elapsed'] = invk.elapsed_time
         per_thread_obj['filenum-final'] = invk.filenum_final
         per_thread_obj['records'] = invk.rq_final
         per_thread_obj['status'] = status
@@ -72,7 +73,9 @@ def output_results(invoke_list, test_params):
         print('total data = %9.3f GiB' % total_data_gb)
         rslt['total-data-GB'] = total_data_gb
     if not test_params.host_set:
-        test_params.host_set = ['localhost']
+        test_params.host_set = [ 'localhost' ]
+    json_test_params = deepcopy(test_params)
+    json_test_params.host_set = ','.join(test_params.host_set)
     if len(invoke_list) < len(test_params.host_set) * test_params.thread_count:
         print('WARNING: failed to get some responses from workload generators')
     max_files = my_host_invoke.iterations * len(invoke_list)
@@ -98,7 +101,7 @@ def output_results(invoke_list, test_params):
     # if JSON output requested, generate it here
 
     if test_params.output_json:
-        json_obj = test_params.to_json()
+        json_obj = json_test_params.to_json()
         json_obj['results'] = rslt
         with open(test_params.output_json, 'w') as jsonf:
             json.dump(json_obj, jsonf, indent=4)
