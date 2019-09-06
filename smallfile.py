@@ -1055,6 +1055,9 @@ class SmallfileWorkload:
     # must also be attempted in do_read
 
     def do_create(self):
+        if self.record_ctime_size and not xattr_installed:
+            raise Exception(
+                'no python xattr module, cannot record create time + size')
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
             self.op_starttime()
@@ -1340,6 +1343,9 @@ class SmallfileWorkload:
     # and measure throughput (and someday latency)
 
     def do_await_create(self):
+        if not xattr_installed:
+            raise Exception(
+                'no python xattr module, so cannot read xattrs')
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
             self.log.debug('awaiting file %s' % fn)
