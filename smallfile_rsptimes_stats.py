@@ -109,7 +109,10 @@ def find_gt(a, x):
     i = bisect.bisect_left(a, x)
     if i < len(a):
         return i
-    raise ValueError
+    # since the only thing we are doing with this result
+    # is to extract a slice of an array, 
+    # returning len(a) is a valid thing
+    # raise ValueError
 
 
 # if you want this to calculate stats for a time_interval
