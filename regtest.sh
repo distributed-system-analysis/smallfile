@@ -363,10 +363,10 @@ json_strs=( 'params' 'file-size' 'file-size-distr' 'files-per-dir' \
 	    'network-sync-dir' 'operation' 'pause-between-files' \
 	    'permute-host-dirs' 'share-dir' 'stonewall' 'threads' \
 	    'top' 'verify-read' 'xattr-count' 'xattr-size' \
-	    'elapsed-time' 'files-per-sec' 'pct-files-done' \
-	    'per-thread' '00' 'elapsed' 'filenum-final' \
-	    'hosts' 'records' 'status' 'total-files' \
-	    'total-io-requests' 'total-threads')
+	    'files-per-sec' 'pct-files-done' \
+	    'per-thread' '00' 'elapsed' \
+	    'in-thread' 'files' 'records' 'status' 'IOPS' 'MiBps' )
+	    
 expect_ct=${#json_strs[*]}
 for j in `seq 1 $expect_ct` ; do
   (( k = $j + 1 ))
