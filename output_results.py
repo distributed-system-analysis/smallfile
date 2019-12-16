@@ -135,7 +135,7 @@ def output_results(invoke_list, test_params):
     # result hierarchy, not needed
 
     if len(rslt['in-host'].keys()) == 1 and test_params.host_set == None:
-        hostkey = rslt['in-host'].keys()[0]
+        hostkey = list(rslt['in-host'].keys())[0]
         threads_in_host = rslt['in-host'][hostkey]['in-thread']
         rslt['in-thread'] = threads_in_host
         del rslt['in-host']
