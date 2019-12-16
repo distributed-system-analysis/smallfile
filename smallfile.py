@@ -56,7 +56,7 @@ pct_files_min = 70
 # we have to support a variety of python environments,
 # so for optional features don't blow up if they aren't there, just remember
 
-xattr_installed = True
+xattr_installed = False
 try:
     import xattr
     xattr_installed = True
@@ -2077,7 +2077,7 @@ class Test(unittest_class):
         touch(sgate_file)
         for t in threadList:
             t.join()
-            if t.isAlive():
+            if t.is_alive():
                 raise Exception('thread join timeout:' + str(t))
             if t.invocation.status != ok:
                 raise Exception('thread did not complete iterations: '
