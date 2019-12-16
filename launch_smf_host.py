@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 # launch_smf_host.py
 # background process which waits for smallfile_remote.py workload to run
