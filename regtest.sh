@@ -46,6 +46,9 @@
 localhost_name="$1"
 if [ -z "$localhost_name" ] ; then localhost_name="localhost" ; fi
 
+nfs_svc=nfs
+(systemctl | grep nfs-server) && nfs_svc="nfs-server"
+
 # xattrs must be set to zero if using tmpfs, since tmpfs doesn't support xattrs
 
 testdir="${TMPDIR:-/run}/smf"
@@ -85,6 +88,7 @@ assertok() {
 
 runsmf() {
   smfcmd="$1"
+  echo "$smfcmd"
   $smfcmd > $f 2>&1
 }
 
@@ -131,7 +135,7 @@ fi
 }
 
 start_service sshd || exit $NOTOK
-start_service nfs || start_service nfs-server || exit $NOTOK
+start_service $nfs_svc || exit $NOTOK
 
 # set up NFS mountpoint
 
@@ -515,6 +519,6 @@ if [ $? == $OK ] ; then
 fi
 sudo exportfs -uav
 sudo rm -rf $testdir $bigtmp
-sudo systemctl stop nfs
+sudo systemctl stop $nfs_svc
 sudo systemctl stop sshd
 echo 'SUCCESS!'
