@@ -46,8 +46,8 @@
 localhost_name="$1"
 if [ -z "$localhost_name" ] ; then localhost_name="localhost" ; fi
 
-nfs_svc=nfs
-(systemctl | grep nfs-server) && nfs_svc="nfs-server"
+nfs_svc="nfs"
+(find /etc/systemd/system | grep nfs-server) && nfs_svc="nfs-server"
 
 # xattrs must be set to zero if using tmpfs, since tmpfs doesn't support xattrs
 
