@@ -64,7 +64,7 @@ nfsdir=/var/tmp/smfnfs
 OK=0
 NOTOK=1
 GREP="grep -q "
-PYTHON=${PYTHON_PROG:-python}
+PYTHON=${PYTHON_PROG:-python3}
 f=smfregtest.log
 
 assertfail() {
