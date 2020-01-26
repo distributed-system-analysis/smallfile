@@ -106,10 +106,14 @@ log.info('substitute-top %s, top directory %s, as-host %s' %
 # to allow samba to work with Linux test driver
 
 network_shared_path = os.path.join(top_dir, 'network_shared')
+
 launch_fn = os.path.join(network_shared_path, as_host) + '.smf_launch'
 if os.path.exists(launch_fn):  # avoid left-over launch files
     os.unlink(launch_fn)
 log.info('launch filename ' + launch_fn)
+
+shutdown_fn = os.path.join(network_shared_path, 'shutdown_launchers.tmp')
+log.info('daemon shutdown filename ' + shutdown_fn)
 while True:
     try:
         with open(launch_fn, 'r') as f:
@@ -125,4 +129,7 @@ while True:
         if e.errno != errno.ENOENT:
             raise e
     finally:
+        if os.path.exists(shutdown_fn):  # avoid left-over launch files
+            log.info('saw daemon shutdown file %s, exiting' % shutdown_fn)
+            sys.exit(0)
         time.sleep(1)
