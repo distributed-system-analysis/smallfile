@@ -184,7 +184,7 @@ def run_multi_host_workload(prm):
             raise Exception('hosts did not reach starting gate ' +
                             'within %d seconds' % host_timeout)
         else:
-            print('saw exception %s, aborting test' % str(e))
+            print('saw exception %s, aborting test' % str(exception_seen))
     else:
 
         # ask all hosts to start the test
