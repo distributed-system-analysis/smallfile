@@ -178,13 +178,6 @@ echo "running YAML parser unit test"
 $PYTHON yaml_parser.py
 assertok $?
 
-# now remove unittest python module, smallfile_cli.py should still run
-
-sudo yum remove -y python-unittest2 || sudo yum remove -y python-unittest
-assertok $?
-
-# test simplest smallfile_cli commands, using non-default dirs
-
 echo "simplest smallfile_cli.py commands"
 
 scmd="$PYTHON smallfile_cli.py "
@@ -447,6 +440,33 @@ for op in `supported_ops $xattrs ''` ; do
   echo "testing local op $op"
   run_one_cmd "$common_params --operation $op"
 done
+
+echo "******** simulating distributed operations with launch-by-daemon" | tee -a $f
+
+cleanup
+rm -fv $testdir/shutdown_launchers.tmp
+python launch_smf_host.py --top $testdir --as-host foo &
+worker_pids="$!"
+python launch_smf_host.py --top $testdir --as-host bar &
+worker_pids="$worker_pids $!"
+sleep 2
+daemon_params=\
+"$PYTHON smallfile_cli.py --launch-by-daemon Y --host-set foo,bar --top $testdir \
+--verify-read Y --response-times N --remote-pgm-dir `pwd` \
+--files 1000 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4"
+
+for op in `supported_ops $xattrs ''` ; do
+  echo
+  echo "testing local op $op"
+  run_one_cmd "$daemon_params --operation $op"
+done
+touch $testdir/network_shared/shutdown_launchers.tmp
+echo "waiting for launcher daemons to shut down..."
+for p in $worker_pids ; do
+  wait $p || exit $NOTOK
+done
+echo "launchers shut down"
+rm -fv $testdir/network_shared/shutdown_launchers.tmp
 
 # we do these kinds of tests to support non-distributed filesystems and NFS exports of them
 
