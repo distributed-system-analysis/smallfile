@@ -18,25 +18,25 @@ New features:
 
 [Introduction](#introduction)
 
-[__What it can do](#what-it-can-do)
+[What it can do](#what-it-can-do)
 
-[__Restrictions](#restrictions)
+[Restrictions](#restrictions)
 
 [How to specify test](#how-to-specify-test)
 
 [Results](#results)
 
-[__Postprocessing of response time data](#postprocessing-of-response-time-data)
+[Postprocessing of response time data](#postprocessing-of-response-time-data)
 
 [How to run correctly](#how-to-run-correctly)
 
-[__Avoiding caching effects](#avoiding-caching-effects)
+[Avoiding caching effects](#avoiding-caching-effects)
 
-[__Use of pause option](#use-of-pause-option)
+[Use of pause option](#use-of-pause-option)
 
 [Use with distributed filesystems](#use-with-distributed-filesystems)
 
-[__The dreaded startup timeout error](#the-dreaded-startup-timeout-error)
+[The dreaded startup timeout error](#the-dreaded-startup-timeout-error)
 
 [Use with local filesystems](#use-with-local-filesystems)
 
@@ -56,11 +56,11 @@ New features:
 
 [Synchronization](#synchronization)
 
-[__Test parameter transmission](#test-parameter-transmission)
+[Test parameter transmission](#test-parameter-transmission)
 
-[__Launching remote worker threads](#launching-remote-worker-threads)
+[Launching remote worker threads](#launching-remote-worker-threads)
 
-[__Returning results](#returning-results)
+[Returning results](#returning-results)
 
 
 License
@@ -108,8 +108,7 @@ What it can do
 * async replication support - can measure time required for files to appear in a directory tree
 * fs coherency test - in multi-host tests, can force all clients to read files written by different client
 
-Both python 2.7 and python 3 are supported.   Limited support is available for
-pypy, this can be useful for reducing interpreter overhead.
+python 2.7, python 3, pypy and pypy3 are supported.   pypy3 can increase throughput by up to 100% where interpreter is the bottleneck -- however at present pypy and pypy3 do not support pyyaml, at least not in Fedora 31.
 
 Restrictions
 -----------
@@ -288,7 +287,7 @@ lower than a threshold (default 70%) then an error is raised.
 Postprocessing of response time data
 --------
 
-If you specify **--response-times Y** in the command, smallfile will save response time of each operation in per-thread output files in the shared directory as rsptimes*.csv.   For example, you can turn these into an X-Y scatterplot so that you can see how response time varies over time.   For example:
+If you specify **--response-times Y** in the command, smallfile will save response time of each operation in per-thread output files in the shared directory as rsptimes\*.csv.   For example, you can turn these into an X-Y scatterplot so that you can see how response time varies over time.   For example:
 
     # python smallfile_cli.py --response-times Y
     # ls -ltr /var/tmp/smf/network_shared/rsptimes*.csv
