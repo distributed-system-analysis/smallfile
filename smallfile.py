@@ -43,6 +43,8 @@ import socket
 import errno
 import codecs
 
+from latency_histogram import latency_histogram
+
 OK = 0  # system call return code for success
 NOTOK = 1
 KB_PER_GB = 1 << 20
@@ -374,6 +376,9 @@ class SmallfileWorkload:
         # append response times to .rsptimes
         self.measure_rsptimes = False
 
+        # generate per-thread response time histogram
+        self.measure_rsptime_histogram = True
+
         # write/expect binary random (incompressible) data
         self.incompressible = False
 
@@ -454,6 +459,7 @@ class SmallfileWorkload:
         s += ' incompressible=' + str(self.incompressible)
         s += ' finish_all_rq=' + str(self.finish_all_rq)
         s += ' rsp_times=' + str(self.measure_rsptimes)
+        s += ' rsp_histo=' + str(self.measure_rsptime_histogram)
         s += ' tid=' + self.tid
         s += ' loglevel=' + str(self.log_level)
         s += ' filenum=' + str(self.filenum)
@@ -493,6 +499,7 @@ class SmallfileWorkload:
         # to measure file operation response times
         self.op_start_time = None
         self.rsptimes = []
+        self.rsptime_histogram = latency_histogram()
         self.rsptime_filename = None
 
     # given a set of top-level directories (e.g. for NFS benchmarking)
@@ -539,21 +546,23 @@ class SmallfileWorkload:
     # indicate start of an operation
 
     def op_starttime(self, starttime=None):
-        if self.measure_rsptimes:
-            if not starttime:
+        if self.measure_rsptime_histogram or self.measure_rsptimes:
+            if starttime == None:
                 self.op_start_time = time.time()
             else:
                 self.op_start_time = starttime
 
-    # indicate end of an operation,
-    # this appends the elapsed time of the operation to .rsptimes array
+    # indicate end of an operation, process filesystem response time
 
     def op_endtime(self, opname):
+        end_time = time.time()
         if self.measure_rsptimes:
-            end_time = time.time()
             rsp_time = end_time - self.op_start_time
             self.rsptimes.append((opname, self.op_start_time, rsp_time))
-            self.op_start_time = None
+        if self.measure_rsptime_histogram:
+            rsp_time = end_time - self.op_start_time
+            self.rsptime_histogram.add_to_histo(rsp_time)
+        self.op_start_time = None
 
     # save response times seen by this thread
 
@@ -567,6 +576,14 @@ class SmallfileWorkload:
                 f.write('%8s, %9.6f, %9.6f\n' %
                         (opname, start_time - self.start_time, rsp_time))
             os.fsync(f.fileno())  # particularly for NFS this is needed
+
+    def save_rsptime_histogram(self):
+        fname = 'rsptime_histogram_' + str(self.tid) + '_' + get_hostname(None) \
+            + '_' + self.opname + '_' + str(self.start_time) + '.csv'
+        rsptime_fname = join(self.network_dir, fname)
+        with open(rsptime_fname, 'w') as f:
+            self.rsptime_histogram.dump_to_file(f)
+            os.fsync(f.fileno())
 
     # determine if test interval is over for this thread
 
@@ -1604,6 +1621,8 @@ class SmallfileWorkload:
             self.log.exception(e)
         if self.measure_rsptimes:
             self.save_rsptimes()
+        if self.measure_rsptime_histogram:
+            self.save_rsptime_histogram()
         if self.status != ok:
             self.log.error('invocation did not complete cleanly')
         if self.filenum != self.iterations:
@@ -1837,12 +1856,14 @@ class Test(unittest_class):
 
     def test_e_Rename(self):
         self.invok.measure_rsptimes = False
+        self.invok.measure_rsptime_histogram = True
         self.mk_files()
         self.runTest('rename')
         fn = self.invok.mk_file_nm(self.invok.dest_dirs)
         self.assertTrue(exists(fn))
 
     def test_f_DeleteRenamed(self):
+        self.invok.measure_rsptime_histogram = False
         self.mk_files()
         self.runTest('rename')
         self.runTest('delete-renamed')

@@ -33,6 +33,8 @@ def parse_yaml(test_params, input_yaml_file):
                 test_params.output_json = v
             elif k == 'response-times':
                 inv.measure_rsptimes = boolean(v)
+            elif k == 'response-time-histogram':
+                inv.measure_rsptime_histogram = boolean(v)
             elif k == 'network-sync-dir':
                 inv.network_dir = boolean(v)
             elif k == 'operation':

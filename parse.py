@@ -47,6 +47,9 @@ def parse():
     add('--output-json',
             default=test_params.output_json,
             help='if true then output JSON-format version of results')
+    add('--response-time-histogram',
+            type=boolean, default=inv.measure_rsptime_histogram,
+            help='if true then save histogram of response time for each file op')
     add('--response-times',
             type=boolean, default=inv.measure_rsptimes,
             help='if true then record response time of each file op')
@@ -166,6 +169,7 @@ def parse():
     inv.stonewall = args.stonewall
     inv.finish_all_rq = args.finish
     inv.measure_rsptimes = args.response_times
+    inv.measure_rsptime_histogram = args.response_time_histogram
     inv.fsync = args.fsync
     inv.record_ctime_size = args.record_ctime_size
     test_params.permute_host_dirs = args.permute_host_dirs
