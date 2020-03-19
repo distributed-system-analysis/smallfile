@@ -8,6 +8,9 @@
 # so beginning time for each group is a power of 2
 
 import copy
+import math
+import time
+import os
 from bisect import bisect_left
 
 class LatencyHistException(Exception):
@@ -38,14 +41,21 @@ class latency_histogram:
         self.bg_ranges =  list(map(lambda lst: lst[0], self.group_intervals))
 
     def add_to_histo(self, t):
-        bg_index = bisect_left(self.bg_ranges, t) - 1
-        bg = self.group_intervals[bg_index]
+        # known to be correct
+        #bg_index = bisect_left(self.bg_ranges, t) - 1
+        log2t = int(math.log2(t/self.smallest_interval)) - self.bucket_bits + 1
+        if log2t < 0:
+            log2t = 0
+        elif log2t >= self.bucket_groups:
+            log2t = self.bucket_groups - 1
+        #assert(log2t == bg_index)
+        bg = self.group_intervals[log2t]
         bg_width = bg[1] - bg[0]
         b_index = int((t - bg[0]) / bg_width)
         if t > bg[0] + (self.buckets_per_group * bg_width):
             b_index = self.buckets_per_group - 1
-        self.bg_histos[bg_index][b_index] += 1
-        return bg_index, b_index
+        self.bg_histos[log2t][b_index] += 1
+        return log2t, b_index
 
     def total_samples(self):
         samples = 0
@@ -110,9 +120,17 @@ def unit_test():
     assert bg_ix == 0 and b_ix == 0 and h.bg_histos[bg_ix][b_ix] == 2
     bg_ix, b_ix = h.add_to_histo(1<<30)
     assert bg_ix == h.bucket_groups - 1 and b_ix == h.buckets_per_group - 1 and h.bg_histos[bg_ix][b_ix] == 1
-    random_sample_count = 5000000
-    map( lambda t : h.add_to_histo(t) , 
-            [ random.expovariate(0.001) for sample in range(0, random_sample_count) ] ) 
+
+    random_sample_count = 50000
+    new_count_str = os.getenv('RANDOM_SAMPLE_COUNT')
+    if new_count_str:
+        random_sample_count = int(new_count_str)
+    samples = [ random.expovariate(0.001) for k in range(0, random_sample_count) ]
+    start_time = time.time()
+    indices = [ h.add_to_histo(sample) for sample in samples ] 
+    end_time = time.time()
+    delta_time = end_time - start_time
+    print('elapsed time for histogram of %d samples is %f sec' % (random_sample_count, delta_time))
     assert h.total_samples() == random_sample_count + 3
     with open('/tmp/latency_histo.yml', 'w') as f:
         h.dump_to_file(f)
