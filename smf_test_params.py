@@ -128,7 +128,7 @@ class smf_test_params:
             ('finish all requests?', '%s' % bool2YN(inv.finish_all_rq)),
             ('stonewall?', '%s' % bool2YN(inv.stonewall)),
             ('measure response times?', '%s' % bool2YN(inv.measure_rsptimes)),
-            ('response time histogram?', '%s' % bool2YN(inv.measure_rsptime_histogram)),
+            ('response time histogram interval', '%d' % inv.measure_rsptime_histogram),
             ('verify read?', '%s' % bool2YN(inv.verify_read)),
             ('verbose?', inv.verbose),
             ('log to stderr?', inv.log_to_stderr),

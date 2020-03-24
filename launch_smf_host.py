@@ -33,7 +33,7 @@ import sys
 import os
 import time
 import errno
-import smallfile
+import socket
 import logging
 import socket
 
@@ -76,7 +76,7 @@ if len(sys.argv) < 3:
 
 substitute_dir = None
 top_dir = None
-as_host = smallfile.get_hostname(None)
+as_host = socket.gethostname()
 j = 1
 while j < len(sys.argv):
     if len(sys.argv) == j + 1:

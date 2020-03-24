@@ -101,6 +101,8 @@ if is_windows_os:
 
 debug_timeout = os.getenv('DEBUG_TIMEOUT')
 
+hostnm = socket.gethostname()
+
 # FIXME: pass in file pathname instead of file number
 
 class MFRdWrExc(Exception):
@@ -207,21 +209,6 @@ def recall_ctime_size_xattr(pathname):
         if eno != errno.ENODATA:
             raise e
     return (ctime, size_kb)
-
-
-def get_hostname(h):
-    if h is None:
-        h = socket.gethostname()
-    return h
-
-
-def hostaddr(h):    # return the IP address of a hostname
-    if h is None:
-        a = socket.gethostbyname(socket.gethostname())
-    else:
-        a = socket.gethostbyname(h)
-    return a
-
 
 def hexdump(b):
     s = ''
@@ -376,8 +363,9 @@ class SmallfileWorkload:
         # append response times to .rsptimes
         self.measure_rsptimes = False
 
-        # generate per-thread response time histogram
-        self.measure_rsptime_histogram = True
+        # generate per-thread response time histogram with this interval
+        # default of 0 means do not do it
+        self.measure_rsptime_histogram = 0
 
         # write/expect binary random (incompressible) data
         self.incompressible = False
@@ -392,7 +380,7 @@ class SmallfileWorkload:
         self.pause_sec = 0.0
 
         # which host the invocation ran on
-        self.onhost = get_hostname(None)
+        self.onhost = hostnm
 
         # thread ID
         self.tid = ''
@@ -425,6 +413,12 @@ class SmallfileWorkload:
         # random seed used to control sequence of random numbers,
         # default to different sequence every time
         self.randstate = random.Random()
+
+        # record time when last histogram was written
+        self.last_histo_time = time.time()
+
+        # file for histograms starts out as None
+        self.rsptime_histo_file = None
 
         # reset object state variables
 
@@ -499,7 +493,7 @@ class SmallfileWorkload:
         # to measure file operation response times
         self.op_start_time = None
         self.rsptimes = []
-        self.rsptime_histogram = latency_histogram()
+        self.rsptime_histogram = latency_histogram('%s_%s' % (self.tid, hostnm))
         self.rsptime_filename = None
 
     # given a set of top-level directories (e.g. for NFS benchmarking)
@@ -546,7 +540,7 @@ class SmallfileWorkload:
     # indicate start of an operation
 
     def op_starttime(self, starttime=None):
-        if self.measure_rsptime_histogram or self.measure_rsptimes:
+        if (self.measure_rsptime_histogram > 0) or self.measure_rsptimes:
             if starttime == None:
                 self.op_start_time = time.time()
             else:
@@ -559,7 +553,7 @@ class SmallfileWorkload:
         if self.measure_rsptimes:
             rsp_time = end_time - self.op_start_time
             self.rsptimes.append((opname, self.op_start_time, rsp_time))
-        if self.measure_rsptime_histogram:
+        if self.measure_rsptime_histogram > 0:
             rsp_time = end_time - self.op_start_time
             self.rsptime_histogram.add_to_histo(rsp_time)
         self.op_start_time = None
@@ -567,7 +561,7 @@ class SmallfileWorkload:
     # save response times seen by this thread
 
     def save_rsptimes(self):
-        fname = 'rsptimes_' + str(self.tid) + '_' + get_hostname(None) \
+        fname = 'rsptimes_' + str(self.tid) + '_' + hostnm \
             + '_' + self.opname + '_' + str(self.start_time) + '.csv'
         rsptime_fname = join(self.network_dir, fname)
         with open(rsptime_fname, 'w') as f:
@@ -578,12 +572,13 @@ class SmallfileWorkload:
             os.fsync(f.fileno())  # particularly for NFS this is needed
 
     def save_rsptime_histogram(self):
-        fname = 'rsptime_histogram_' + str(self.tid) + '_' + get_hostname(None) \
-            + '_' + self.opname + '_' + str(self.start_time) + '.csv'
-        rsptime_fname = join(self.network_dir, fname)
-        with open(rsptime_fname, 'w') as f:
-            self.rsptime_histogram.dump_to_file(f)
-            os.fsync(f.fileno())
+        if self.rsptime_histo_file == None:
+            rsptime_fname = join(self.network_dir, 
+                                'rsptime_histogram_%s_%s_%s_%s.csv' % 
+                                 (str(self.tid), hostnm, 
+                                  self.opname, str(self.start_time)))
+            self.rsptime_histo_file = open(rsptime_fname, 'w')
+        self.rsptime_histogram.dump_to_file(self.rsptime_histo_file)
 
     # determine if test interval is over for this thread
 
@@ -707,7 +702,7 @@ class SmallfileWorkload:
             try:
                 touch(self.stonewall_fn())
                 self.log.info('stonewall file written by thread %s on host %s'
-                              % (self.tid, get_hostname(None)))
+                              % (self.tid, hostnm))
             except IOError as e:
                 err = e.errno
                 if err != errno.EEXIST:
@@ -724,6 +719,11 @@ class SmallfileWorkload:
     # to minimize overhead, do not check stonewall file before every iteration
 
     def do_another_file(self):
+        now_time = time.time()
+        if ((self.measure_rsptime_histogram > 0) and 
+            ((now_time - self.last_histo_time) > self.measure_rsptime_histogram)):
+            self.save_rsptime_histogram()
+            self.last_histo_time = now_time
         if self.stonewall and self.filenum % self.files_between_checks == 0:
             if not self.test_ended() and os.path.exists(self.stonewall_fn()):
                 self.log.info('stonewalled after ' + str(self.filenum)
@@ -1621,8 +1621,12 @@ class SmallfileWorkload:
             self.log.exception(e)
         if self.measure_rsptimes:
             self.save_rsptimes()
-        if self.measure_rsptime_histogram:
+        if self.measure_rsptime_histogram > 0:
             self.save_rsptime_histogram()
+            if self.rsptime_histo_file != None:
+                os.fsync(self.rsptime_histo_file.fileno())
+                self.rsptime_histo_file.close()
+                self.rsptime_histo_file = None
         if self.status != ok:
             self.log.error('invocation did not complete cleanly')
         if self.filenum != self.iterations:
@@ -1856,14 +1860,14 @@ class Test(unittest_class):
 
     def test_e_Rename(self):
         self.invok.measure_rsptimes = False
-        self.invok.measure_rsptime_histogram = True
+        self.invok.measure_rsptime_histogram = 1
         self.mk_files()
         self.runTest('rename')
         fn = self.invok.mk_file_nm(self.invok.dest_dirs)
         self.assertTrue(exists(fn))
 
     def test_f_DeleteRenamed(self):
-        self.invok.measure_rsptime_histogram = False
+        self.invok.measure_rsptime_histogram = 0
         self.mk_files()
         self.runTest('rename')
         self.runTest('delete-renamed')

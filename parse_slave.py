@@ -11,6 +11,7 @@ import sys
 import os
 import errno
 import time
+import socket
 import pickle
 import smallfile
 import argparse
@@ -26,7 +27,7 @@ def parse():
     parser.add_argument( '--network-sync-dir',
             help='directory used to synchronize with test driver')
     parser.add_argument( '--as-host',
-            default=smallfile.get_hostname(None),
+            default=socket.gethostname(),
             help='directory used to synchronize with test driver')
     args = parser.parse_args()
 

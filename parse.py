@@ -9,6 +9,7 @@ See Appendix on this page for instructions pertaining to license.
 
 import sys
 import os
+import socket
 import smallfile
 from smallfile import SmallfileWorkload, NOTOK
 import smf_test_params
@@ -48,8 +49,8 @@ def parse():
             default=test_params.output_json,
             help='if true then output JSON-format version of results')
     add('--response-time-histogram',
-            type=boolean, default=inv.measure_rsptime_histogram,
-            help='if true then save histogram of response time for each file op')
+            type=non_negative_integer, default=inv.measure_rsptime_histogram,
+            help='save histogram of response time with this interval')
     add('--response-times',
             type=boolean, default=inv.measure_rsptimes,
             help='if true then record response time of each file op')
@@ -183,7 +184,9 @@ def parse():
     test_params.remote_pgm_dir = args.remote_pgm_dir
     test_params.network_sync_dir = args.network_sync_dir
     test_params.is_slave = args.slave
-    inv.onhost = smallfile.get_hostname(args.as_host)
+    inv.onhost = args.as_host
+    if inv.onhost == None:
+        inv.onhost = socket.gethostname()
     test_params.host_set = args.host_set
 
     # if YAML input was used, update test_params object with this
