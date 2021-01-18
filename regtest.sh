@@ -391,7 +391,7 @@ supported_ops()
         if [ -n "$multitop" ] ; then single_topdir_ops='' ; fi
         
         # for debug only: ops="create cleanup"
-        ops="cleanup create append overwrite read $single_topdir_ops chmod stat $xattr_ops symlink mkdir rmdir rename delete-renamed"
+        ops="cleanup create append overwrite truncate-overwrite read $single_topdir_ops chmod stat $xattr_ops symlink mkdir rmdir rename delete-renamed"
         echo $ops
 }
 

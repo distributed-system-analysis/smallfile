@@ -227,7 +227,9 @@ beforehand)
 * ls-l -- scan directories and read basic file metadata
 * cleanup -- delete any pre-existing files from a previous run 
 * swift-put -- simulates OpenStack Swift behavior when doing PUT operation
-* swift-get -- simulates OpenStack Swift behavior for each GET operation. 
+* swift-get -- simulates OpenStack Swift behavior for each GET operation.
+* overwrite -- overwrite existing files.
+* truncate-overwrite -- truncate existing file and then write data to it.
 
 For example, if you want to run smallfile_cli.py on 1 host with 8 threads
 each creating 2 GB of 1-MiB files, you can use these options:
