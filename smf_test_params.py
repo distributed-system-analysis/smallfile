@@ -27,6 +27,7 @@ class smf_test_params:
 
         # this field used to calculate timeouts
         self.min_directories_per_sec = 50
+        self.cleanup_delay_usec_per_sec = 0
         self.output_json = output_json
         self.version = '3.1'
         self.as_host = None
@@ -123,6 +124,7 @@ class smf_test_params:
             ('hash file number into dir.?', bool2YN(inv.hash_to_dir)),
             ('fsync after modify?', bool2YN(inv.fsync)),
             ('pause between files (microsec)', '%d' % inv.pause_between_files),
+            ('delay after cleanup per file (microsec)', '%d' % inv.cleanup_delay_usec_per_file),
             ('minimum directories per sec', '%d' 
              % int(self.min_directories_per_sec)),
             ('finish all requests?', '%s' % bool2YN(inv.finish_all_rq)),
@@ -182,6 +184,7 @@ class smf_test_params:
         p['hash-to-dir'] = bool2YN(inv.hash_to_dir)
         p['fsync-after-modify'] = bool2YN(inv.fsync)
         p['pause-between-files'] = str(inv.pause_between_files)
+        p['cleanup-delay-usec-per-file'] = str(inv.cleanup_delay_usec_per_file)
         p['finish-all-requests'] = bool2YN(inv.finish_all_rq)
         p['stonewall'] = bool2YN(inv.stonewall)
         p['verify-read'] = bool2YN(inv.verify_read)

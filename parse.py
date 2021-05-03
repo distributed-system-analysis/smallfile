@@ -97,6 +97,9 @@ def parse():
     add('--pause',
             type=non_negative_integer, default=inv.pause_between_files,
             help='pause between each file (microsec)')
+    add('--cleanup-delay-usec-per-file',
+            type=non_negative_integer, default=inv.cleanup_delay_usec_per_file,
+            help='time to delay after cleanup per file (microsec)')
     add('--stonewall',
             type=boolean, default=inv.stonewall,
             help='stop measuring as soon as first thread is done')
@@ -163,6 +166,7 @@ def parse():
     inv.suffix = args.suffix
     inv.hash_to_dir = args.hash_into_dirs
     inv.pause_between_files = args.pause
+    test_params.cleanup_delay_usec_per_file = inv.cleanup_delay_usec_per_file = args.cleanup_delay_usec_per_file
     inv.stonewall = args.stonewall
     inv.finish_all_rq = args.finish
     inv.measure_rsptimes = args.response_times

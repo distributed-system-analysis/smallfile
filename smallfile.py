@@ -46,6 +46,7 @@ import codecs
 OK = 0  # system call return code for success
 NOTOK = 1
 KB_PER_GB = 1 << 20
+USEC_PER_SEC = 1000000.0
 
 # min % of files processed considered acceptable for a test run
 # this should be a parameter but we'll just lower it to 70% for now
@@ -383,6 +384,9 @@ class SmallfileWorkload:
         # how many microsec to sleep between each file
         self.pause_between_files = 0
 
+        # wait this long after cleanup for async. deletion activity to finish
+        self.cleanup_delay_usec_per_file = 0
+
         # same as pause_between_files but in floating-point seconds
         self.pause_sec = 0.0
 
@@ -449,6 +453,7 @@ class SmallfileWorkload:
         s += ' hash_to_dir=' + str(self.hash_to_dir)
         s += ' fsync=' + str(self.fsync)
         s += ' stonewall=' + str(self.stonewall)
+        s += ' cleanup_delay_usec_per_file=' + str(self.cleanup_delay_usec_per_file)
         s += ' files_between_checks=' + str(self.files_between_checks)
         s += ' verify_read=' + str(self.verify_read)
         s += ' incompressible=' + str(self.incompressible)
@@ -1569,6 +1574,10 @@ class SmallfileWorkload:
         self.clean_all_subdirs()
         self.stonewall = save_stonewall
         self.finish_all_rq = save_finish
+        if self.cleanup_delay_usec_per_file > 0:
+            total_sleep_time = self.cleanup_delay_usec_per_file * self.filenum_final / USEC_PER_SEC
+            self.log.info('waiting %f sec to give storage time to recycle deleted files' % total_sleep_time)
+            time.sleep(total_sleep_time)
         self.status = ok
 
     def do_workload(self):
