@@ -186,6 +186,7 @@ The parameters are (from most useful to least useful):
  * --xattr-size -- size of extended attribute value in bytes (names begin with
   'user.smallfile-') 
  * --xattr-count -- number of extended attributes per file
+ * --cleanup-delay-usec-per-file -- insert a delay after "cleanup" 
  * --prefix -- a string prefix to prepend to files (so they don't collide with
 previous runs for example)
  * --suffix -- a string suffix to append to files (so they don't collide with
@@ -366,6 +367,18 @@ files/sec and you have 20 threads running,try a 60/100000 = 600 microsecond
 pause.  Verify that this isn't affecting throughput by reducing the pause and
 running a longer test.
 
+Use of cleanup-delay-usec-per-file option
+=========================================
+Some distributed filesystems do not actually recycle file space at the moment you delete the file. 
+They may wait some time and then do it asynchronously to enable the application to proceed more quickly.
+This can cause subsequent test performance to compete with the space-recycling activity, resulting in
+variable results.   The "cleanup-delay-usec-per-file" option gives you a way to work around this problem.
+If you set it to non-zero, then during the "cleanup" operation (and only this one), 
+a time delay will be computed by multiplying the number of files processed by this parameter, and 
+smallfile will sleep for this time duration before proceeding to subsequent operations.
+You can take advantage of this by structuring your tests so that each sample operation sequence,
+such as create,read,rename,delete-renamed , is followed by a "cleanup" op.   You can then cause smallfile to 
+pause for a while after each sample, before the next sample begins.
 
 Use with distributed filesystems
 ---------
