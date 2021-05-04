@@ -51,7 +51,7 @@ nfs_svc="nfs"
 
 # xattrs must be set to zero if using tmpfs, since tmpfs doesn't support xattrs
 
-testdir="${TMPDIR:-/run}/smf"
+testdir="${TMPDIR:-/var/tmp}/smf"
 xattrs=0
 if [ -d $testdir ] ; then
 	df $testdir | grep tmpfs
@@ -95,14 +95,16 @@ runsmf() {
 cleanup() {
   rm -rf /var/tmp/invoke*.log $testdir/* *.pyc
   sudo mkdir -p $testdir
+  # assumption: only thing being exported on this host is /var/tmp/smfnfs
+  sudo exportfs -uav
   grep -q $nfsdir /proc/mounts 
   if [ $? = $OK ] ; then sudo umount $nfsdir || exit $NOTOK ; fi
-  rm -rf $nfsdir
-  sudo mkdir -p $nfsdir
-  sudo chown $USER $nfsdir
+  sudo rm -rf $nfsdir
+  sudo mkdir -pv $nfsdir
+  sudo chmod 777 $nfsdir
   sudo exportfs -v | grep -q $testdir 2>/tmp/ee
   if [ $? != $OK ] ; then 
-    sudo exportfs -v -o rw,no_root_squash,sync,fsid=15 localhost:$testdir || exit $NOTOK
+    sudo exportfs -v -o rw,sync localhost:$testdir || exit $NOTOK
   fi
   sudo exportfs -v | grep -q $testdir 2>/tmp/ee
   if [ $? != $OK ] ; then 
@@ -333,6 +335,7 @@ prefix: a
 suffix: b
 hash-into-dirs:   yes
 pause: 5
+cleanup-delay-usec-per-file: 500
 host-set: $localhost_name
 output-json: $nfsdir/smf.json
 EOF
