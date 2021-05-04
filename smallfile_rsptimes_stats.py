@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # smallfile_rsptimes_stats.py -- python program to reduce response time sample data from smallfile benchmark to
 # statistics.  
