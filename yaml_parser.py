@@ -65,6 +65,8 @@ def parse_yaml(test_params, input_yaml_file):
                 inv.xattr_count = positive_integer(v)
             elif k == 'pause':
                 inv.pause_between_files = non_negative_integer(v)
+            elif k == 'cleanup-delay-usec-per-file':
+                inv.cleanup_delay_usec_per_file = test_params.cleanup_delay_usec_per_file = non_negative_integer(v)
             elif k == 'stonewall':
                 inv.stonewall = boolean(v)
             elif k == 'finish':
