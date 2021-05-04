@@ -74,8 +74,8 @@ class smf_test_params:
 
     def __str__(self):
         fmt = 'smf_test_params: version=%s json=%s as_host=%s host_set=%s '
-        fmt += 'launch_by_daemon=%s'
-        fmt += 'thread_count=%d remote_pgm_dir=%s'
+        fmt += 'launch_by_daemon=%s '
+        fmt += 'thread_count=%d remote_pgm_dir=%s '
         fmt += 'slave=%s permute_host_dirs=%s startup_timeout=%d '
         fmt += 'host_timeout=%d smf_invoke=%s '
         return fmt % (
