@@ -127,6 +127,7 @@ def run_multi_host_workload(prm):
     host_timeout = prm.host_startup_timeout
     if smallfile.is_windows_os:
         host_timeout += 20
+    h = None
 
     try:
         while sec < host_timeout:
@@ -155,7 +156,7 @@ def run_multi_host_workload(prm):
 
             kill_remaining_threads = False
             for t in remote_thread_list:
-                if not t.isAlive():
+                if not t.is_alive():
                     print('thread %s on host %s has died' % (t, h))
                     kill_remaining_threads = True
                     break
@@ -179,7 +180,10 @@ def run_multi_host_workload(prm):
         hosts_ready = False
     if not hosts_ready:
         smallfile.abort_test(abortfn, [])
-        print('ERROR: host %s did not reach starting gate' % h)
+        if h != None:
+            print('ERROR: host %s did not reach starting gate' % h)
+        else:
+            print('no host reached starting gate')
         if not exception_seen:
             raise Exception('hosts did not reach starting gate ' +
                             'within %d seconds' % host_timeout)
