@@ -150,8 +150,10 @@ cp -r /foo/bar/no-such-dir /tmp/ >> $f 2>&1
 assertfail $?
 
 # before running unit tests, install unittest2 python module
-
-sudo yum install -y python-unittest2 || sudo yum install -y python-unittest
+# package install may fail on distros like Fedora 33 because it's already there
+sudo yum install -y python-unittest2 || sudo yum install -y python-unittest \
+	> /tmp/yum-install-unittest.log 2>&1
+echo 'import unittest' | $PYTHON
 assertok $?
 
 # run the smallfile.py module's unit test

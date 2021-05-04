@@ -17,17 +17,16 @@ Created on Apr 22, 2009
 #    embed parallel python and thread launching logic so we can have both
 #    CLI and GUI interfaces to same code
 #
+# to run all unit tests:
+#   python smallfile.py
 # to run just one of unit tests do
 #   python -m unittest smallfile.Test.your-unit-test
-# "unittest" regression test API has changed,
-# unittest2 is there for backwards compatibility
-# so it now uses unittest2,
-# but it isn't installed by default so we have to conditionalize its use
-# we only need it installed where we want to run regression test this way
-# on Fedora:
-#   yum install python-unittest2
 # alternative single-test syntax:
 #   python smallfile.py -v Test.test_c1_Mkdir
+#
+# on older Fedoras:
+#   yum install python-unittest2
+# on Fedora 33 with python 3.9.2, unittest is built in and no package is needed
 
 
 import os
@@ -77,12 +76,12 @@ try:
 except ImportError as e:
     pass
 
-unittest2_installed = False
 try:
     import unittest2
-    unittest2_installed = True
+    unittest_module = unittest2
 except ImportError as e:
     import unittest
+    unittest_module = unittest
 
 # Windows 2008 server seemed to have this environment variable
 # didn't check if it's universal
@@ -1681,13 +1680,8 @@ class TestThread(threading.Thread):
 #   python -m unittest2 smallfile.Test.your-unit-test
 
 ok = 0
-if unittest2_installed:
-    unittest_class = unittest2.TestCase
-else:
-    unittest_class = unittest.TestCase
 
-
-class Test(unittest_class):
+class Test(unittest_module.TestCase):
 
     def setUp(self):
         self.invok = SmallfileWorkload()
@@ -2095,7 +2089,4 @@ class Test(unittest_class):
 # so you can just do "python smallfile.py" to test it
 
 if __name__ == '__main__':
-    if unittest2_installed:
-        unittest2.main()
-    else:
-        unittest.main()
+    unittest_module.main()

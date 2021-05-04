@@ -103,8 +103,14 @@ def parse_yaml(test_params, input_yaml_file):
 
 
 if __name__ == '__main__':
-    import unittest2
-    class YamlParseTest(unittest2.TestCase):
+    try:
+        import unittest2
+        unittest_module = unittest2
+    except ModuleNotFoundError:
+        import unittest
+        unittest_module = unittest
+
+    class YamlParseTest(unittest_module.TestCase):
         def setUp(self):
             self.params = smf_test_params.smf_test_params()
 
@@ -152,4 +158,4 @@ if __name__ == '__main__':
             topdirs = [ os.path.join(mydir, d) for d in [ 'foo', 'bar' ] ]
             assert(self.params.top_dirs == topdirs)
 
-    unittest2.main()
+    unittest_module.main()
