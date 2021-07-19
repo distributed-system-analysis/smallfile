@@ -33,6 +33,7 @@ import pickle
 import smallfile
 from smallfile import ensure_deleted, SMFResultException
 from smallfile import OK, NOTOK
+from smallfile import use_isAlive
 import sync_files
 import output_results
 import multi_thread_workload
@@ -153,7 +154,8 @@ def run_multi_host_workload(prm):
 
             kill_remaining_threads = False
             for t in remote_thread_list:
-                if not t.isAlive():
+                thrd_is_alive = (t.isAlive if use_isAlive else t.is_alive())
+                if not thrd_is_alive:
                     print('thread %s has died' % t)
                     kill_remaining_threads = True
                     break
@@ -172,16 +174,17 @@ def run_multi_host_workload(prm):
     except KeyboardInterrupt as e:
         print('saw SIGINT signal, aborting test')
         exception_seen = e
+        hosts_ready = False
     except Exception as e:
         exception_seen = e
         hosts_ready = False
+        print('saw exception %s, aborting test' % str(e))
     if not hosts_ready:
         smallfile.abort_test(abortfn, [])
         if not exception_seen:
             raise Exception('hosts did not reach starting gate ' +
                             'within %d seconds' % host_timeout)
-        else:
-            print('saw exception %s, aborting test' % str(e))
+            sys.exit(NOTOK)
     else:
 
         # ask all hosts to start the test
