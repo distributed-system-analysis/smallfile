@@ -1,5 +1,6 @@
 import yaml
 import smallfile
+from smallfile import unittest_module
 import argparse
 import parser_data_types
 from parser_data_types import SmfParseException, TypeExc
@@ -63,6 +64,8 @@ def parse_yaml(test_params, input_yaml_file):
                 inv.xattr_count = positive_integer(v)
             elif k == 'pause':
                 inv.pause_between_files = non_negative_integer(v)
+            elif k == 'auto-pause':
+                inv.auto_pause = boolean(v)
             elif k == 'stonewall':
                 inv.stonewall = boolean(v)
             elif k == 'finish':
@@ -99,8 +102,9 @@ def parse_yaml(test_params, input_yaml_file):
 
 
 if __name__ == '__main__':
-    import unittest2
-    class YamlParseTest(unittest2.TestCase):
+    unittest_module = unittest2
+
+    class YamlParseTest(unittest_module.TestCase):
         def setUp(self):
             self.params = smf_test_params.smf_test_params()
 
@@ -148,4 +152,4 @@ if __name__ == '__main__':
             topdirs = [ os.path.join(mydir, d) for d in [ 'foo', 'bar' ] ]
             assert(self.params.top_dirs == topdirs)
 
-    unittest2.main()
+    unittest_module.main()
