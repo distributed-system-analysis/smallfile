@@ -77,12 +77,16 @@ try:
 except ImportError as e:
     pass
 
-unittest2_installed = False
 try:
     import unittest2
-    unittest2_installed = True
+    unittest_module = unittest2
 except ImportError as e:
     import unittest
+    unittest_module = unittest
+
+# python threading module method name isAlive changed to is_alive in python3
+
+use_isAlive = (sys.version_info[0] < 3)
 
 # Windows 2008 server seemed to have this environment variable
 # didn't check if it's universal
@@ -381,11 +385,12 @@ class SmallfileWorkload:
         # , compare read data to what was written
         self.verify_read = True
 
+        # should we attempt to adjust pause between files 
+        self.auto_pause = False
         # how many microsec to sleep between each file
         self.pause_between_files = 0
-
-        # same as pause_between_files but in floating-point seconds
-        self.pause_sec = 0.0
+        # collect samples for this long, then add to start time
+        self.pause_history_duration = 5.0
 
         # which host the invocation ran on
         self.onhost = get_hostname(None)
@@ -422,6 +427,13 @@ class SmallfileWorkload:
         # default to different sequence every time
         self.randstate = random.Random()
 
+        # number of hosts/pods in test, default is 1 smallfile host/pod
+        self.total_hosts = 1
+
+        # number of threads in each host/pod
+        self.threads = 1
+        self.total_threads = self.total_hosts * self.threads
+
         # reset object state variables
 
         self.reset()
@@ -451,16 +463,20 @@ class SmallfileWorkload:
         s += ' fsync=' + str(self.fsync)
         s += ' stonewall=' + str(self.stonewall)
         s += ' files_between_checks=' + str(self.files_between_checks)
+        s += ' pause=' + str(self.pause_between_files)
         s += ' verify_read=' + str(self.verify_read)
         s += ' incompressible=' + str(self.incompressible)
         s += ' finish_all_rq=' + str(self.finish_all_rq)
         s += ' rsp_times=' + str(self.measure_rsptimes)
+        s += ' auto_pause=' + str(self.auto_pause)
         s += ' tid=' + self.tid
         s += ' loglevel=' + str(self.log_level)
         s += ' filenum=' + str(self.filenum)
         s += ' filenum_final=' + str(self.filenum_final)
         s += ' rq=' + str(self.rq)
         s += ' rq_final=' + str(self.rq_final)
+        s += ' total_hosts=' + str(self.total_hosts)
+        s += ' threads=' + str(self.threads)
         s += ' start=' + str(self.start_time)
         s += ' end=' + str(self.end_time)
         s += ' elapsed=' + str(self.elapsed_time)
@@ -484,8 +500,13 @@ class SmallfileWorkload:
         self.abort = False
         self.file_dirs = []  # subdirectores within per-thread dir
         self.status = self.NOTOK
-        self.pause_sec = self.pause_between_files / self.MICROSEC_PER_SEC
 
+        # response time samples 
+        self.pause_rsptime_history = []
+        # start time for this history interval
+        self.pause_history_start_time = 0.0
+        self.pause_sec = self.pause_between_files / self.MICROSEC_PER_SEC
+        self.pause_history_duration = 2.0
         # to measure per-thread elapsed time
         self.start_time = None
         self.end_time = None
@@ -540,21 +561,23 @@ class SmallfileWorkload:
     # indicate start of an operation
 
     def op_starttime(self, starttime=None):
-        if self.measure_rsptimes:
-            if not starttime:
-                self.op_start_time = time.time()
-            else:
-                self.op_start_time = starttime
+        if not starttime:
+            self.op_start_time = time.time()
+        else:
+            self.op_start_time = starttime
+
 
     # indicate end of an operation,
     # this appends the elapsed time of the operation to .rsptimes array
 
     def op_endtime(self, opname):
+        end_time = time.time()
+        rsp_time = end_time - self.op_start_time
         if self.measure_rsptimes:
-            end_time = time.time()
-            rsp_time = end_time - self.op_start_time
             self.rsptimes.append((opname, self.op_start_time, rsp_time))
-            self.op_start_time = None
+        if self.auto_pause:
+            self.adjust_pause_time(end_time, rsp_time)
+
 
     # save response times seen by this thread
 
@@ -568,6 +591,33 @@ class SmallfileWorkload:
                 f.write('%8s, %9.6f, %9.6f\n' %
                         (opname, start_time - self.start_time, rsp_time))
             os.fsync(f.fileno())  # particularly for NFS this is needed
+
+
+    # adjust pause time based on whether response time was significantly bigger than pause time
+    # we lower the pause time until 
+
+    def adjust_pause_time(self, end_time, rsp_time):
+        self.log.debug('adjust_pause_time %f %f %f %f' % 
+                       (end_time, rsp_time, self.pause_sec, self.pause_history_start_time))
+        if self.pause_sec > 0.0:
+            if self.pause_history_start_time + self.pause_history_duration > end_time:
+                self.pause_rsptime_history.append(rsp_time)
+            else:
+                if len(self.pause_rsptime_history) > 0:
+                    # there are samples to process
+                    mean_rsptime = sum(self.pause_rsptime_history)/len(self.pause_rsptime_history)
+                    time_so_far = end_time - self.pause_history_start_time
+                    # estimate system throughput assuming all threads are same
+                    est_throughput = len(self.pause_rsptime_history) * self.total_threads / time_so_far
+                    mean_utilization = mean_rsptime * est_throughput
+                    old_pause = self.pause_sec
+                    self.pause_sec *= mean_utilization
+                    self.log.debug('time_so_far %f mean_rsptime %f est_throughput %f mean_util %f' %
+                                   (time_so_far, mean_rsptime, est_throughput, mean_utilization))
+                    self.log.debug('per-thread pause changed from %9.6f to %9.6f' % (old_pause, self.pause_sec))
+                self.pause_history_start_time = end_time - rsp_time
+                self.pause_rsptime_history = [rsp_time]
+        self.op_start_time = None
 
     # determine if test interval is over for this thread
 
@@ -1654,13 +1704,8 @@ class TestThread(threading.Thread):
 #   python -m unittest2 smallfile.Test.your-unit-test
 
 ok = 0
-if unittest2_installed:
-    unittest_class = unittest2.TestCase
-else:
-    unittest_class = unittest.TestCase
 
-
-class Test(unittest_class):
+class Test(unittest_module.TestCase):
 
     def setUp(self):
         self.invok = SmallfileWorkload()
@@ -1861,6 +1906,13 @@ class Test(unittest_class):
         self.assertTrue(self.file_size(fn) == (orig_kb + 2048)
                         * self.invok.BYTES_PER_KB)
 
+    def test_h00_pause(self):
+        self.mk_files()
+        self.invok.pause_between_files = 5000
+        self.invok.total_hosts = 10
+        self.invok.auto_pause = True
+        self.runTest('read')
+
     def test_h00_read(self):
         if not xattr_installed:
             return
@@ -1912,7 +1964,8 @@ class Test(unittest_class):
         self.invok.filesize_distr = self.invok.fsdistr_random_exponential
         self.invok.incompressible = True
         self.invok.verify_read = True
-        self.invok.invocations = 40
+        self.invok.pause_between_files = 1000
+        self.invok.iterations = 2000
         self.invok.record_sz_kb = 0
         self.invok.total_sz_kb = 16
         self.runTest('create')
@@ -2057,8 +2110,13 @@ class Test(unittest_class):
         touch(sgate_file)
         for t in threadList:
             t.join()
-            if t.isAlive():
-                raise Exception('thread join timeout:' + str(t))
+            thread_join_exception = Exception('thread join timeout:' + str(t))
+            if use_isAlive:
+                if t.isAlive(): 
+                    raise thread_join_exception
+            else:
+                if t.is_alive():
+                    raise thread_join_exception
             if t.invocation.status != ok:
                 raise Exception('thread did not complete iterations: '
                                 + str(t))
@@ -2067,7 +2125,4 @@ class Test(unittest_class):
 # so you can just do "python smallfile.py" to test it
 
 if __name__ == '__main__':
-    if unittest2_installed:
-        unittest2.main()
-    else:
-        unittest.main()
+    unittest_module.main()
