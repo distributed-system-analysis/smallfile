@@ -102,8 +102,6 @@ def parse_yaml(test_params, input_yaml_file):
 
 
 if __name__ == '__main__':
-    unittest_module = unittest2
-
     class YamlParseTest(unittest_module.TestCase):
         def setUp(self):
             self.params = smf_test_params.smf_test_params()
