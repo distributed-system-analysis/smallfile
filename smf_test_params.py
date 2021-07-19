@@ -119,8 +119,10 @@ class smf_test_params:
             ('hash file number into dir.?', bool2YN(inv.hash_to_dir)),
             ('fsync after modify?', bool2YN(inv.fsync)),
             ('pause between files (microsec)', '%d' % inv.pause_between_files),
+            ('auto-pause?', bool2YN(inv.auto_pause)),
             ('minimum directories per sec', '%d' 
              % int(self.min_directories_per_sec)),
+            ('total hosts', '%d' % inv.total_hosts),
             ('finish all requests?', '%s' % bool2YN(inv.finish_all_rq)),
             ('stonewall?', '%s' % bool2YN(inv.stonewall)),
             ('measure response times?', '%s' % bool2YN(inv.measure_rsptimes)),
