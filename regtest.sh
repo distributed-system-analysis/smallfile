@@ -1,4 +1,5 @@
 #!/bin/bash
+set -xeo
 # smallfile regression test
 #
 # you can set the environment variable PYTHON_PROG 
@@ -51,18 +52,16 @@ if [ -z "$localhost_name" ] ; then localhost_name="localhost" ; fi
 testdir="${TMPDIR:-/run}/smf"
 xattrs=0
 if [ -d $testdir ] ; then
-	df $testdir | grep tmpfs
-	if [ $? != 0 ] ; then
-		xattrs=1
-	fi
+	(df $testdir | grep -q tmpfs) || xattrs=1
 fi
 bigtmp="${BIGTMP:-/var/tmp}/smf"
 nfsdir=/var/tmp/smfnfs
 OK=0
 NOTOK=1
 GREP="grep -q "
-PYTHON=${PYTHON_PROG:-python}
+PYTHON=${PYTHON_PROG:-python3}
 f=smfregtest.log
+iam=$USER
 
 assertfail() {
   status=$1
@@ -73,29 +72,23 @@ assertfail() {
   fi
 }
 
-assertok() {
-  status=$1
-  if [ $status != $OK ] ; then
-    echo "ERROR: unexpected failure status $status"
-    echo "see end of $f for cause"
-    # FIXME: why isn't shell status 1 after regtest.sh exits here?
-    exit $NOTOK
-  fi
-}
-
 runsmf() {
   smfcmd="$1"
+  echo "$smfcmd"
   $smfcmd > $f 2>&1
 }
 
 cleanup() {
   rm -rf /var/tmp/invoke*.log $testdir/* *.pyc
-  sudo mkdir -p $testdir
-  grep $nfsdir /proc/mounts 
-  if [ $? = $OK ] ; then sudo umount -v $nfsdir ; fi
+  sudo mkdir -pv $testdir
+  sudo chown -v $iam:$iam $testdir $testdir/..
+  sudo chmod -v 777 $testdir
+  touch $testdir/letmein
+  grep -q $nfsdir /proc/mounts && sudo umount -v $nfsdir
   rm -rf $nfsdir
   sudo mkdir -p $nfsdir
-  sudo chown $USER $nfsdir
+  sudo chown -v $iam:$iam $nfsdir
+  sudo chmod -v 777 $nfsdir
   sudo exportfs -uav
   sudo exportfs -v -o rw,no_root_squash,sync,fsid=15 localhost:$testdir
   sleep 1
@@ -105,6 +98,7 @@ cleanup() {
     exit $NOTOK
   fi
   df $nfsdir
+  touch $nfsdir/letmein
 }
 
 is_systemctl=1
@@ -122,60 +116,52 @@ if [ $is_systemctl == 1 ] ; then
 else
   sudo service $svcname restart
 fi
+s=$?
 if [ $? != $OK ] ; then
   echo "FAILED to start service $svcname"
-  exit $NOTOK
 fi
+return $s
 }
 
-start_service sshd
-start_service nfs
+start_service sshd || exit $NOTOK
+start_service nfs || start_service nfs-server || exit $NOTOK
 
 # set up NFS mountpoint
 
-sudo mkdir -p $testdir
-sudo chown $USER $testdir
-sudo chmod 777 $testdir
 cleanup
 
 # test assertion mechanism
 
-cp -r /foo/bar/no-such-dir /tmp/ >> $f 2>&1
-assertfail $?
+cp -r /foo/bar/no-such-dir /tmp/ >> $f 2>&1 || assertfail $?
 
-# before running unit tests, install unittest2 python module
+# before running unit tests, install unittest2 python module if necessary
 
-sudo yum install -y python-unittest2 || sudo yum install -y python-unittest
-assertok $?
+(echo 'import unittest' | $PYTHON) || \
+  sudo yum install -y python-unittest2 || \
+  sudo yum install -y python-unittest || \
+  sudo yum install -y python3-unittest || \
+  (echo 'import unittest' | $PYTHON) || \
+  exit $NOTOK
 
 # run the smallfile.py module's unit test
 
 echo "running smallfile.py unit test"
 $PYTHON smallfile.py
-assertok $?
 
 # run the invoke_process.py unit test
 
 echo "running invoke_process.py unit test"
 $PYTHON invoke_process.py
-assertok $?
 
 # run drop_buffer_cache.py unit test
 
 echo "running drop_buffer_cache.py unit test"
 $PYTHON drop_buffer_cache.py
-assertok $?
 
 # run yaml parser unit test
 
 echo "running YAML parser unit test"
 $PYTHON yaml_parser.py
-assertok $?
-
-# now remove unittest python module, smallfile_cli.py should still run
-
-sudo yum remove -y python-unittest2 || sudo yum remove -y python-unittest
-assertok $?
 
 # test simplest smallfile_cli commands, using non-default dirs
 
@@ -183,11 +169,10 @@ echo "simplest smallfile_cli.py commands"
 
 scmd="$PYTHON smallfile_cli.py "
 cleanup
-ls -l /var/tmp/smf/{starting_gate,stonewall}.tmp 2>/tmp/e
-assertfail $?
+rm -fv $testdir/{starting_gate,stonewall}.tmp 2>/tmp/e || \
+  assertfail $?
 runsmf "$scmd"
-assertok $?
-ls -l /var/tmp/smf/{starting_gate,stonewall}.tmp
+ls -l $testdir/{starting_gate,stonewall}.tmp || \
 
 non_dflt_dir=/var/tmp/foo
 scmd="$PYTHON smallfile_cli.py --top $non_dflt_dir "
@@ -195,19 +180,15 @@ cleanup
 rm -rf $non_dflt_dir
 mkdir $non_dflt_dir
 runsmf "$scmd"
-assertok $?
 (cd $non_dflt_dir/network_shared ; ls -l {starting_gate,stonewall}.tmp)
-assertok $?
 
 scmd="$scmd --host-set localhost"
 cleanup
 rm -rf $non_dflt_dir
 mkdir $non_dflt_dir
 runsmf "$scmd"
-assertok $?
 (cd $non_dflt_dir/network_shared ; \
  ls -l {starting_gate,stonewall}.tmp param.pickle host_ready.localhost.tmp) 2>/tmp/e
-assertok $?
 
 # test parsing
 
@@ -215,45 +196,33 @@ nonnegmsg="integer value greater than zero expected"
 echo "testing parsing"
 scmd="$PYTHON smallfile_cli.py --top $testdir "
 cleanup
-runsmf "$scmd --files 0"
-assertfail $?
+runsmf "$scmd --files 0" || \
+  assertfail $?
 $GREP "$nonnegmsg" $f
-assertok $?
 
 cleanup
-runsmf "$scmd --threads 0"
-assertfail $?
+runsmf "$scmd --threads 0" || \
+  assertfail $?
 $GREP "$nonnegmsg" $f
-assertok $?
 
-runsmf "$scmd --files -1"
-assertfail $?
-runsmf "$scmd --record-size -1"
-assertfail $?
-runsmf "$scmd --file-size -1"
-assertfail $?
-runsmf "$scmd --files-per-dir 0"
-assertfail $?
-runsmf "$scmd --dirs-per-dir 0"
-assertfail $?
-runsmf "$scmd --record-size -1"
-assertfail $?
-runsmf "$scmd --record-size a"
-assertfail $?
-runsmf "$scmd --top /"
-assertfail $?
-runsmf "$scmd --response-times foo"
-assertfail $?
-runsmf "$scmd --stonewall foo"
-assertfail $?
-runsmf "$scmd --finish foo"
-assertfail $?
+runsmf "$scmd --files -1" 		|| assertfail $?
+runsmf "$scmd --record-size -1" 	|| assertfail $?
+runsmf "$scmd --file-size -1" 		|| assertfail $?
+runsmf "$scmd --files-per-dir 0" 	|| assertfail $?
+runsmf "$scmd --dirs-per-dir 0" 	|| assertfail $?
+runsmf "$scmd --record-size -1" 	|| assertfail $?
+runsmf "$scmd --record-size a" 		|| assertfail $?
+runsmf "$scmd --top /" 			|| assertfail $?
+runsmf "$scmd --response-times foo"	|| assertfail $?
+runsmf "$scmd --stonewall foo" 		|| assertfail $?
+runsmf "$scmd --finish foo"		|| assertfail $?
+runsmf "$scmd --host-count -5" 		|| assertfail $?
+runsmf "$scmd --auto-pause foo"		|| assertfail $?
 
 cat > $nfsdir/bad.yaml <<EOF
 --file-size 30
 EOF
-runsmf "python --yaml-input $nfsdir/bad.yaml"
-assertfail $?
+runsmf "$PYTHON --yaml-input $nfsdir/bad.yaml" || assertfail $?
 
 # run a command with all CLI options and verify that they were successfully parsed
 
@@ -264,9 +233,8 @@ scmd="$PYTHON smallfile_cli.py --top $nfsdir/smf "
 scmd="$scmd --verify-read N --response-times Y --finish N --stonewall N --permute-host-dirs Y --verbose Y"
 scmd="$scmd --same-dir Y --operation create --threads 5 --files 20 --files-per-dir 5 --dirs-per-dir 3"
 scmd="$scmd --record-size 6 --file-size 30 --file-size-distribution exponential --prefix a --suffix b"
-scmd="$scmd --hash-into-dirs Y --pause 5 --host-set $localhost_name --output-json $nfsdir/smf.json"
+scmd="$scmd --hash-into-dirs Y --pause 5 --auto-pause Y --host-set $localhost_name --output-json $nfsdir/smf.json"
 runsmf "$scmd"
-assertok $?
 expect_strs=( 'verify read? : N' \
         "hosts in test : \['$localhost_name'\]" \
         'file size distribution : random exponential'\
@@ -284,6 +252,7 @@ expect_strs=( 'verify read? : N' \
         'finish all requests? : N' \
         'threads share directories? : Y' \
         'pause between files (microsec) : 5' \
+	'auto-pause? : Y' \
         "top test directory(s) : \['$nfsdir/smf'\]" \
         'operation : create' \
         'threads : 5' \
@@ -293,15 +262,10 @@ expect_strs=( 'verify read? : N' \
         'record size (KB, 0 = maximum) : 6' \
         'file size (KB) : 30' )
 expect_ct=${#expect_strs[*]}
-for j in `seq 1 $expect_ct` ; do 
-  ((k = $j - 1))
-  expected_str="${expect_strs[$k]}"
-  $GREP "$expected_str" $f
-  s=$?
-  if [ $s != $OK ] ; then 
-    echo "expecting: $expected_str"
-  fi
-  assertok $s $f
+for j in $(seq 0 $expect_ct) ; do 
+  expected_str="${expect_strs[$j]}"
+  $GREP "$expected_str" $f || \
+	  (echo "expecting: $expected_str" ; exit $NOTOK)
 done
 
 # now do same thing in YAML to verify 
@@ -332,6 +296,7 @@ prefix: a
 suffix: b
 hash-into-dirs:   yes
 pause: 5
+auto-pause: Y
 host-set: $localhost_name
 output-json: $nfsdir/smf.json
 EOF
@@ -339,22 +304,16 @@ EOF
 # argparse recognizes unambiguous abbreviations of param. names
 scmd="$PYTHON smallfile_cli.py --yaml-input $yamlfile"
 runsmf "$scmd"
-assertok $?
-for j in `seq 1 $expect_ct` ; do 
-  ((k = $j - 1))
+for k in `seq 0 $expect_ct` ; do 
   expected_str="${expect_strs[$k]}"
-  $GREP "$expected_str" $f
-  s=$?
-  if [ $s != $OK ] ; then 
-    echo "expecting: $expected_str"
-  fi
-  assertok $s $f
+  $GREP "$expected_str" $f || \
+	  (echo "expecting: $expected_str" ; exit $NOTOK)
 done
 
 
 echo "parsing JSON output"
 smfpretty=/var/tmp/smfpretty.json
-python -m json.tool < $nfsdir/smf.json > $smfpretty
+$PYTHON -m json.tool < $nfsdir/smf.json > $smfpretty
 json_strs=( 'params' 'file-size' 'file-size-distr' 'files-per-dir' \
 	    'files-per-thread' 'finish-all-requests' 'fname-prefix' \
 	    'fname-suffix' 'fsync-after-modify' 'hash-to-dir' 'host-set' \
@@ -369,12 +328,8 @@ expect_ct=${#json_strs[*]}
 for j in `seq 1 $expect_ct` ; do
   (( k = $j + 1 ))
   expected_str="${json_strs[$k]}"
-  $GREP "$expected_str" $smfpretty
-  s=$?
-  if [ $s != $OK ] ; then 
-    echo "expecting: $expected_str"
-  fi
-  assertok $s $f
+  $GREP "$expected_str" $smfpretty ||
+	  (echo "expecting: $expected_str" ; exit $NOTOK)
 done
 
 supported_ops()
@@ -400,13 +355,7 @@ run_one_cmd()
 {
   cmd="$1"
   echo "$cmd" | tee -a $f
-  $cmd > /tmp/onetest.tmp 2>&1
-  # capture exit status of command before you do anything else!
-  s=$?
-  # show what happened whether command succeeds or fails
-  cat /tmp/onetest.tmp | tee -a $f
-  # now check for error
-  assertok $s
+  $cmd 2>&1 | tee /tmp/onetest.tmp
 }
 
 common_params=\
@@ -442,7 +391,8 @@ scmd="$PYTHON smallfile_cli.py --top $topdirlist "
 topdirlist_nocomma=`echo $topdirlist | sed 's/,/ /g'`
 for d in $topdirlist_nocomma ; do
   sudo mkdir -pv $d
-  sudo chmod 777 $d
+  sudo chown -v $iam:$iam $d
+  sudo chmod -v 777 $d
 done
 cleanup
 for op in `supported_ops $xattrs 'multitop'` ; do
@@ -486,7 +436,9 @@ echo "*** run one long test of creates and reads ***" | tee -a $f
 cleanup
 xattrs=$save_xattrs
 rm -rf $bigtmp
-mkdir $bigtmp
+mkdir -pv $bigtmp
+chown -v $iam:$iam $bigtmp
+chmod -v 777 $bigtmp
 bigtest_params="$common_params --top $bigtmp --files 20000 --file-size 0 --record-size 4 "
 bigtest_params="$bigtest_params --files-per-dir 3 --dirs-per-dir 2 --threads 10 --stonewall Y --pause 10"
 for op in create read ; do
@@ -504,6 +456,6 @@ if [ $? == $OK ] ; then
 fi
 sudo exportfs -uav
 sudo rm -rf $testdir $bigtmp
-sudo systemctl stop nfs
+sudo systemctl stop nfs || sudo systemctl stop nfs-server
 sudo systemctl stop sshd
 echo 'SUCCESS!'
