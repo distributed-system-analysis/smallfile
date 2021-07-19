@@ -89,6 +89,9 @@ def parse():
     add('--pause',
             type=non_negative_integer, default=inv.pause_between_files,
             help='pause between each file (microsec)')
+    add('--auto-pause',
+            type=boolean, default=inv.auto_pause,
+            help='adjust pause between files automatically based on response times')
     add('--stonewall',
             type=boolean, default=inv.stonewall,
             help='stop measuring as soon as first thread is done')
@@ -136,13 +139,16 @@ def parse():
             help=argparse.SUPPRESS)
     add('--as-host',
             help=argparse.SUPPRESS)
+    add('--host-count',
+            type=positive_integer, default=0,
+            help='total number of hosts/pods participating in smallfile test')
 
     args = parser.parse_args()
 
     inv.opname = args.operation
     test_params.top_dirs = [ os.path.abspath(p) for p in args.top ]
     inv.iterations = args.files
-    test_params.thread_count = args.threads
+    test_params.thread_count = inv.threads = args.threads
     inv.files_per_dir = args.files_per_dir
     inv.dirs_per_dir = args.dirs_per_dir
     inv.record_sz_kb = args.record_size
@@ -154,6 +160,7 @@ def parse():
     inv.suffix = args.suffix
     inv.hash_to_dir = args.hash_into_dirs
     inv.pause_between_files = args.pause
+    inv.auto_pause = args.auto_pause
     inv.stonewall = args.stonewall
     inv.finish_all_rq = args.finish
     inv.measure_rsptimes = args.response_times
@@ -172,6 +179,12 @@ def parse():
     test_params.is_slave = args.slave
     inv.onhost = smallfile.get_hostname(args.as_host)
     test_params.host_set = args.host_set
+    inv.total_hosts = args.host_count
+    if inv.total_hosts == 0:
+        if test_params.host_set != None:
+            inv.total_hosts = len(test_params.host_set)
+        else:
+            inv.total_hosts = 1
 
     # if YAML input was used, update test_params object with this
     # YAML parameters override CLI parameters
@@ -223,6 +236,11 @@ def parse():
         prm_list = test_params.human_readable()
         for (prm_name, prm_value) in prm_list:
             print('%40s : %s' % (prm_name, prm_value))
+
+    if inv.auto_pause and inv.pause_between_files == 0:
+        inv.pause_between_files = 10000
+        print(('auto-pause requested but pause param not specified' +
+               ', defaulting to %d microseconds') % inv.pause_between_files)
 
     test_params.recalculate_timeouts()
     return test_params
