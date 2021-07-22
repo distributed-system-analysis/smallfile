@@ -156,7 +156,7 @@ def run_multi_host_workload(prm):
 
             kill_remaining_threads = False
             for t in remote_thread_list:
-                if not t.is_alive():
+                if not smallfile.thrd_is_alive(t):
                     print('thread %s on host %s has died' % (t, h))
                     kill_remaining_threads = True
                     break

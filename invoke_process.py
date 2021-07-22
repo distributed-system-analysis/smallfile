@@ -9,8 +9,8 @@ See Appendix on this page for instructions pertaining to license.
 '''
 
 import multiprocessing
-import unittest
 import smallfile
+from smallfile import unittest_module
 import os
 import time
 
@@ -75,7 +75,7 @@ def deltree(dir_tree):
 ok = 0
 
 
-class Test(unittest.TestCase):
+class Test(unittest_module.TestCase):
 
     def setUp(self):
         self.invok = smallfile.SmallfileWorkload()
@@ -147,4 +147,4 @@ class Test(unittest.TestCase):
 # so you can just do "python invoke_process.py" to test it
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest_module.main()

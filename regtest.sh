@@ -65,13 +65,14 @@ OK=0
 NOTOK=1
 GREP="grep -q "
 PYTHON=${PYTHON_PROG:-python3}
+iam=$USER
 f=smfregtest.log
+echo "see end of $f for cause of failures" 
 
 assertfail() {
   status=$1
   if [ $status == $OK ] ; then
     echo "ERROR: unexpected success status $status"
-    echo "see end of $f for cause" 
     exit $NOTOK
   fi
 }
@@ -93,15 +94,18 @@ runsmf() {
 }
 
 cleanup() {
-  rm -rf /var/tmp/invoke*.log $testdir/* *.pyc
-  sudo mkdir -p $testdir
-  # assumption: only thing being exported on this host is /var/tmp/smfnfs
-  sudo exportfs -uav
   grep -q $nfsdir /proc/mounts 
   if [ $? = $OK ] ; then sudo umount $nfsdir || exit $NOTOK ; fi
+  sudo exportfs -ua
+  rm -rf /var/tmp/invoke*.log $testdir/* *.pyc
+  sudo mkdir -pv $testdir
+  sudo chown -v $iam:$iam $testdir
+  sudo chmod -v 777 $testdir
+  # assumption: only thing being exported on this host is /var/tmp/smfnfs
   sudo rm -rf $nfsdir
-  sudo mkdir -pv $nfsdir
-  sudo chmod 777 $nfsdir
+  sudo mkdir -v $nfsdir
+  sudo chown -v $iam:$iam $nfsdir
+  sudo chmod -v 777 $nfsdir
   sudo exportfs -v | grep -q $testdir 2>/tmp/ee
   if [ $? != $OK ] ; then 
     sudo exportfs -v -o rw,sync localhost:$testdir || exit $NOTOK
@@ -112,7 +116,7 @@ cleanup() {
     exit $NOTOK
   fi
   sleep 1
-  sudo mount -t nfs -o nfsvers=3,tcp,actimeo=1 $localhost_name:$testdir $nfsdir || exit $NOTOK
+  sudo mount -t nfs -v -o nfsvers=3,tcp,actimeo=1 $localhost_name:$testdir $nfsdir || exit $NOTOK
 }
 
 is_systemctl=1
@@ -153,10 +157,12 @@ assertfail $?
 
 # before running unit tests, install unittest2 python module
 # package install may fail on distros like Fedora 33 because it's already there
-sudo yum install -y python-unittest2 || sudo yum install -y python-unittest \
-	> /tmp/yum-install-unittest.log 2>&1
-echo 'import unittest' | $PYTHON
-assertok $?
+(echo 'import unittest' | $PYTHON) || \
+ sudo yum install -y python-unittest2 || \
+ sudo yum install -y python-unittest || \
+ sudo yum install -y python3-unittest || \
+ (echo 'import unittest' | $PYTHON) || \
+  exit $NOTOK
 
 # run the smallfile.py module's unit test
 
