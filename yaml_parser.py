@@ -1,5 +1,6 @@
 import yaml
 import smallfile
+from smallfile import unittest_module
 import argparse
 import parser_data_types
 from parser_data_types import SmfParseException, TypeExc
@@ -103,12 +104,6 @@ def parse_yaml(test_params, input_yaml_file):
 
 
 if __name__ == '__main__':
-    try:
-        import unittest2
-        unittest_module = unittest2
-    except ModuleNotFoundError:
-        import unittest
-        unittest_module = unittest
 
     class YamlParseTest(unittest_module.TestCase):
         def setUp(self):

@@ -1685,7 +1685,7 @@ class TestThread(threading.Thread):
 # including multi-threaded test
 # this should be designed to run without any user intervention
 # to run just one of these tests do
-#   python -m unittest2 smallfile.Test.your-unit-test
+#   python -m unittest smallfile.Test.your-unit-test
 
 ok = 0
 
