@@ -156,6 +156,14 @@ def abort_test(abort_fn, thread_list):
         t.terminate()
 
 
+# hide difference between python2 and python3
+# python threading module method name isAlive changed to is_alive in python3
+
+def thrd_is_alive(thrd):
+    use_isAlive = (sys.version_info[0] < 3)
+    return (thrd.isAlive() if use_isAlive else thrd.is_alive())
+
+
 # create directory if it's not already there
 
 def ensure_dir_exists(dirpath):
@@ -2079,7 +2087,7 @@ class Test(unittest_module.TestCase):
         touch(sgate_file)
         for t in threadList:
             t.join()
-            if t.is_alive():
+            if thrd_is_alive(t):
                 raise Exception('thread join timeout:' + str(t))
             if t.invocation.status != ok:
                 raise Exception('thread did not complete iterations: '
