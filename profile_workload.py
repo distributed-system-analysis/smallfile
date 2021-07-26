@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
 # python program used by profile.sh to generate profile of smallfile workloads

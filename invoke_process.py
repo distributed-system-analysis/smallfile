@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 '''
@@ -10,8 +9,8 @@ See Appendix on this page for instructions pertaining to license.
 '''
 
 import multiprocessing
-import unittest
 import smallfile
+from smallfile import unittest_module
 import os
 import time
 
@@ -45,10 +44,14 @@ class subprocess(multiprocessing.Process):
             self.status = self.invoke.NOTOK
         finally:
             self.rsptimes = None  # response time array already saved to file
+            # reduce amount of data returned from this thread
+            # by eliminating references objects that are no longer needed
             self.invoke.log = None  # log objects cannot be serialized
             self.invoke.buf = None
             self.invoke.biggest_buf = None
-            self.rsptimes = []
+            self.invoke.rsptimes = None
+            self.invoke.loggers = None
+            self.invoke.file_dirs = None
             self.sender.send(self.invoke)
 
 
@@ -72,7 +75,7 @@ def deltree(dir_tree):
 ok = 0
 
 
-class Test(unittest.TestCase):
+class Test(unittest_module.TestCase):
 
     def setUp(self):
         self.invok = smallfile.SmallfileWorkload()
@@ -144,4 +147,4 @@ class Test(unittest.TestCase):
 # so you can just do "python invoke_process.py" to test it
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest_module.main()

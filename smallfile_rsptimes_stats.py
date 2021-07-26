@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # smallfile_rsptimes_stats.py -- python program to reduce response time sample data from smallfile benchmark to
 # statistics.  
@@ -14,6 +14,15 @@
 # since there is no standard method for this yet,
 # this program has to be adjusted to parse the filenames
 # and extract 2 fields, thread number and short hostname
+#
+# the start-time parameter is optional but if it is specified
+# the percentiles-vs-time time column will have this added to it
+# this could be useful for ingesting data into a repository like
+# elastic search and displaying it side-by-side with other performance
+# data collected during a test run.  The default of 0 just outputs
+# time since start of test (like before).  The start time as
+# seconds since the epoch (1970) can be obtained from the JSON
+# output in the 'start-time' field.
 # 
 # 
 import sys
@@ -33,12 +42,14 @@ time_infinity = 1<<62
 
 percentiles = [ 50, 90, 95, 99 ]
 min_rsptime_samples = 5
+start_time = 0.0
 
 def usage( msg ):
   print('ERROR: %s' % msg)
   print('usage: python smallfile_rsptimes_stats.py ')
   print('           [ --common-hostname-suffix my.suffix ] ')
   print('           [ --time-interval positive-integer-seconds ] ')
+  print('           [ --start-time seconds-since-1970 ] ')
   print('           directory' )
   sys.exit(1)
 
@@ -55,6 +66,8 @@ def parse_rsptime_file( result_dir, csv_pathname ):
             components = sample.split(',')
             op = components[0]
             at_time = float(components[1])
+            if start_time > 0:
+                at_time += start_time
             rsp_time = float(components[2])
             samples.append( (op, at_time, rsp_time) )
     return samples
@@ -78,8 +91,8 @@ def do_sorting(sample_set, already_sorted=False):
         sorted_samples = sorted(sample_set, key=get_at_time)
     else:
         sorted_samples = sample_set
-    sorted_keys = map(get_at_time, sorted_samples)
-    sorted_rsptimes = sorted(map(get_rsp_time, sample_set))
+    sorted_keys = list(map(get_at_time, sorted_samples))
+    sorted_rsptimes = sorted(list(map(get_rsp_time, sample_set)))
     return (sorted_samples, sorted_keys, sorted_rsptimes)
 
 
@@ -96,7 +109,10 @@ def find_gt(a, x):
     i = bisect.bisect_left(a, x)
     if i < len(a):
         return i
-    raise ValueError
+    # since the only thing we are doing with this result
+    # is to extract a slice of an array, 
+    # returning len(a) is a valid thing
+    # raise ValueError
 
 
 # if you want this to calculate stats for a time_interval
@@ -113,7 +129,7 @@ def reduce_thread_set( sorted_samples_tuple, from_time=0, to_time=time_infinity 
         sorted_times = sorted(map(get_rsp_time, sorted_samples[start_index:end_index]))
     sample_count = len(sorted_times)
     if sample_count < min_rsptime_samples:
-	return None
+        return None
     mintime = sorted_times[0]
     maxtime = sorted_times[-1]
     mean = scipy.stats.tmean(sorted_times)
@@ -129,7 +145,7 @@ def reduce_thread_set( sorted_samples_tuple, from_time=0, to_time=time_infinity 
 
 def format_stats(all_stats):
     if all_stats == None:
-	return ' 0,,,,,' + ',,,,,,,,,,,,,,,,'[0:len(percentiles)-1]
+        return ' 0,,,,,' + ',,,,,,,,,,,,,,,,'[0:len(percentiles)-1]
     (sample_count, mintime, maxtime, mean, pctdev, pctiles) = all_stats
     partial_record = '%d, %f, %f, %f, %f, ' % (
             sample_count, mintime, maxtime, mean, pctdev)
@@ -164,6 +180,8 @@ while argindex < argcount:
       suffix = '.' + pval
   elif pname == 'time-interval':
     time_interval = int(pval)
+  elif pname == 'start-time':
+    start_time = float(pval)
   else:
     usage('--%s: no such optional parameter defined' % pname)
 
@@ -177,7 +195,7 @@ print('time interval is %d seconds' % time_interval)
 ## hostname
 
 regex = \
- 'rsptimes_([0-9]{2})_([a-z]{1}[0-9,a-z,\-,\.]*)%s_[-,a-z]*_[.,0-9]*.csv'
+ 'rsptimes_([0-9]{2})_([0-9,a-z,\-,\.]*)%s_[-,a-z]*_[.,0-9]*.csv'
 
 # filter out redundant suffix, if any, in hostname
 
@@ -249,8 +267,9 @@ with open(summary_pathname, 'w') as outf:
     # if there is only 1 thread per host, no need for per-host stats
     # assumption: all hosts have 1 thread/host or all hosts have > 1 thread/host
 
-    first_host = hosts[hosts.keys()[0]]
-    if len(first_host.keys()) > 1:
+    host_keys = list(hosts.keys())
+    first_host = host_keys[0]
+    if len(first_host) > 1:
         outf.write('per-host stats:\n')
         for h in sorted(hosts.keys()):
             sample_set = []
@@ -284,7 +303,7 @@ with open(summary_pathname, 'w') as outf:
         for t in threadset.keys():
             (_, samples) = threadset[t]
             if len(samples) > 0:
-            	(_, max_at_time,max_rsp_time) = samples[-1]
+                (_, max_at_time,max_rsp_time) = samples[-1]
             else:
                 max_at_time = 0.0
                 max_rsp_time = 0.0
@@ -308,7 +327,7 @@ with open(summary_pathname, 'w') as outf:
                 for (_, samples) in per_host_dict.values():
                     cluster_sample_set.extend(samples)
             sorted_cluster_tuple = do_sorting(cluster_sample_set)
-        for from_t in range(0,quantized_end_time,time_interval):
+        for from_t in range(int(start_time),quantized_end_time,time_interval):
             to_t = from_t + time_interval
             results_in_interval = reduce_thread_set(sorted_cluster_tuple, 
                                                     from_time=from_t, 

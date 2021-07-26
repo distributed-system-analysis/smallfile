@@ -18,7 +18,9 @@ def parse_yaml(test_params, input_yaml_file):
     inv = test_params.master_invoke
     with open(input_yaml_file, 'r') as f:
         try:
-            y = yaml.load(f)
+            y = yaml.safe_load(f)
+            if y == None:
+                y = {}
         except yaml.YAMLError as e:
             emsg = "YAML parse error: " + str(e)
             raise SmfParseException(emsg)
@@ -66,6 +68,8 @@ def parse_yaml(test_params, input_yaml_file):
                 inv.pause_between_files = non_negative_integer(v)
             elif k == 'auto-pause':
                 inv.auto_pause = boolean(v)
+            elif k == 'cleanup-delay-usec-per-file':
+                inv.cleanup_delay_usec_per_file = test_params.cleanup_delay_usec_per_file = non_negative_integer(v)
             elif k == 'stonewall':
                 inv.stonewall = boolean(v)
             elif k == 'finish':
@@ -102,6 +106,8 @@ def parse_yaml(test_params, input_yaml_file):
 
 
 if __name__ == '__main__':
+
+
     class YamlParseTest(unittest_module.TestCase):
         def setUp(self):
             self.params = smf_test_params.smf_test_params()

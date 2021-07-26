@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 '''
@@ -15,8 +14,14 @@ from smallfile import SmallfileWorkload, NOTOK
 import smf_test_params
 from smf_test_params import bool2YN
 import argparse
-import yaml_parser
-from yaml_parser import parse_yaml
+yaml_parser_installed = False
+try:
+    import yaml_parser
+    from yaml_parser import parse_yaml
+    yaml_parser_installed = True
+except ImportError as e:
+    pass
+
 import parser_data_types
 from parser_data_types import SmfParseException
 from parser_data_types import boolean, positive_integer, non_negative_integer
@@ -56,6 +61,9 @@ def parse():
     add('--host-set',
             type=host_set, default=test_params.host_set,
             help='list of workload generator hosts (or file containing it) ')
+    add('--launch-by-daemon',
+            type=boolean, default=test_params.launch_by_daemon,
+            help='use non-ssh launcher to get test running')
     add('--files',
             type=positive_integer, default=inv.iterations, 
             help='files processed per thread')
@@ -92,6 +100,9 @@ def parse():
     add('--auto-pause',
             type=boolean, default=inv.auto_pause,
             help='adjust pause between files automatically based on response times')
+    add('--cleanup-delay-usec-per-file',
+            type=non_negative_integer, default=inv.cleanup_delay_usec_per_file,
+            help='time to delay after cleanup per file (microsec)')
     add('--stonewall',
             type=boolean, default=inv.stonewall,
             help='stop measuring as soon as first thread is done')
@@ -147,13 +158,16 @@ def parse():
 
     inv.opname = args.operation
     test_params.top_dirs = [ os.path.abspath(p) for p in args.top ]
+    test_params.launch_by_daemon = args.launch_by_daemon
     inv.iterations = args.files
     test_params.thread_count = inv.threads = args.threads
     inv.files_per_dir = args.files_per_dir
     inv.dirs_per_dir = args.dirs_per_dir
     inv.record_sz_kb = args.record_size
     inv.total_sz_kb = args.file_size
-    test_params.size_distribution = inv.filesize_distr = args.file_size_distribution
+    test_params.size_distribution = \
+            inv.filesize_distr = \
+            args.file_size_distribution
     inv.xattr_size = args.xattr_size
     inv.xattr_count = args.xattr_count
     inv.prefix = args.prefix
@@ -161,6 +175,9 @@ def parse():
     inv.hash_to_dir = args.hash_into_dirs
     inv.pause_between_files = args.pause
     inv.auto_pause = args.auto_pause
+    test_params.cleanup_delay_usec_per_file = \
+            inv.cleanup_delay_usec_per_file = \
+            args.cleanup_delay_usec_per_file
     inv.stonewall = args.stonewall
     inv.finish_all_rq = args.finish
     inv.measure_rsptimes = args.response_times
@@ -190,6 +207,8 @@ def parse():
     # YAML parameters override CLI parameters
 
     if args.yaml_input_file:
+        if not yaml_parser_installed:
+            raise SmfParseException('python yaml module not available - is this PyPy?')
         yaml_parser.parse_yaml(test_params, args.yaml_input_file)
     if not test_params.network_sync_dir:
         test_params.network_sync_dir = os.path.join(test_params.top_dirs[0], 'network_shared')
@@ -202,7 +221,7 @@ def parse():
         raise SmfParseException(sdmsg % parentdir)
 
     if inv.record_sz_kb > inv.total_sz_kb and inv.total_sz_kb != 0:
-        usage('record size cannot exceed file size')
+        raise SmfParseException('record size cannot exceed file size')
 
     if inv.record_sz_kb == 0 and inv.verbose:
         print(('record size not specified, ' +
@@ -212,12 +231,14 @@ def parse():
     if test_params.top_dirs:
         for d in test_params.top_dirs:
             if len(d) < 6:
-                usage('directory less than 6 characters, ' +
-                      'cannot use top of filesystem, too dangerous')
-            if not os.path.isdir(d) and not test_params.network_sync_dir:
-                usage('you must ensure that shared directory ' + d + 
-                      ' is accessible ' +
-                      'from this host and every remote host in test')
+                raise SmfParseException(
+                        'directory less than 6 characters, ' +
+                        'cannot use top of filesystem, too dangerous')
+            if not os.path.isdir(d) and test_params.network_sync_dir != None:
+                raise SmfParseException(
+                        'you must ensure that shared directory ' + d + 
+                        ' is accessible ' +
+                        'from this host and every remote host in test')
     if test_params.top_dirs:
         inv.set_top(test_params.top_dirs)
     else:

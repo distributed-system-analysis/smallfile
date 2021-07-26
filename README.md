@@ -9,6 +9,7 @@ in its management.  Please update any scripts, etc. that clone it to point
 to this new location.
 
 New features:
+* support for docker containers
 * YAML input format for parameters
 
 # Table of contents
@@ -17,25 +18,25 @@ New features:
 
 [Introduction](#introduction)
 
-[__What it can do](#what-it-can-do)
+[What it can do](#what-it-can-do)
 
-[__Restrictions](#restrictions)
+[Restrictions](#restrictions)
 
 [How to specify test](#how-to-specify-test)
 
 [Results](#results)
 
-[__Postprocessing of response time data](#postprocessing-of-response-time-data)
+[Postprocessing of response time data](#postprocessing-of-response-time-data)
 
 [How to run correctly](#how-to-run-correctly)
 
-[__Avoiding caching effects](#avoiding-caching-effects)
+[Avoiding caching effects](#avoiding-caching-effects)
 
-[__Use of pause option](#use-of-pause-option)
+[Use of pause option](#use-of-pause-option)
 
 [Use with distributed filesystems](#use-with-distributed-filesystems)
 
-[__The dreaded startup timeout error](#the-dreaded-startup-timeout-error)
+[The dreaded startup timeout error](#the-dreaded-startup-timeout-error)
 
 [Use with local filesystems](#use-with-local-filesystems)
 
@@ -55,11 +56,11 @@ New features:
 
 [Synchronization](#synchronization)
 
-[__Test parameter transmission](#test-parameter-transmission)
+[Test parameter transmission](#test-parameter-transmission)
 
-[__Launching remote worker threads](#launching-remote-worker-threads)
+[Launching remote worker threads](#launching-remote-worker-threads)
 
-[__Returning results](#returning-results)
+[Returning results](#returning-results)
 
 
 License
@@ -93,6 +94,7 @@ What it can do
 --------
 
 * multi-host - manages workload generators on multiple hosts
+* containers - can run on sets of docker containers
 * aggregates throughput - for entire set of hosts
 * synchronizes workload generation - can start and stop workload generator threads at approximately same time
 * pure workloads - only one kind of operation in each run (as opposed to mixed workloads)
@@ -106,8 +108,7 @@ What it can do
 * async replication support - can measure time required for files to appear in a directory tree
 * fs coherency test - in multi-host tests, can force all clients to read files written by different client
 
-Both python 2.7 and python 3 are supported.   Limited support is available for
-pypy, this can be useful for reducing interpreter overhead.
+python 2.7, python 3, pypy and pypy3 are supported.   pypy3 can increase throughput by up to 100% where interpreter is the bottleneck -- however at present pypy and pypy3 do not support pyyaml, at least not in Fedora 31.
 
 Restrictions
 -----------
@@ -126,11 +127,14 @@ Restrictions
 How to specify test
 ============
 
-You must have password-less ssh access between the test driver node and the
-workload generator hosts if you want to run a distributed (multi-host) test.
-
 You must use a directory visible to all participating hosts to run a
 distributed test.
+
+You can include multiple hosts in a test in 1 of 2 ways:
+* provide password-less ssh access to these hosts from the test driver
+* run the launcher daemon on each host (more about this below)
+
+This latter method is particularly useful for containers where we may not want to have each container running sshd.  To see more about this, look for the --launch-by-daemon parameter below.
 
 To see what parameters are supported by smallfile_cli.py, do 
 
@@ -156,8 +160,9 @@ The parameters are (from most useful to least useful):
   operation started, down to microsecond resolution. The response time field is
   the file operation duration down to microsecond resolution.
  * --output-json - if specified then write results in JSON format to the specified pathname for easier postprocessing.
- * --host-set -- comma-separated set of hosts used for this test, no domain
+ * --host-set -- comma-separated set of hosts used for this test, or file containing list of hosts
   names allowed. Default: non-distributed test.
+ * --launch-by-daemon - if specified, then ssh will not be used to launch test, see section titled "launching remote worker threads"
  * --files -- how many files should each thread process? 
  * --threads -- how many workload generator threads should each smallfile_cli.py process create? 
  * --file-size -- total amount of data accessed per file.   If zero then no
@@ -181,6 +186,7 @@ The parameters are (from most useful to least useful):
  * --xattr-size -- size of extended attribute value in bytes (names begin with
   'user.smallfile-') 
  * --xattr-count -- number of extended attributes per file
+ * --cleanup-delay-usec-per-file -- insert a delay after "cleanup" 
  * --prefix -- a string prefix to prepend to files (so they don't collide with
 previous runs for example)
  * --suffix -- a string suffix to append to files (so they don't collide with
@@ -282,7 +288,7 @@ lower than a threshold (default 70%) then an error is raised.
 Postprocessing of response time data
 --------
 
-If you specify **--response-times Y** in the command, smallfile will save response time of each operation in per-thread output files in the shared directory as rsptimes*.csv.   For example, you can turn these into an X-Y scatterplot so that you can see how response time varies over time.   For example:
+If you specify **--response-times Y** in the command, smallfile will save response time of each operation in per-thread output files in the shared directory as rsptimes\*.csv.   For example, you can turn these into an X-Y scatterplot so that you can see how response time varies over time.   For example:
 
     # python smallfile_cli.py --response-times Y
     # ls -ltr /var/tmp/smf/network_shared/rsptimes*.csv
@@ -361,6 +367,18 @@ files/sec and you have 20 threads running,try a 60/100000 = 600 microsecond
 pause.  Verify that this isn't affecting throughput by reducing the pause and
 running a longer test.
 
+Use of cleanup-delay-usec-per-file option
+=========================================
+Some distributed filesystems do not actually recycle file space at the moment you delete the file. 
+They may wait some time and then do it asynchronously to enable the application to proceed more quickly.
+This can cause subsequent test performance to compete with the space-recycling activity, resulting in
+variable results.   The "cleanup-delay-usec-per-file" option gives you a way to work around this problem.
+If you set it to non-zero, then during the "cleanup" operation (and only this one), 
+a time delay will be computed by multiplying the number of files processed by this parameter, and 
+smallfile will sleep for this time duration before proceeding to subsequent operations.
+You can take advantage of this by structuring your tests so that each sample operation sequence,
+such as create,read,rename,delete-renamed , is followed by a "cleanup" op.   You can then cause smallfile to 
+pause for a while after each sample, before the next sample begins.
 
 Use with distributed filesystems
 ---------
@@ -368,7 +386,8 @@ Use with distributed filesystems
 With distributed filesystems, it is necessary to have multiple hosts
 simultaneously applying workload to measure the performance of a distributed
 filesystem. The –host-set parameter lets you specify a comma-separated list of
-hosts to use.
+hosts to use, or you can just specify a filename containing a list of hosts, 1 host per record.  
+The latter is certainly the more convenient option for large clusters.
 
 For any distributed filesystem test, there must be a single directory which is
 shared across all hosts, both test driver and worker hosts, that can be used to
@@ -664,9 +683,25 @@ command and read this file to discover test parameters.
 Launching remote worker threads
 ----------
 
-For Linux or other non-Windows environments, the test driver launches worker threads using parallel ssh commands to invoke the smallfile_remote.py program, and when this program exits, that is how the test driver discovers that the remote threads on this host have completed.
+For multi-host non-Windows environments, the test driver launches worker threads using parallel ssh commands to invoke the smallfile_remote.py program, and when this program exits, that is how the test driver discovers that the remote threads on this host have completed.  This works both for bare metal hosts and for virtual machines.
 
-For Windows environments, ssh usage is more problematic. Sshd requires installation of cygwin, a Windows app that emulates a Linux-like environment, but we really want to test with native win32 environment instead. So a different launching method is used (and this method works on non-Windows environments as well). 
+For Windows or containerized environments, ssh usage is more problematic. In Windows, ssh daemon "sshd" requires installation of cygwin, a Windows app that emulates a Linux-like environment, but we really want to test with native win32 environment instead. For containers, sshd is not typically available as a way to get inside the container.  So a different launching method is used (and this method works on non-Windows environments as well). 
+
+First you start launch_smf_host.py in each workload generator.    You must specify --top parameter for each remote host or container.  
+
+For Windows workload generators, if you are running smallfile_cli.py from a non-Windows host you may need --substitute-top parameter followed by the Windows path to the top directory, usually not the same as in Linux/Unix.  For example:
+
+    % start python launch_smf_host.py --top /mnt/cifs/smf --substitute-top z:\smf
+
+For containers, You must specify each daemon's unique ID in the command line - for example, if this is running in a container, then the hostname may not be unique.  This unique ID will be used by the launch_smf_host.py daemon in the container to search for requests from the test driver to run a test.  For example:
+
+    # ./launch_smf_host.py --top /mnt/sharedfs/smf --host-set container_2
+
+Next, you run smallfile_cli.py with "--launch-by-daemon Y" option and pass --host-set followed by a list of the Daemon IDs that you want to participate in the test.  For example:
+
+    # ./smallfile_cli.py --launch-by-daemon Y --host-set container_1,container_2
+
+This second step will result in a set of files being created in the shared network directory, 1 per daemon, that provide the daemon with the test parameters that it is to use.  The existence of this file will tell the daemon to start a test.  Everything else works the same as with ssh method.
 
 Returning results
 -----------------

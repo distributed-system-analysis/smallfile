@@ -47,9 +47,12 @@ set -xeo
 localhost_name="$1"
 if [ -z "$localhost_name" ] ; then localhost_name="localhost" ; fi
 
+nfs_svc="nfs"
+(find /etc/systemd/system | grep nfs-server) && nfs_svc="nfs-server"
+
 # xattrs must be set to zero if using tmpfs, since tmpfs doesn't support xattrs
 
-testdir="${TMPDIR:-/run}/smf"
+testdir="${TMPDIR:-/var/tmp}/smf"
 xattrs=0
 if [ -d $testdir ] ; then
 	(df $testdir | grep -q tmpfs) || xattrs=1
@@ -62,12 +65,12 @@ GREP="grep -q "
 PYTHON=${PYTHON_PROG:-python3}
 f=smfregtest.log
 iam=$USER
+echo "see end of $f for cause of failures" 
 
 assertfail() {
   status=$1
   if [ $status == $OK ] ; then
     echo "ERROR: unexpected success status $status"
-    echo "see end of $f for cause" 
     exit $NOTOK
   fi
 }
@@ -79,30 +82,29 @@ runsmf() {
 }
 
 cleanup() {
-  rm -rf /var/tmp/invoke*.log $testdir/* *.pyc
-  sudo mkdir -pv $testdir
-  sudo chown -v $iam:$iam $testdir $testdir/..
-  sudo chmod -v 777 $testdir
+  grep -q $nfsdir /proc/mounts 
+  if [ $? = $OK ] ; then sudo umount $nfsdir || exit $NOTOK ; fi
+  sudo exportfs -ua
+  rm -rf /var/tmp/invoke*.log
+  mkdir -pv $testdir
+  chown -v $iam:$iam $testdir $testdir/..
+  chmod -v 777 $testdir
   touch $testdir/letmein
-  grep -q $nfsdir /proc/mounts && sudo umount -v $nfsdir
-  rm -rf $nfsdir
-  sudo mkdir -p $nfsdir
-  sudo chown -v $iam:$iam $nfsdir
-  sudo chmod -v 777 $nfsdir
-  sudo exportfs -uav
   sudo exportfs -v -o rw,no_root_squash,sync,fsid=15 localhost:$testdir
+  sudo rm -rf $nfsdir
+  mkdir -p $nfsdir
+  chown -v $iam:$iam $nfsdir
+  chmod -v 777 $nfsdir
   sleep 1
   sudo mount -t nfs -o nfsvers=3,tcp,actimeo=1 $localhost_name:$testdir $nfsdir
-  if [ $? != $OK ] ; then 
-    echo "NFS mount failed!"
-    exit $NOTOK
-  fi
+  sudo chmod -v 777 $nfsdir
+  sudo exportfs -v | grep -q $testdir 2>/tmp/ee
   df $nfsdir
   touch $nfsdir/letmein
 }
 
 is_systemctl=1
-which systemctl
+systemctl > /tmp/junk
 if [ $? != $OK ] ; then  # chances are it's pre-systemctl Linux distro, use "service" instead
   is_systemctl=0
 fi
@@ -124,7 +126,7 @@ return $s
 }
 
 start_service sshd || exit $NOTOK
-start_service nfs || start_service nfs-server || exit $NOTOK
+start_service $nfs_svc || exit $NOTOK
 
 # set up NFS mountpoint
 
@@ -134,13 +136,13 @@ cleanup
 
 cp -r /foo/bar/no-such-dir /tmp/ >> $f 2>&1 || assertfail $?
 
-# before running unit tests, install unittest2 python module if necessary
-
+# before running unit tests, install whatever python module provides unittest feature
+# package install may fail on distros like Fedora 33 because it's already there
 (echo 'import unittest' | $PYTHON) || \
-  sudo yum install -y python-unittest2 || \
-  sudo yum install -y python-unittest || \
-  sudo yum install -y python3-unittest || \
-  (echo 'import unittest' | $PYTHON) || \
+ sudo yum install -y python-unittest2 || \
+ sudo yum install -y python-unittest || \
+ sudo yum install -y python3-unittest || \
+ (echo 'import unittest' | $PYTHON) || \
   exit $NOTOK
 
 # run the smallfile.py module's unit test
@@ -222,7 +224,7 @@ runsmf "$scmd --auto-pause foo"		|| assertfail $?
 cat > $nfsdir/bad.yaml <<EOF
 --file-size 30
 EOF
-runsmf "$PYTHON --yaml-input $nfsdir/bad.yaml" || assertfail $?
+runsmf "$PYTHON smallfile_cli.py --yaml-input $nfsdir/bad.yaml" || assertfail $?
 
 # run a command with all CLI options and verify that they were successfully parsed
 
@@ -297,6 +299,7 @@ suffix: b
 hash-into-dirs:   yes
 pause: 5
 auto-pause: Y
+cleanup-delay-usec-per-file: 500
 host-set: $localhost_name
 output-json: $nfsdir/smf.json
 EOF
@@ -320,10 +323,10 @@ json_strs=( 'params' 'file-size' 'file-size-distr' 'files-per-dir' \
 	    'network-sync-dir' 'operation' 'pause-between-files' \
 	    'permute-host-dirs' 'share-dir' 'stonewall' 'threads' \
 	    'top' 'verify-read' 'xattr-count' 'xattr-size' \
-	    'elapsed-time' 'files-per-sec' 'pct-files-done' \
-	    'per-thread' '00' 'elapsed' 'filenum-final' \
-	    'hosts' 'records' 'status' 'total-files' \
-	    'total-io-requests' 'total-threads')
+	    'files-per-sec' 'pct-files-done' \
+	    'per-thread' '00' 'elapsed' \
+	    'in-thread' 'files' 'records' 'status' 'IOPS' 'MiBps' )
+	    
 expect_ct=${#json_strs[*]}
 for j in `seq 1 $expect_ct` ; do
   (( k = $j + 1 ))
@@ -361,10 +364,19 @@ run_one_cmd()
 common_params=\
 "$PYTHON smallfile_cli.py --files 1000 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --verify-read Y --response-times N --xattr-count 9 --xattr-size 253 --stonewall N"
 
+# also test response time percentile analysis
+
 echo "*** run one long cleanup test with huge directory and 1 thread ***"
 
 cleanup_test_params="$common_params --threads 1 --files 1000000 --files-per-dir 1000000 --file-size 0"
-run_one_cmd "$cleanup_test_params --top $testdir --operation create"
+rm -fv /tmp/smf.json $testdir/*rsptime*csv
+run_one_cmd "$cleanup_test_params --top $testdir --operation create --response-times Y --output-json /tmp/smf.json"
+start_time=$(tr '",' '  ' < /tmp/smf.json | awk '/start-time/{print $NF}')
+echo "start time was $start_time"
+$PYTHON smallfile_rsptimes_stats.py --start-time $start_time --time-interval 1 $testdir/network_shared
+int_start_time=$(echo $start_time | awk -F. '{ print $1 }')
+echo "rounded-down start time was $int_start_time"
+grep $int_start_time $testdir/network_shared/stats-rsptimes.csv || exit $NOTOK
 run_one_cmd "$cleanup_test_params --top $testdir --operation cleanup"
 
 echo "*** run one test with many threads ***"
@@ -381,6 +393,33 @@ for op in `supported_ops $xattrs ''` ; do
   echo "testing local op $op"
   run_one_cmd "$common_params --operation $op"
 done
+
+echo "******** simulating distributed operations with launch-by-daemon" | tee -a $f
+
+cleanup
+rm -fv $testdir/shutdown_launchers.tmp
+python launch_smf_host.py --top $testdir --as-host foo &
+worker_pids="$!"
+python launch_smf_host.py --top $testdir --as-host bar &
+worker_pids="$worker_pids $!"
+sleep 2
+daemon_params=\
+"$PYTHON smallfile_cli.py --launch-by-daemon Y --host-set foo,bar --top $testdir \
+--verify-read Y --response-times N --remote-pgm-dir `pwd` \
+--files 1000 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4"
+
+for op in `supported_ops $xattrs ''` ; do
+  echo
+  echo "testing local op $op"
+  run_one_cmd "$daemon_params --operation $op"
+done
+touch $testdir/network_shared/shutdown_launchers.tmp
+echo "waiting for launcher daemons to shut down..."
+for p in $worker_pids ; do
+  wait $p || exit $NOTOK
+done
+echo "launchers shut down"
+rm -fv $testdir/network_shared/shutdown_launchers.tmp
 
 # we do these kinds of tests to support non-distributed filesystems and NFS exports of them
 
@@ -456,6 +495,6 @@ if [ $? == $OK ] ; then
 fi
 sudo exportfs -uav
 sudo rm -rf $testdir $bigtmp
-sudo systemctl stop nfs || sudo systemctl stop nfs-server
+sudo systemctl stop $nfs_svc
 sudo systemctl stop sshd
 echo 'SUCCESS!'

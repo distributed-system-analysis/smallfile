@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # because it uses the "multiprocessing" python module instead of "threading"
@@ -95,7 +95,7 @@ def run_multi_host_workload(prm):
             this_remote_cmd += ' --as-host %s' % remote_host
         if verbose:
             print(this_remote_cmd)
-        if smallfile.is_windows_os:
+        if smallfile.is_windows_os or prm.launch_by_daemon:
             remote_thread_list.append(
                 launcher_thread.launcher_thread(prm,
                                                 remote_host,
@@ -104,10 +104,12 @@ def run_multi_host_workload(prm):
             remote_thread_list.append(ssh_thread.ssh_thread(remote_host,
                                                             this_remote_cmd))
 
-    # start them, pacing starts so that we don't get ssh errors
+    # start them
 
     for t in remote_thread_list:
-        time.sleep(0.1)
+        if not prm.launch_by_daemon:
+            # pace starts so that we don't get ssh errors
+            time.sleep(0.1)
         t.start()
 
     # wait for hosts to arrive at starting gate
@@ -126,6 +128,7 @@ def run_multi_host_workload(prm):
     host_timeout = prm.host_startup_timeout
     if smallfile.is_windows_os:
         host_timeout += 20
+    h = None
 
     try:
         while sec < host_timeout:
@@ -154,9 +157,8 @@ def run_multi_host_workload(prm):
 
             kill_remaining_threads = False
             for t in remote_thread_list:
-                thrd_is_alive = (t.isAlive if use_isAlive else t.is_alive())
-                if not thrd_is_alive:
-                    print('thread %s has died' % t)
+                if not smallfile.thrd_is_alive(t):
+                    print('thread %s on host %s has died' % (t, str(h)))
                     kill_remaining_threads = True
                     break
             if kill_remaining_threads:
@@ -181,9 +183,15 @@ def run_multi_host_workload(prm):
         print('saw exception %s, aborting test' % str(e))
     if not hosts_ready:
         smallfile.abort_test(abortfn, [])
+        if h != None:
+            print('ERROR: host %s did not reach starting gate' % h)
+        else:
+            print('no host reached starting gate')
         if not exception_seen:
             raise Exception('hosts did not reach starting gate ' +
                             'within %d seconds' % host_timeout)
+        else:
+            print('saw exception %s, aborting test' % str(exception_seen))
             sys.exit(NOTOK)
     else:
 
@@ -192,6 +200,7 @@ def run_multi_host_workload(prm):
 
         try:
             sync_files.write_sync_file(starting_gate, 'hi')
+            prm.test_start_time = time.time()
             print('starting all threads by creating starting gate file %s' %
                   starting_gate)
         except IOError as e:

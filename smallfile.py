@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 
@@ -18,17 +17,16 @@ Created on Apr 22, 2009
 #    embed parallel python and thread launching logic so we can have both
 #    CLI and GUI interfaces to same code
 #
+# to run all unit tests:
+#   python smallfile.py
 # to run just one of unit tests do
 #   python -m unittest smallfile.Test.your-unit-test
-# "unittest" regression test API has changed,
-# unittest2 is there for backwards compatibility
-# so it now uses unittest2,
-# but it isn't installed by default so we have to conditionalize its use
-# we only need it installed where we want to run regression test this way
-# on Fedora:
-#   yum install python-unittest2
 # alternative single-test syntax:
 #   python smallfile.py -v Test.test_c1_Mkdir
+#
+# on older Fedoras:
+#   yum install python-unittest2
+# on Fedora 33 with python 3.9.2, unittest is built in and no package is needed
 
 
 import os
@@ -47,6 +45,7 @@ import codecs
 OK = 0  # system call return code for success
 NOTOK = 1
 KB_PER_GB = 1 << 20
+USEC_PER_SEC = 1000000.0
 
 # min % of files processed considered acceptable for a test run
 # this should be a parameter but we'll just lower it to 70% for now
@@ -56,7 +55,7 @@ pct_files_min = 70
 # we have to support a variety of python environments,
 # so for optional features don't blow up if they aren't there, just remember
 
-xattr_installed = True
+xattr_installed = False
 try:
     import xattr
     xattr_installed = True
@@ -159,6 +158,14 @@ def abort_test(abort_fn, thread_list):
         touch(abort_fn)
     for t in thread_list:
         t.terminate()
+
+
+# hide difference between python2 and python3
+# python threading module method name isAlive changed to is_alive in python3
+
+def thrd_is_alive(thrd):
+    use_isAlive = (sys.version_info[0] < 3)
+    return (thrd.isAlive() if use_isAlive else thrd.is_alive())
 
 
 # create directory if it's not already there
@@ -392,6 +399,12 @@ class SmallfileWorkload:
         # collect samples for this long, then add to start time
         self.pause_history_duration = 5.0
 
+        # wait this long after cleanup for async. deletion activity to finish
+        self.cleanup_delay_usec_per_file = 0
+
+        # same as pause_between_files but in floating-point seconds
+        self.pause_sec = 0.0
+
         # which host the invocation ran on
         self.onhost = get_hostname(None)
 
@@ -462,6 +475,7 @@ class SmallfileWorkload:
         s += ' hash_to_dir=' + str(self.hash_to_dir)
         s += ' fsync=' + str(self.fsync)
         s += ' stonewall=' + str(self.stonewall)
+        s += ' cleanup_delay_usec_per_file=' + str(self.cleanup_delay_usec_per_file)
         s += ' files_between_checks=' + str(self.files_between_checks)
         s += ' pause=' + str(self.pause_between_files)
         s += ' verify_read=' + str(self.verify_read)
@@ -709,13 +723,26 @@ class SmallfileWorkload:
         if self.starting_gate:
             gateReady = self.gen_thread_ready_fname(self.tid)
             touch(gateReady)
+            delay_time = 0.1
             while not os.path.exists(self.starting_gate):
                 if os.path.exists(self.abort_fn()):
                     raise Exception('thread ' + str(self.tid)
                                     + ' saw abort flag')
                 # wait a little longer so that
                 # other clients have time to see that gate exists
-                time.sleep(0.3)
+                delay_time = delay_time * 1.5
+                if delay_time > 2.0: delay_time = 2.0
+                time.sleep(delay_time)
+            gateinfo = os.stat(self.starting_gate)
+            synch_time = gateinfo.st_mtime + 3.0 - time.time()
+            if synch_time > 0.0:
+                time.sleep(synch_time)
+            if synch_time < 0.0:
+                self.log.warn('other threads may have already started')
+            if self.verbose:
+                self.log.debug('started test at %f sec after waiting %f sec' % 
+                                (time.time(), synch_time))
+
 
     # record info needed to compute test statistics
 
@@ -1092,6 +1119,9 @@ class SmallfileWorkload:
     # must also be attempted in do_read
 
     def do_create(self):
+        if self.record_ctime_size and not xattr_installed:
+            raise Exception(
+                'no python xattr module, cannot record create time + size')
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
             self.op_starttime()
@@ -1377,6 +1407,9 @@ class SmallfileWorkload:
     # and measure throughput (and someday latency)
 
     def do_await_create(self):
+        if not xattr_installed:
+            raise Exception(
+                'no python xattr module, so cannot read xattrs')
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
             self.log.debug('awaiting file %s' % fn)
@@ -1601,6 +1634,10 @@ class SmallfileWorkload:
         self.clean_all_subdirs()
         self.stonewall = save_stonewall
         self.finish_all_rq = save_finish
+        if self.cleanup_delay_usec_per_file > 0:
+            total_sleep_time = self.cleanup_delay_usec_per_file * self.filenum_final / USEC_PER_SEC
+            self.log.info('waiting %f sec to give storage time to recycle deleted files' % total_sleep_time)
+            time.sleep(total_sleep_time)
         self.status = ok
 
     def do_workload(self):
@@ -1619,8 +1656,8 @@ class SmallfileWorkload:
                 max(10, self.max_files_between_checks - self.total_sz_kb / 100)
         try:
             self.end_time = 0.0
-            self.start_time = time.time()
             self.wait_for_gate()
+            self.start_time = time.time()
             o = self.opname
             try:
                 func = SmallfileWorkload.workloads[o]
@@ -1701,7 +1738,7 @@ class TestThread(threading.Thread):
 # including multi-threaded test
 # this should be designed to run without any user intervention
 # to run just one of these tests do
-#   python -m unittest2 smallfile.Test.your-unit-test
+#   python -m unittest smallfile.Test.your-unit-test
 
 ok = 0
 
@@ -2060,6 +2097,7 @@ class Test(unittest_module.TestCase):
         self.cleanup_files()
 
     def test_z_multithr_stonewall(self):
+        self.invok.verbose = True
         self.invok.stonewall = True
         self.invok.finish = True
         self.invok.prefix = 'thr_'
@@ -2110,13 +2148,8 @@ class Test(unittest_module.TestCase):
         touch(sgate_file)
         for t in threadList:
             t.join()
-            thread_join_exception = Exception('thread join timeout:' + str(t))
-            if use_isAlive:
-                if t.isAlive(): 
-                    raise thread_join_exception
-            else:
-                if t.is_alive():
-                    raise thread_join_exception
+            if thrd_is_alive(t):
+                raise Exception('thread join timeout:' + str(t))
             if t.invocation.status != ok:
                 raise Exception('thread did not complete iterations: '
                                 + str(t))
