@@ -48,7 +48,7 @@ localhost_name="$1"
 if [ -z "$localhost_name" ] ; then localhost_name="localhost" ; fi
 
 nfs_svc="nfs"
-(find /etc/systemd/system | grep nfs-server) && nfs_svc="nfs-server"
+(find /usr/lib/systemd/system | grep nfs-server) && nfs_svc="nfs-server"
 
 # xattrs must be set to zero if using tmpfs, since tmpfs doesn't support xattrs
 
@@ -66,6 +66,10 @@ PYTHON=${PYTHON_PROG:-python3}
 f=smfregtest.log
 iam=$USER
 echo "see end of $f for cause of failures" 
+if [ "$USER" != "root" ] ; then
+	SUDO=sudo
+fi
+
 
 assertfail() {
   status=$1
@@ -75,15 +79,26 @@ assertfail() {
   fi
 }
 
+# test assertion mechanism
+
+cp -r /foo/bar/no-such-dir /tmp/ >> $f 2>&1 || assertfail $?
+
+
+# also echo smallfile command to the log so you can see what was last attempt
+
 runsmf() {
   smfcmd="$1"
-  echo "$smfcmd"
+  echo "$smfcmd" | tee -a $f
   $smfcmd > $f 2>&1
 }
 
+
+# idempotent routine to unmount NFS mountpoint, clean up old files,
+# recreate directory and NFS mountpoint, and remount NFS mountpoint
+
 cleanup() {
-  if [ `grep $nfsdir /proc/mounts | wc -l` -gt 0 ] ; then sudo umount $nfsdir ; fi
-  sudo exportfs -ua
+  if [ `grep $nfsdir /proc/mounts | wc -l` -gt 0 ] ; then $SUDO umount $nfsdir ; fi
+  $SUDO exportfs -ua
   rm -rf /var/tmp/invoke*.log
   mkdir -pv $testdir
   chown -v $iam:$iam $testdir 
@@ -91,60 +106,90 @@ cleanup() {
     echo $iam cannot own parent directory of $testdir
   chmod -v 777 $testdir
   touch $testdir/letmein
-  sudo exportfs -v -o rw,no_root_squash,sync,fsid=15 localhost:$testdir
-  sudo rm -rf $nfsdir
+  $SUDO exportfs -v -o rw,no_root_squash,sync,fsid=15 localhost:$testdir
+  $SUDO rm -rf $nfsdir
   mkdir -p $nfsdir
   chown -v $iam:$iam $nfsdir
   chmod -v 777 $nfsdir
   sleep 1
-  sudo mount -t nfs -o nfsvers=3,tcp,actimeo=1 $localhost_name:$testdir $nfsdir
-  sudo chmod -v 777 $nfsdir
-  sudo exportfs -v | grep -q $testdir 2>/tmp/ee
+  $SUDO mount -t nfs -o nfsvers=3,tcp,actimeo=1 $localhost_name:$testdir $nfsdir
+  $SUDO chmod -v 777 $nfsdir
+  $SUDO exportfs -v | grep -q $testdir 2>/tmp/ee
   df $nfsdir
   touch $nfsdir/letmein
 }
 
+
+# if distro is REALLY old or hates systemd, systemctl might not be in use
+
 is_systemctl=1
-systemctl > /tmp/junk
+$SUDO systemctl > /tmp/junk
 if [ $? != $OK ] ; then  # chances are it's pre-systemctl Linux distro, use "service" instead
   is_systemctl=0
 fi
+
+
+# start service in distro-independent way
 
 start_service()
 {
 svcname=$1
 echo "attempting to start service $svcname"
 if [ $is_systemctl == 1 ] ; then
-  sudo systemctl restart $svcname
+  $SUDO systemctl restart $svcname
 else
-  sudo service $svcname restart
-fi
-s=$?
-if [ $? != $OK ] ; then
-  echo "FAILED to start service $svcname"
+  $SUDO service $svcname restart
 fi
 return $s
 }
 
-start_service sshd || exit $NOTOK
-start_service $nfs_svc || exit $NOTOK
 
-# set up NFS mountpoint
+# since we do not know if this is python2 or 3, just
+# try all the packages in the list before giving up
+# in some cases, package install may not be necessary
+# because the module is built into python in later versions
+# parameter 1 is the name used to import the package in python
+# parameters 2-N are the package names that might be needed to get it
 
-cleanup
+install_python_module_from_package()
+{
+	pkgname=$1
+	shift
+	pkglist=$*
+	(echo "import $pkgname" | $PYTHON) || \
+	 ((for p in $pkglist ; do \
+	    yum install -y $p || echo "attempted install of $p" ; \
+           done) ; \
+	   (echo "import $pkgname" | $PYTHON) )
+}
 
-# test assertion mechanism
+ps awux | grep sshd || sshd_was_off=1
+start_service sshd
+start_service $nfs_svc
 
-cp -r /foo/bar/no-such-dir /tmp/ >> $f 2>&1 || assertfail $?
+install_python_module_from_package \
+	unittest \
+	python-unittest python-unittest2 python3-unittest
 
-# before running unit tests, install whatever python module provides unittest feature
-# package install may fail on distros like Fedora 33 because it's already there
-(echo 'import unittest' | $PYTHON) || \
- sudo yum install -y python-unittest2 || \
- sudo yum install -y python-unittest || \
- sudo yum install -y python3-unittest || \
- (echo 'import unittest' | $PYTHON) || \
-  exit $NOTOK
+install_python_module_from_package \
+	numpy \
+	python2-numpy python3-numpy
+
+install_python_module_from_package \
+	scipy \
+	python2-scipy python3-scipy
+
+install_python_module_from_package \
+	yaml \
+	python2-pyyaml python3-pyyaml
+
+# to get xattr, in RHEL8 you need to enable this repo:
+#  subscription-manager repos --enable=codeready-builder-for-rhel-8-x86_64-source-rpms
+
+$SUDO yum install -y gcc
+install_python_module_from_package xattr pyxattr || \
+	(pip install pyxattr ; pip3 install pyxattr ; \
+	 (echo 'import xattr' | $PYTHON) )
 
 # run the smallfile.py module's unit test
 
@@ -165,6 +210,10 @@ $PYTHON drop_buffer_cache.py
 
 echo "running YAML parser unit test"
 $PYTHON yaml_parser.py
+
+# set up NFS mountpoint
+
+cleanup
 
 # test simplest smallfile_cli commands, using non-default dirs
 
@@ -359,7 +408,7 @@ run_one_cmd()
 {
   cmd="$1"
   echo "$cmd" | tee -a $f
-  $cmd 2>&1 | tee /tmp/onetest.tmp
+  $cmd >> $f 2>&1
 }
 
 common_params=\
@@ -399,9 +448,9 @@ echo "******** simulating distributed operations with launch-by-daemon" | tee -a
 
 cleanup
 rm -fv $testdir/shutdown_launchers.tmp
-python launch_smf_host.py --top $testdir --as-host foo &
+$PYTHON launch_smf_host.py --top $testdir --as-host foo &
 worker_pids="$!"
-python launch_smf_host.py --top $testdir --as-host bar &
+$PYTHON launch_smf_host.py --top $testdir --as-host bar &
 worker_pids="$worker_pids $!"
 sleep 2
 daemon_params=\
@@ -430,9 +479,9 @@ topdirlist="${testdir}1,${testdir}2,${testdir}3,${testdir}4"
 scmd="$PYTHON smallfile_cli.py --top $topdirlist "
 topdirlist_nocomma=`echo $topdirlist | sed 's/,/ /g'`
 for d in $topdirlist_nocomma ; do
-  sudo mkdir -pv $d
-  sudo chown -v $iam:$iam $d
-  sudo chmod -v 777 $d
+  $SUDO mkdir -pv $d
+  $SUDO chown -v $iam:$iam $d
+  $SUDO chmod -v 777 $d
 done
 cleanup
 for op in `supported_ops $xattrs 'multitop'` ; do
@@ -440,7 +489,7 @@ for op in `supported_ops $xattrs 'multitop'` ; do
   echo "testing local op $op"
   run_one_cmd "$common_params --top $topdirlist --operation $op"
 done
-for d in $topdirlist_nocomma ; do sudo rm -rf $d ; done
+for d in $topdirlist_nocomma ; do $SUDO rm -rf $d ; done
 
 # these kinds of tests are needed for distributed filesystems or NFS/SMB exports
 
@@ -491,11 +540,13 @@ run_one_cmd "$bigtest_params --operation cleanup "
 
 $GREP $nfsdir /proc/mounts
 if [ $? == $OK ] ; then
-  sudo umount -v $nfsdir
-  sudo rm -rf $nfsdir
+  $SUDO umount -v $nfsdir
+  $SUDO rm -rf $nfsdir
 fi
-sudo exportfs -uav
-sudo rm -rf $testdir $bigtmp
-sudo systemctl stop $nfs_svc
-sudo systemctl stop sshd
+$SUDO exportfs -uav
+$SUDO rm -rf $testdir $bigtmp
+$SUDO systemctl stop $nfs_svc
+if [ -n "$sshd_was_off" ] ; then
+	$SUDO systemctl stop sshd
+fi
 echo 'SUCCESS!'
