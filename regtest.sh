@@ -82,12 +82,13 @@ runsmf() {
 }
 
 cleanup() {
-  grep -q $nfsdir /proc/mounts 
-  if [ $? = $OK ] ; then sudo umount $nfsdir || exit $NOTOK ; fi
+  if [ `grep $nfsdir /proc/mounts | wc -l` -gt 0 ] ; then sudo umount $nfsdir ; fi
   sudo exportfs -ua
   rm -rf /var/tmp/invoke*.log
   mkdir -pv $testdir
-  chown -v $iam:$iam $testdir $testdir/..
+  chown -v $iam:$iam $testdir 
+  chown -v $iam:$iam $testdir/.. || \
+    echo $iam cannot own parent directory of $testdir
   chmod -v 777 $testdir
   touch $testdir/letmein
   sudo exportfs -v -o rw,no_root_squash,sync,fsid=15 localhost:$testdir
