@@ -31,7 +31,7 @@ import pickle
 # smallfile modules
 
 import smallfile
-from smallfile import ensure_deleted, SMFResultException
+from smallfile import ensure_deleted, SMFResultException, SMFRunException
 from smallfile import OK, NOTOK
 from smallfile import use_isAlive
 import sync_files
@@ -58,6 +58,15 @@ def run_multi_host_workload(prm):
     starting_gate = master_invoke.starting_gate
     verbose = master_invoke.verbose
 
+    if os.getenv('PYPY'):
+        python_prog = os.getenv('PYPY')
+    elif sys.version.startswith('2'):
+        python_prog = 'python'
+    elif sys.version.startswith('3'):
+        python_prog = 'python3'
+    else:
+        raise SMFRunException('unrecognized python version %s' % sys.version)
+
     # construct list of ssh threads to invoke in parallel
 
     sync_files.create_top_dirs(master_invoke, True)
@@ -66,14 +75,6 @@ def run_multi_host_workload(prm):
     # if verbose: print('writing ' + pickle_fn))
 
     sync_files.write_pickle(pickle_fn, prm)
-    if os.getenv('PYPY'):
-        python_prog = os.getenv('PYPY')
-    elif sys.version.startswith('2'):
-        python_prog = 'python'
-    elif sys.version.startswith('3'):
-        python_prog = 'python3'
-    else:
-        raise Exception('unrecognized python version %s' % sys.version)
 
     # print('python_prog = %s'%python_prog)
 
@@ -138,7 +139,7 @@ def run_multi_host_workload(prm):
                 print('shared dir list: ' + str(ndirlist))
             hosts_ready = True
             if os.path.exists(abortfn):
-                raise Exception('worker host signaled abort')
+                raise SMFRunException('worker host signaled abort')
             for j in range(last_host_seen + 1, len(prm_host_set)):
                 h = prm_host_set[j]
                 fn = master_invoke.gen_host_ready_fname(h.strip())
@@ -188,11 +189,11 @@ def run_multi_host_workload(prm):
         else:
             print('no host reached starting gate')
         if not exception_seen:
-            raise Exception('hosts did not reach starting gate ' +
+            raise SMFRunException('hosts did not reach starting gate ' +
                             'within %d seconds' % host_timeout)
         else:
             print('saw exception %s, aborting test' % str(exception_seen))
-            sys.exit(NOTOK)
+        sys.exit(NOTOK)
     else:
 
         # ask all hosts to start the test
@@ -254,12 +255,9 @@ def run_multi_host_workload(prm):
         output_results.output_results(invoke_list, prm)
         all_ok = OK
     except IOError as e:
-
         print('host %s filename %s: %s' % (h, pickle_fn, str(e)))
     except KeyboardInterrupt as e:
         print('control-C signal seen (SIGINT)')
-    except SMFResultException as e:
-        print(str(e))
 
     sys.exit(all_ok)
 

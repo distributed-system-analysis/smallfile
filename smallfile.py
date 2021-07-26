@@ -120,14 +120,10 @@ class MFRdWrExc(Exception):
 
 
 class SMFResultException(Exception):
+    pass
 
-    def __init__(self, msg):
-        Exception.__init__(self)
-        self.msg = msg
-
-    def __str__(self):
-        return self.msg
-
+class SMFRunException(Exception):
+    pass
 
 # avoid exception if file we wish to delete is not there
 
@@ -174,7 +170,7 @@ def ensure_dir_exists(dirpath):
     if not os.path.exists(dirpath):
         parent_path = os.path.dirname(dirpath)
         if parent_path == dirpath:
-            raise Exception('ensure_dir_exists: ' +
+            raise SMFRunException('ensure_dir_exists: ' +
                             'cannot obtain parent path ' +
                             'of non-existent path: ' +
                             dirpath)
@@ -187,7 +183,7 @@ def ensure_dir_exists(dirpath):
                 raise e
     else:
         if not os.path.isdir(dirpath):
-            raise Exception('%s already exists and is not a directory!'
+            raise SMFRunException('%s already exists and is not a directory!'
                             % dirpath)
 
 
@@ -726,7 +722,7 @@ class SmallfileWorkload:
             delay_time = 0.1
             while not os.path.exists(self.starting_gate):
                 if os.path.exists(self.abort_fn()):
-                    raise Exception('thread ' + str(self.tid)
+                    raise SMFRunException('thread ' + str(self.tid)
                                     + ' saw abort flag')
                 # wait a little longer so that
                 # other clients have time to see that gate exists
@@ -787,7 +783,7 @@ class SmallfileWorkload:
                 self.end_test()
             return False
         if self.abort:
-            raise Exception('thread ' + str(self.tid)
+            raise SMFRunException('thread ' + str(self.tid)
                             + ' saw abort flag')
         self.filenum += 1
         if self.pause_sec > 0.0:
@@ -1085,7 +1081,7 @@ class SmallfileWorkload:
                         topdir = t
                         break
                 if not topdir:
-                    raise Exception(('directory %s is not part of ' +
+                    raise SMFRunException(('directory %s is not part of ' +
                                      'any top-level directory in %s')
                                     % (unique_dpath, str(tree)))
 
@@ -1120,7 +1116,7 @@ class SmallfileWorkload:
 
     def do_create(self):
         if self.record_ctime_size and not xattr_installed:
-            raise Exception(
+            raise SMFRunException(
                 'no python xattr module, cannot record create time + size')
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
@@ -1207,7 +1203,7 @@ class SmallfileWorkload:
 
     def do_getxattr(self):
         if not xattr_installed:
-            raise Exception('xattr module not present, ' +
+            raise SMFRunException('xattr module not present, ' +
                             'getxattr and setxattr operations will not work')
 
         while self.do_another_file():
@@ -1223,7 +1219,7 @@ class SmallfileWorkload:
 
     def do_setxattr(self):
         if not xattr_installed:
-            raise Exception('xattr module not present, ' +
+            raise SMFRunException('xattr module not present, ' +
                             'getxattr and setxattr operations will not work')
 
         while self.do_another_file():
@@ -1248,7 +1244,7 @@ class SmallfileWorkload:
 
     def do_write(self, append=False):
         if self.record_ctime_size and not xattr_installed:
-            raise Exception('xattr module not present ' +
+            raise SMFRunException('xattr module not present ' +
                             'but record-ctime-size specified')
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
@@ -1316,7 +1312,7 @@ class SmallfileWorkload:
 
     def do_readdir(self):
         if self.hash_to_dir:
-            raise Exception('cannot do readdir test with ' +
+            raise SMFRunException('cannot do readdir test with ' +
                             '--hash-into-dirs option')
         prev_dir = ''
         dir_map = {}
@@ -1330,7 +1326,7 @@ class SmallfileWorkload:
                     common_dir = dir[len(self.top_dirs[0]):]
                     break
             if not common_dir:
-                raise Exception(('readdir: filename %s is not ' +
+                raise SMFRunException(('readdir: filename %s is not ' +
                                  'in any top dir in %s')
                                 % (fn, str(self.top_dirs)))
             if common_dir != prev_dir:
@@ -1362,7 +1358,7 @@ class SmallfileWorkload:
 
     def do_ls_l(self):
         if self.hash_to_dir:
-            raise Exception('cannot do readdir test with ' +
+            raise SMFRunException('cannot do readdir test with ' +
                             '--hash-into-dirs option')
         prev_dir = ''
         dir_map = {}
@@ -1376,7 +1372,7 @@ class SmallfileWorkload:
                     common_dir = dir[len(self.top_dirs[0]):]
                     break
             if not common_dir:
-                raise Exception('ls-l: filename %s is not in any top dir in %s'
+                raise SMFRunException('ls-l: filename %s is not in any top dir in %s'
                                 % (fn, str(self.top_dirs)))
             if common_dir != prev_dir:
                 self.op_starttime()
@@ -1408,7 +1404,7 @@ class SmallfileWorkload:
 
     def do_await_create(self):
         if not xattr_installed:
-            raise Exception(
+            raise SMFRunException(
                 'no python xattr module, so cannot read xattrs')
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
@@ -1428,7 +1424,7 @@ class SmallfileWorkload:
             while True:
                 st = os.stat(fn)
                 if st.st_size > original_sz_kb * self.BYTES_PER_KB:
-                    raise Exception(('asynchronously created replica ' +
+                    raise SMFRunException(('asynchronously created replica ' +
                                      'in %s is %u bytes, ' +
                                      'larger than original %u KB')
                                     % (fn, st.st_size, original_sz_kb))
@@ -1471,7 +1467,7 @@ class SmallfileWorkload:
 
     def do_swift_get(self):
         if not xattr_installed:
-            raise Exception('xattr module not present, ' +
+            raise SMFRunException('xattr module not present, ' +
                             'getxattr and setxattr operations will not work')
         l = self.log
         while self.do_another_file():
@@ -1527,7 +1523,7 @@ class SmallfileWorkload:
         if not xattr_installed or \
            not fallocate_installed or \
            not fadvise_installed:
-            raise Exception('one of necessary modules not available')
+            raise SMFRunException('one of necessary modules not available')
 
         l = self.log
         while self.do_another_file():
@@ -1543,7 +1539,7 @@ class SmallfileWorkload:
                 # os.ftruncate(fd, fszbytes)
                 ret = fallocate.fallocate(fd, 0, 0, fszbytes)
                 if ret != OK:
-                    raise Exception('fallocate call returned %d' % ret)
+                    raise SMFRunException('fallocate call returned %d' % ret)
                 rszkb = self.get_record_size_to_use()
                 remaining_kb = next_fsz
                 while remaining_kb > 0:
@@ -1662,7 +1658,7 @@ class SmallfileWorkload:
             try:
                 func = SmallfileWorkload.workloads[o]
             except KeyError as e:
-                raise Exception('invalid workload type ' + o)
+                raise SMFRunException('invalid workload type ' + o)
             func(self)  # call the do_ function for that workload type
             self.status = ok
         except KeyboardInterrupt as e:
@@ -1771,7 +1767,7 @@ class Test(unittest_module.TestCase):
 
     def chk_status(self):
         if self.invok.status != ok:
-            raise Exception('test failed, check log file %s'
+            raise SMFRunException('test failed, check log file %s'
                             % self.invok.log_fn())
 
     def runTest(self, opName):
@@ -2143,15 +2139,15 @@ class Test(unittest_module.TestCase):
             abort_test(self.invok.abort_fn(), threadList)
             for t in threadList:
                 t.join(1.1)
-            raise Exception('threads did not show up within %d seconds'
+            raise SMFRunException('threads did not show up within %d seconds'
                             % thread_ready_timeout)
         touch(sgate_file)
         for t in threadList:
             t.join()
             if thrd_is_alive(t):
-                raise Exception('thread join timeout:' + str(t))
+                raise SMFRunException('thread join timeout:' + str(t))
             if t.invocation.status != ok:
-                raise Exception('thread did not complete iterations: '
+                raise SMFRunException('thread did not complete iterations: '
                                 + str(t))
 
 

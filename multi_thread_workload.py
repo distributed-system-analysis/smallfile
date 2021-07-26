@@ -7,7 +7,7 @@ import copy
 
 import smallfile
 from smallfile import ensure_deleted, ensure_dir_exists, OK, NOTOK, \
-    SMFResultException, abort_test
+    SMFResultException, SMFRunException, abort_test
 import invoke_process
 import sync_files
 import output_results
@@ -103,7 +103,7 @@ def run_multi_thread_workload(prm):
 
     if thread_to_wait_for < thread_count:
         abort_test(abort_fname, thread_list)
-        raise Exception('only %d threads reached starting gate within %d sec'
+        raise SMFRunException('only %d threads reached starting gate within %d sec'
                         % (thread_to_wait_for, startup_timeout))
 
     # declare that this host is at the starting gate
@@ -140,7 +140,7 @@ def run_multi_thread_workload(prm):
             time.sleep(0.5)
         if not os.path.exists(sg):
             abort_test(my_host_invoke.abort_fn(), thread_list)
-            raise Exception('starting signal not seen within %d seconds'
+            raise SMFRunException('starting signal not seen within %d seconds'
                             % prm.host_startup_timeout)
     if verbose:
         print('starting test on host ' + host + ' in 2 seconds')
