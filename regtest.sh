@@ -1,5 +1,4 @@
 #!/bin/bash
-set -xeo
 # smallfile regression test
 #
 # you can set the environment variable PYTHON_PROG 
@@ -63,13 +62,19 @@ OK=0
 NOTOK=1
 GREP="grep -q "
 PYTHON=${PYTHON_PROG:-python3}
-f=smfregtest.log
 iam=$USER
-echo "see end of $f for cause of failures" 
 if [ "$USER" != "root" ] ; then
 	SUDO=sudo
 fi
+logf=/tmp/onetest.log
 
+assertok() {
+  status=$1
+  if [ $status != $OK ] ; then
+    echo "ERROR: unexpected failure status $status"
+    exit $NOTOK
+  fi
+}
 
 assertfail() {
   status=$1
@@ -81,15 +86,25 @@ assertfail() {
 
 # test assertion mechanism
 
-cp -r /foo/bar/no-such-dir /tmp/ >> $f 2>&1 || assertfail $?
-
+cp -r /foo/bar/no-such-dir /tmp/ 
+assertfail $?
+rm -rf /tmp/junk && cp -r . /tmp/junk
+assertok $?
 
 # also echo smallfile command to the log so you can see what was last attempt
+# if you expect it to fail, pass "true" (anything really) in param 2
 
 runsmf() {
   smfcmd="$1"
-  echo "$smfcmd" | tee -a $f
-  $smfcmd > $f 2>&1
+  expectfail="$2"
+  echo
+  echo "$smfcmd" 
+  s=$OK
+  $smfcmd > $logf || s=$? || echo -n
+  echo status $s
+  cat $logf
+  if [ -n "$expectfail" ] ; then assertfail $s ; fi
+  if [ -z "$expectfail" ] ; then assertok $s ; fi
 }
 
 
@@ -98,25 +113,42 @@ runsmf() {
 
 cleanup() {
   if [ `grep $nfsdir /proc/mounts | wc -l` -gt 0 ] ; then $SUDO umount $nfsdir ; fi
+  assertok $?
   $SUDO exportfs -ua
+  assertok $?
   rm -rf /var/tmp/invoke*.log
+  assertok $?
   mkdir -pv $testdir
+  assertok $?
   chown -v $iam:$iam $testdir 
+  assertok $?
   chown -v $iam:$iam $testdir/.. || \
     echo $iam cannot own parent directory of $testdir
   chmod -v 777 $testdir
+  assertok $?
   touch $testdir/letmein
+  assertok $?
   $SUDO exportfs -v -o rw,no_root_squash,sync,fsid=15 localhost:$testdir
+  assertok $?
   $SUDO rm -rf $nfsdir
+  assertok $?
   mkdir -p $nfsdir
+  assertok $?
   chown -v $iam:$iam $nfsdir
+  assertok $?
   chmod -v 777 $nfsdir
+  assertok $?
   sleep 1
   $SUDO mount -t nfs -o nfsvers=3,tcp,actimeo=1 $localhost_name:$testdir $nfsdir
+  assertok $?
   $SUDO chmod -v 777 $nfsdir
+  assertok $?
   $SUDO exportfs -v | grep -q $testdir 2>/tmp/ee
-  df $nfsdir
+  assertok $?
+  df $nfsdir | grep $nfsdir
+  assertok $?
   touch $nfsdir/letmein
+  assertok $?
 }
 
 
@@ -140,6 +172,7 @@ if [ $is_systemctl == 1 ] ; then
 else
   $SUDO service $svcname restart
 fi
+assertok $?
 return $s
 }
 
@@ -158,14 +191,18 @@ install_python_module_from_package()
 	pkglist=$*
 	(echo "import $pkgname" | $PYTHON) || \
 	 ((for p in $pkglist ; do \
-	    yum install -y $p || echo "attempted install of $p" ; \
+	    $SUDO yum install -y $p || echo "attempted install of $p" ; \
            done) ; \
 	   (echo "import $pkgname" | $PYTHON) )
+	assertok $?
 }
 
 ps awux | grep sshd || sshd_was_off=1
 start_service sshd
 start_service $nfs_svc
+
+$SUDO yum install -y python2 python3 || \
+  echo 'best-effort python2 and python3 install'
 
 install_python_module_from_package \
 	unittest \
@@ -186,30 +223,37 @@ install_python_module_from_package \
 # to get xattr, in RHEL8 you need to enable this repo:
 #  subscription-manager repos --enable=codeready-builder-for-rhel-8-x86_64-source-rpms
 
-$SUDO yum install -y gcc
-install_python_module_from_package xattr pyxattr || \
-	(pip install pyxattr ; pip3 install pyxattr ; \
-	 (echo 'import xattr' | $PYTHON) )
+$SUDO yum install -y gcc python2-pip python3-pip || \
+	echo "best-effort pip install"
+
+install_python_module_from_package xattr python3-pyxattr || \
+	(pip install pyxattr || pip2 install pyxattr || pip3 install pyxattr ; \
+	(echo 'import xattr' | $PYTHON) )
+assertok $?
 
 # run the smallfile.py module's unit test
 
 echo "running smallfile.py unit test"
 $PYTHON smallfile.py
+assertok $?
 
 # run the invoke_process.py unit test
 
 echo "running invoke_process.py unit test"
 $PYTHON invoke_process.py
+assertok $?
 
 # run drop_buffer_cache.py unit test
 
 echo "running drop_buffer_cache.py unit test"
 $PYTHON drop_buffer_cache.py
+assertok $?
 
 # run yaml parser unit test
 
 echo "running YAML parser unit test"
 $PYTHON yaml_parser.py
+assertok $?
 
 # set up NFS mountpoint
 
@@ -221,10 +265,10 @@ echo "simplest smallfile_cli.py commands"
 
 scmd="$PYTHON smallfile_cli.py "
 cleanup
-rm -fv $testdir/{starting_gate,stonewall}.tmp 2>/tmp/e || \
-  assertfail $?
+rm -fv $testdir/{starting_gate,stonewall}.tmp 2>/tmp/e
 runsmf "$scmd"
-ls -l $testdir/{starting_gate,stonewall}.tmp || \
+ls -l $testdir/network_shared/{starting_gate,stonewall}.tmp
+assertok $?
 
 non_dflt_dir=/var/tmp/foo
 scmd="$PYTHON smallfile_cli.py --top $non_dflt_dir "
@@ -233,6 +277,7 @@ rm -rf $non_dflt_dir
 mkdir $non_dflt_dir
 runsmf "$scmd"
 (cd $non_dflt_dir/network_shared ; ls -l {starting_gate,stonewall}.tmp)
+assertok $?
 
 scmd="$scmd --host-set localhost"
 cleanup
@@ -241,6 +286,7 @@ mkdir $non_dflt_dir
 runsmf "$scmd"
 (cd $non_dflt_dir/network_shared ; \
  ls -l {starting_gate,stonewall}.tmp param.pickle host_ready.localhost.tmp) 2>/tmp/e
+assertok $?
 
 # test parsing
 
@@ -248,33 +294,31 @@ nonnegmsg="integer value greater than zero expected"
 echo "testing parsing"
 scmd="$PYTHON smallfile_cli.py --top $testdir "
 cleanup
-runsmf "$scmd --files 0" || \
-  assertfail $?
-$GREP "$nonnegmsg" $f
+runsmf "$scmd --files 0" assertfail
+$GREP "$nonnegmsg" $logf
 
 cleanup
-runsmf "$scmd --threads 0" || \
-  assertfail $?
-$GREP "$nonnegmsg" $f
+runsmf "$scmd --threads 0" assertfail
+$GREP "$nonnegmsg" $logf
 
-runsmf "$scmd --files -1" 		|| assertfail $?
-runsmf "$scmd --record-size -1" 	|| assertfail $?
-runsmf "$scmd --file-size -1" 		|| assertfail $?
-runsmf "$scmd --files-per-dir 0" 	|| assertfail $?
-runsmf "$scmd --dirs-per-dir 0" 	|| assertfail $?
-runsmf "$scmd --record-size -1" 	|| assertfail $?
-runsmf "$scmd --record-size a" 		|| assertfail $?
-runsmf "$scmd --top /" 			|| assertfail $?
-runsmf "$scmd --response-times foo"	|| assertfail $?
-runsmf "$scmd --stonewall foo" 		|| assertfail $?
-runsmf "$scmd --finish foo"		|| assertfail $?
-runsmf "$scmd --host-count -5" 		|| assertfail $?
-runsmf "$scmd --auto-pause foo"		|| assertfail $?
+runsmf "$scmd --files -1" 		assertfail
+runsmf "$scmd --record-size -1" 	assertfail
+runsmf "$scmd --file-size -1" 		assertfail
+runsmf "$scmd --files-per-dir 0" 	assertfail
+runsmf "$scmd --dirs-per-dir 0" 	assertfail
+runsmf "$scmd --record-size -1" 	assertfail
+runsmf "$scmd --record-size a" 		assertfail
+runsmf "$scmd --top /" 			assertfail
+runsmf "$scmd --response-times foo"	assertfail
+runsmf "$scmd --stonewall foo" 		assertfail
+runsmf "$scmd --finish foo"		assertfail
+runsmf "$scmd --host-count -5" 		assertfail
+runsmf "$scmd --auto-pause foo"		assertfail
 
 cat > $nfsdir/bad.yaml <<EOF
 --file-size 30
 EOF
-runsmf "$PYTHON smallfile_cli.py --yaml-input $nfsdir/bad.yaml" || assertfail $?
+runsmf "$PYTHON smallfile_cli.py --yaml-input $nfsdir/bad.yaml" assertfail
 
 # run a command with all CLI options and verify that they were successfully parsed
 
@@ -316,7 +360,7 @@ expect_strs=( 'verify read? : N' \
 expect_ct=${#expect_strs[*]}
 for j in $(seq 0 $expect_ct) ; do 
   expected_str="${expect_strs[$j]}"
-  $GREP "$expected_str" $f || \
+  $GREP "$expected_str" $logf || \
 	  (echo "expecting: $expected_str" ; exit $NOTOK)
 done
 
@@ -359,7 +403,7 @@ scmd="$PYTHON smallfile_cli.py --yaml-input $yamlfile"
 runsmf "$scmd"
 for k in `seq 0 $expect_ct` ; do 
   expected_str="${expect_strs[$k]}"
-  $GREP "$expected_str" $f || \
+  $GREP "$expected_str" $logf || \
 	  (echo "expecting: $expected_str" ; exit $NOTOK)
 done
 
@@ -404,13 +448,6 @@ supported_ops()
         echo $ops
 }
 
-run_one_cmd()
-{
-  cmd="$1"
-  echo "$cmd" | tee -a $f
-  $cmd >> $f 2>&1
-}
-
 common_params=\
 "$PYTHON smallfile_cli.py --files 1000 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4 --record-size 16 --file-size 32  --verify-read Y --response-times N --xattr-count 9 --xattr-size 253 --stonewall N"
 
@@ -420,20 +457,21 @@ echo "*** run one long cleanup test with huge directory and 1 thread ***"
 
 cleanup_test_params="$common_params --threads 1 --files 1000000 --files-per-dir 1000000 --file-size 0"
 rm -fv /tmp/smf.json $testdir/*rsptime*csv
-run_one_cmd "$cleanup_test_params --top $testdir --operation create --response-times Y --output-json /tmp/smf.json"
+runsmf "$cleanup_test_params --top $testdir --operation create --response-times Y --output-json /tmp/smf.json"
+
 start_time=$(tr '",' '  ' < /tmp/smf.json | awk '/start-time/{print $NF}')
 echo "start time was $start_time"
 $PYTHON smallfile_rsptimes_stats.py --start-time $start_time --time-interval 1 $testdir/network_shared
 int_start_time=$(echo $start_time | awk -F. '{ print $1 }')
 echo "rounded-down start time was $int_start_time"
 grep $int_start_time $testdir/network_shared/stats-rsptimes.csv || exit $NOTOK
-run_one_cmd "$cleanup_test_params --top $testdir --operation cleanup"
+runsmf "$cleanup_test_params --top $testdir --operation cleanup"
 
 echo "*** run one test with many threads ***"
 
 many_thread_params="$common_params --threads 30 --files 10000 --files-per-dir 10 --file-size 0"
-run_one_cmd "$many_thread_params --top $testdir --operation create"
-run_one_cmd "$many_thread_params --top $testdir --operation cleanup"
+runsmf "$many_thread_params --top $testdir --operation create"
+runsmf "$many_thread_params --top $testdir --operation cleanup"
 
 echo "******** testing non-distributed operations" | tee -a $f
 
@@ -441,7 +479,7 @@ cleanup
 for op in `supported_ops $xattrs ''` ; do
   echo
   echo "testing local op $op"
-  run_one_cmd "$common_params --operation $op"
+  runsmf "$common_params --operation $op"
 done
 
 echo "******** simulating distributed operations with launch-by-daemon" | tee -a $f
@@ -461,7 +499,7 @@ daemon_params=\
 for op in `supported_ops $xattrs ''` ; do
   echo
   echo "testing local op $op"
-  run_one_cmd "$daemon_params --operation $op"
+  runsmf "$daemon_params --operation $op"
 done
 touch $testdir/network_shared/shutdown_launchers.tmp
 echo "waiting for launcher daemons to shut down..."
@@ -487,7 +525,7 @@ cleanup
 for op in `supported_ops $xattrs 'multitop'` ; do
   echo
   echo "testing local op $op"
-  run_one_cmd "$common_params --top $topdirlist --operation $op"
+  runsmf "$common_params --top $topdirlist --operation $op"
 done
 for d in $topdirlist_nocomma ; do $SUDO rm -rf $d ; done
 
@@ -503,7 +541,7 @@ cleanup
 for op in `supported_ops $xattrs ''` ; do
   echo
   echo "testing distributed op $op"
-  run_one_cmd "$common_params --host-set $localhost_name --stonewall Y --pause 500 --operation $op"
+  runsmf "$common_params --host-set $localhost_name --stonewall Y --pause 500 --operation $op"
 done
 
 # we do these tests for virtualization (many KVM guests or containers, shared storage but no shared fs)
@@ -516,7 +554,7 @@ for op in `supported_ops $xattrs ''` ; do
   mkdir $nfsdir/sync
   echo
   echo "testing remote-but-local op $op"
-  run_one_cmd "$common_params --top $testdir --network-sync-dir $nfsdir/sync --host-set $localhost_name --operation $op"
+  runsmf "$common_params --top $testdir --network-sync-dir $nfsdir/sync --host-set $localhost_name --operation $op"
 done
 
 
@@ -532,11 +570,11 @@ bigtest_params="$common_params --top $bigtmp --files 20000 --file-size 0 --recor
 bigtest_params="$bigtest_params --files-per-dir 3 --dirs-per-dir 2 --threads 10 --stonewall Y --pause 10"
 for op in create read ; do
   echo "big test with op $op"
-  run_one_cmd "$bigtest_params --operation $op "
+  runsmf "$bigtest_params --operation $op "
 done
 # could be out of space on root filesystem, so cleanup
 rm -rf /var/tmp/invoke*.log
-run_one_cmd "$bigtest_params --operation cleanup "
+runsmf "$bigtest_params --operation cleanup "
 
 $GREP $nfsdir /proc/mounts
 if [ $? == $OK ] ; then
