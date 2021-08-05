@@ -1677,7 +1677,7 @@ class SmallfileWorkload:
         if self.rq_final < 0:
             self.end_test()
         self.elapsed_time = self.end_time - self.start_time
-
+        self.log.info('finished %s' % self.opname)
         # this next call works fine with python 2.7
         # but not with python 2.6, why? do we need it?
         #    logging.shutdown()
