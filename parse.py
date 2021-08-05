@@ -259,7 +259,7 @@ def parse():
             print('%40s : %s' % (prm_name, prm_value))
 
     if inv.auto_pause and inv.pause_between_files == 0:
-        inv.pause_between_files = 10000
+        inv.pause_between_files = 1000
         print(('auto-pause requested but pause param not specified' +
                ', defaulting to %d microseconds') % inv.pause_between_files)
 
