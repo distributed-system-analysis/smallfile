@@ -393,7 +393,9 @@ class SmallfileWorkload:
         # how many microsec to sleep between each file
         self.pause_between_files = 0
         # collect samples for this long, then add to start time
-        self.pause_history_duration = 5.0
+        # this will immediately be incremented to 1, 
+        # but will not increase further unless we see response times in excess of 1 second
+        self.pause_history_duration = 0.0
 
         # wait this long after cleanup for async. deletion activity to finish
         self.cleanup_delay_usec_per_file = 0
@@ -441,7 +443,6 @@ class SmallfileWorkload:
 
         # number of threads in each host/pod
         self.threads = 1
-        self.total_threads = self.total_hosts * self.threads
 
         # reset object state variables
 
@@ -474,11 +475,12 @@ class SmallfileWorkload:
         s += ' cleanup_delay_usec_per_file=' + str(self.cleanup_delay_usec_per_file)
         s += ' files_between_checks=' + str(self.files_between_checks)
         s += ' pause=' + str(self.pause_between_files)
+        s += ' pause_sec' + str(self.pause_sec)
+        s += ' auto_pause=' + str(self.auto_pause)
         s += ' verify_read=' + str(self.verify_read)
         s += ' incompressible=' + str(self.incompressible)
         s += ' finish_all_rq=' + str(self.finish_all_rq)
         s += ' rsp_times=' + str(self.measure_rsptimes)
-        s += ' auto_pause=' + str(self.auto_pause)
         s += ' tid=' + self.tid
         s += ' loglevel=' + str(self.log_level)
         s += ' filenum=' + str(self.filenum)
@@ -516,7 +518,8 @@ class SmallfileWorkload:
         # start time for this history interval
         self.pause_history_start_time = 0.0
         self.pause_sec = self.pause_between_files / self.MICROSEC_PER_SEC
-        self.pause_history_duration = 2.0
+        # recalculate this to capture any changes in self.total_hosts and self.threads
+        self.total_threads = self.total_hosts * self.threads
         # to measure per-thread elapsed time
         self.start_time = None
         self.end_time = None
@@ -613,18 +616,24 @@ class SmallfileWorkload:
             if self.pause_history_start_time + self.pause_history_duration > end_time:
                 self.pause_rsptime_history.append(rsp_time)
             else:
-                if len(self.pause_rsptime_history) > 0:
+                rsptime_samples = len(self.pause_rsptime_history)
+                if rsptime_samples > 2:
                     # there are samples to process
-                    mean_rsptime = sum(self.pause_rsptime_history)/len(self.pause_rsptime_history)
+                    mean_rsptime = sum(self.pause_rsptime_history)/rsptime_samples
                     time_so_far = end_time - self.pause_history_start_time
                     # estimate system throughput assuming all threads are same
-                    est_throughput = len(self.pause_rsptime_history) * self.total_threads / time_so_far
+                    est_throughput = rsptime_samples * self.total_threads / time_so_far
                     mean_utilization = mean_rsptime * est_throughput
                     old_pause = self.pause_sec
-                    self.pause_sec *= mean_utilization
-                    self.log.debug('time_so_far %f mean_rsptime %f est_throughput %f mean_util %f' %
-                                   (time_so_far, mean_rsptime, est_throughput, mean_utilization))
-                    self.log.debug('per-thread pause changed from %9.6f to %9.6f' % (old_pause, self.pause_sec))
+                    new_pause = 0.5 * mean_utilization * mean_rsptime
+                    self.pause_sec = (old_pause + new_pause) / 2.0
+                    self.log.debug('time_so_far %f samples %d mean_rsptime %f est_throughput %f mean_util %f' %
+                                   (time_so_far, rsptime_samples, mean_rsptime, est_throughput, mean_utilization))
+                    self.log.info('per-thread pause changed from %9.6f to %9.6f' % (old_pause, self.pause_sec))
+                else:
+                    # not enough samples,we need a longer measurement interval
+                    self.log.info('increasing pause_history_duration %f by 1'  % self.pause_history_duration)
+                    self.pause_history_duration += 1
                 self.pause_history_start_time = end_time - rsp_time
                 self.pause_rsptime_history = [rsp_time]
         self.op_start_time = None
@@ -1939,13 +1948,6 @@ class Test(unittest_module.TestCase):
         self.assertTrue(self.file_size(fn) == (orig_kb + 2048)
                         * self.invok.BYTES_PER_KB)
 
-    def test_h00_pause(self):
-        self.mk_files()
-        self.invok.pause_between_files = 5000
-        self.invok.total_hosts = 10
-        self.invok.auto_pause = True
-        self.runTest('read')
-
     def test_h00_read(self):
         if not xattr_installed:
             return
@@ -1997,7 +1999,7 @@ class Test(unittest_module.TestCase):
         self.invok.filesize_distr = self.invok.fsdistr_random_exponential
         self.invok.incompressible = True
         self.invok.verify_read = True
-        self.invok.pause_between_files = 1000
+        self.invok.pause_between_files = 500
         self.invok.iterations = 2000
         self.invok.record_sz_kb = 0
         self.invok.total_sz_kb = 16
@@ -2073,6 +2075,18 @@ class Test(unittest_module.TestCase):
         self.invok.suffix = 'deep'
         self.mk_files()
         self.assertTrue(exists(self.lastFileNameInTest(self.invok.src_dirs)))
+        self.cleanup_files()
+
+    def test_j1a_pause(self):
+        self.invok.iterations = 2000
+        self.invok.pause_between_files = 5000
+        self.invok.total_hosts = 10
+        self.invok.auto_pause = True
+        self.mk_files()
+        self.invok.auto_pause = False
+        self.invok.pause_between_files = 0
+        self.invok.pause_sec = 0.0
+        self.invok.total_hosts = 1
         self.cleanup_files()
 
     def test_j2_deep_hashed_tree(self):
