@@ -41,6 +41,7 @@ import threading
 import socket
 import errno
 import codecs
+from math import sqrt
 
 OK = 0  # system call return code for success
 NOTOK = 1
@@ -390,18 +391,15 @@ class SmallfileWorkload:
 
         # should we attempt to adjust pause between files 
         self.auto_pause = False
-        # how many microsec to sleep between each file
-        self.pause_between_files = 0
+
+        # sleep this long between each file op
+        self.pause_between_files = 0.0
+
         # collect samples for this long, then add to start time
-        # this will immediately be incremented to 1, 
-        # but will not increase further unless we see response times in excess of 1 second
-        self.pause_history_duration = 0.0
+        self.pause_history_duration = 1.0
 
         # wait this long after cleanup for async. deletion activity to finish
         self.cleanup_delay_usec_per_file = 0
-
-        # same as pause_between_files but in floating-point seconds
-        self.pause_sec = 0.0
 
         # which host the invocation ran on
         self.onhost = get_hostname(None)
@@ -448,6 +446,7 @@ class SmallfileWorkload:
 
         self.reset()
 
+    # FIXME: should be converted to dictionary and output in JSON
     # convert object to string for logging, etc.
 
     def __str__(self):
@@ -475,7 +474,7 @@ class SmallfileWorkload:
         s += ' cleanup_delay_usec_per_file=' + str(self.cleanup_delay_usec_per_file)
         s += ' files_between_checks=' + str(self.files_between_checks)
         s += ' pause=' + str(self.pause_between_files)
-        s += ' pause_sec' + str(self.pause_sec)
+        s += ' pause_sec=' + str(self.pause_sec)
         s += ' auto_pause=' + str(self.auto_pause)
         s += ' verify_read=' + str(self.verify_read)
         s += ' incompressible=' + str(self.incompressible)
@@ -513,13 +512,20 @@ class SmallfileWorkload:
         self.file_dirs = []  # subdirectores within per-thread dir
         self.status = self.NOTOK
 
-        # response time samples 
-        self.pause_rsptime_history = []
+        # response time samples for auto-pause feature
+        self.pause_rsptime_count = 20
+        # special value that means no response times have been measured yet
+        self.pause_rsptime_unmeasured = -11
+        self.pause_rsptime_index = self.pause_rsptime_unmeasured
+        self.pause_rsptime_history = [0 for k in range(0, self.pause_rsptime_count)]
+        self.pause_sample_count = 0
         # start time for this history interval
         self.pause_history_start_time = 0.0
         self.pause_sec = self.pause_between_files / self.MICROSEC_PER_SEC
         # recalculate this to capture any changes in self.total_hosts and self.threads
         self.total_threads = self.total_hosts * self.threads
+        self.throttling_factor = 0.1 * (sqrt(self.total_threads) - 0.99)
+
         # to measure per-thread elapsed time
         self.start_time = None
         self.end_time = None
@@ -588,6 +594,7 @@ class SmallfileWorkload:
         rsp_time = end_time - self.op_start_time
         if self.measure_rsptimes:
             self.rsptimes.append((opname, self.op_start_time, rsp_time))
+        self.op_start_time = None
         if self.auto_pause:
             self.adjust_pause_time(end_time, rsp_time)
 
@@ -606,37 +613,58 @@ class SmallfileWorkload:
             os.fsync(f.fileno())  # particularly for NFS this is needed
 
 
+    # compute pause time based on available response time samples,
+    # assuming all threads converge to roughly the same average response time
+    # we treat the whole system as one big queueing center and apply
+    # little's law U = XS to it to estimate what pause time should be
+    # to achieve max throughput without excessive queueing and unfairness
+
+    def calculate_pause_time(self, end_time):
+        # there are samples to process
+        mean_rsptime = sum(self.pause_rsptime_history)/self.pause_rsptime_count
+        time_so_far = end_time - self.pause_history_start_time
+        # estimate system throughput assuming all threads are same
+        # per-thread throughput is measured by number of rsptime samples
+        # in this interval divided by length of interval
+        est_throughput = self.pause_sample_count * self.total_threads / time_so_far
+        # assumption: all threads converge to the same throughput
+        mean_utilization = mean_rsptime * est_throughput
+        old_pause = self.pause_sec
+        new_pause = mean_utilization * mean_rsptime * self.throttling_factor
+        self.pause_sec = (old_pause + 2*new_pause) / 3.0
+        self.log.debug('time_so_far %f samples %d index %d mean_rsptime %f throttle %f est_throughput %f mean_util %f' %
+                        (time_so_far, self.pause_sample_count, self.pause_rsptime_index, mean_rsptime, self.throttling_factor,
+                         est_throughput, mean_utilization))
+        self.log.info('per-thread pause changed from %9.6f to %9.6f' % (old_pause, self.pause_sec))
+
     # adjust pause time based on whether response time was significantly bigger than pause time
     # we lower the pause time until 
 
     def adjust_pause_time(self, end_time, rsp_time):
         self.log.debug('adjust_pause_time %f %f %f %f' % 
                        (end_time, rsp_time, self.pause_sec, self.pause_history_start_time))
-        if self.pause_sec > 0.0:
-            if self.pause_history_start_time + self.pause_history_duration > end_time:
-                self.pause_rsptime_history.append(rsp_time)
-            else:
-                rsptime_samples = len(self.pause_rsptime_history)
-                if rsptime_samples > 2:
-                    # there are samples to process
-                    mean_rsptime = sum(self.pause_rsptime_history)/rsptime_samples
-                    time_so_far = end_time - self.pause_history_start_time
-                    # estimate system throughput assuming all threads are same
-                    est_throughput = rsptime_samples * self.total_threads / time_so_far
-                    mean_utilization = mean_rsptime * est_throughput
-                    old_pause = self.pause_sec
-                    new_pause = 0.5 * mean_utilization * mean_rsptime
-                    self.pause_sec = (old_pause + new_pause) / 2.0
-                    self.log.debug('time_so_far %f samples %d mean_rsptime %f est_throughput %f mean_util %f' %
-                                   (time_so_far, rsptime_samples, mean_rsptime, est_throughput, mean_utilization))
-                    self.log.info('per-thread pause changed from %9.6f to %9.6f' % (old_pause, self.pause_sec))
-                else:
-                    # not enough samples,we need a longer measurement interval
-                    self.log.info('increasing pause_history_duration %f by 1'  % self.pause_history_duration)
-                    self.pause_history_duration += 1
-                self.pause_history_start_time = end_time - rsp_time
-                self.pause_rsptime_history = [rsp_time]
-        self.op_start_time = None
+        if self.pause_rsptime_index == self.pause_rsptime_unmeasured:
+            self.pause_sec = 0.001
+            self.pause_history_start_time = end_time - rsp_time
+            # try to get the right order of magnitude for response time estimate immediately
+            self.pause_rsptime_history = [ rsp_time for k in range(0, self.pause_rsptime_count) ]
+            self.pause_rsptime_index = 1
+            self.pause_sample_count = 1
+            self.calculate_pause_time(end_time)
+        else:
+            # insert response time into ring buffer of most recent response times
+            self.pause_rsptime_history[self.pause_rsptime_index] = rsp_time
+            self.pause_rsptime_index += 1
+            if self.pause_rsptime_index >= self.pause_rsptime_count:
+                self.pause_rsptime_index = 0
+            self.pause_sample_count += 1
+
+            # if it's time to adjust pause_sec...
+            if self.pause_history_start_time + self.pause_history_duration < end_time or \
+                    self.pause_sample_count > self.pause_rsptime_count / 2:
+                self.calculate_pause_time(end_time)
+                self.pause_history_start_time = end_time
+                self.pause_sample_count = 0
 
     # determine if test interval is over for this thread
 

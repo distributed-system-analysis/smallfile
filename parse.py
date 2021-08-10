@@ -258,10 +258,14 @@ def parse():
         for (prm_name, prm_value) in prm_list:
             print('%40s : %s' % (prm_name, prm_value))
 
-    if inv.auto_pause and inv.pause_between_files == 0:
-        inv.pause_between_files = 1000
-        print(('auto-pause requested but pause param not specified' +
-               ', defaulting to %d microseconds') % inv.pause_between_files)
+    if inv.opname == 'cleanup' and (inv.auto_pause or (inv.pause_between_files > 0)):
+        inv.auto_pause = False
+        inv.pause_between_files = 0
+        print('do not need pause between files during cleanup')
+    if inv.auto_pause and inv.pause_between_files > 0:
+        inv.pause_between_files = 0
+        print('pause parameter not needed with auto-pause Y, setting pause to 0')
 
+    inv.reset()
     test_params.recalculate_timeouts()
     return test_params

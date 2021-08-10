@@ -29,7 +29,7 @@ class smf_test_params:
         self.min_directories_per_sec = 50
         self.cleanup_delay_usec_per_sec = 0
         self.output_json = output_json
-        self.version = '3.1'
+        self.version = '3.2'
         self.as_host = None
         self.host_set = host_set
         self.thread_count = thread_count
