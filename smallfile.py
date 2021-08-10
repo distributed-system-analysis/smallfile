@@ -41,7 +41,7 @@ import threading
 import socket
 import errno
 import codecs
-from math import sqrt
+from math import sqrt, log2
 
 OK = 0  # system call return code for success
 NOTOK = 1
@@ -513,9 +513,10 @@ class SmallfileWorkload:
         self.status = self.NOTOK
 
         # response time samples for auto-pause feature
-        self.pause_rsptime_count = 20
+        self.pause_rsptime_count = 100
         # special value that means no response times have been measured yet
         self.pause_rsptime_unmeasured = -11
+        self.files_between_pause = 5
         self.pause_rsptime_index = self.pause_rsptime_unmeasured
         self.pause_rsptime_history = [0 for k in range(0, self.pause_rsptime_count)]
         self.pause_sample_count = 0
@@ -524,7 +525,7 @@ class SmallfileWorkload:
         self.pause_sec = self.pause_between_files / self.MICROSEC_PER_SEC
         # recalculate this to capture any changes in self.total_hosts and self.threads
         self.total_threads = self.total_hosts * self.threads
-        self.throttling_factor = 0.1 * (sqrt(self.total_threads) - 0.99)
+        self.throttling_factor = 0.01 * log2(self.total_threads + 1)
 
         # to measure per-thread elapsed time
         self.start_time = None
@@ -644,13 +645,15 @@ class SmallfileWorkload:
         self.log.debug('adjust_pause_time %f %f %f %f' % 
                        (end_time, rsp_time, self.pause_sec, self.pause_history_start_time))
         if self.pause_rsptime_index == self.pause_rsptime_unmeasured:
-            self.pause_sec = 0.001
+            self.pause_sec = 0.00001
             self.pause_history_start_time = end_time - rsp_time
             # try to get the right order of magnitude for response time estimate immediately
             self.pause_rsptime_history = [ rsp_time for k in range(0, self.pause_rsptime_count) ]
             self.pause_rsptime_index = 1
             self.pause_sample_count = 1
-            self.calculate_pause_time(end_time)
+            self.pause_sec = self.throttling_factor * rsp_time
+            #self.calculate_pause_time(end_time)
+            self.log.info('per-thread pause initialized to %9.6f' % self.pause_sec)
         else:
             # insert response time into ring buffer of most recent response times
             self.pause_rsptime_history[self.pause_rsptime_index] = rsp_time
@@ -823,8 +826,8 @@ class SmallfileWorkload:
             raise SMFRunException('thread ' + str(self.tid)
                             + ' saw abort flag')
         self.filenum += 1
-        if self.pause_sec > 0.0:
-            time.sleep(self.pause_sec)
+        if self.pause_sec > 0.0 and self.iterations % self.files_between_pause == 0:
+            time.sleep(self.pause_sec * self.files_between_pause)
         return True
 
     # in this method of directory selection, as filenum increments upwards,
@@ -2107,7 +2110,7 @@ class Test(unittest_module.TestCase):
 
     def test_j1a_pause(self):
         self.invok.iterations = 2000
-        self.invok.pause_between_files = 5000
+        self.invok.pause_between_files = 0
         self.invok.total_hosts = 10
         self.invok.auto_pause = True
         self.mk_files()
