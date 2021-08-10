@@ -262,6 +262,10 @@ def parse():
         inv.auto_pause = False
         inv.pause_between_files = 0
         print('do not need pause between files during cleanup')
+    if inv.total_hosts * inv.threads == 1:
+        inv.auto_pause = False
+        inv.pause_between_files = 0
+        print('do not need pause between files for single-threaded workload')
     if inv.auto_pause and inv.pause_between_files > 0:
         inv.pause_between_files = 0
         print('pause parameter not needed with auto-pause Y, setting pause to 0')
