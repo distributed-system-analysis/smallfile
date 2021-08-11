@@ -44,6 +44,8 @@ def parse_yaml(test_params, input_yaml_file):
                 test_params.top_dirs = [ os.path.abspath(p) for p in y['top'].split(',') ]
             elif k == 'host-set':
                 test_params.host_set = host_set(v)
+            elif k == 'total-hosts':
+                inv.total_hosts = positive_integer(v)
             elif k == 'files':
                 inv.iterations = positive_integer(v)
             elif k == 'threads':
