@@ -197,11 +197,6 @@ def parse():
     inv.onhost = smallfile.get_hostname(args.as_host)
     test_params.host_set = args.host_set
     inv.total_hosts = args.host_count
-    if inv.total_hosts == 0:
-        if test_params.host_set != None:
-            inv.total_hosts = len(test_params.host_set)
-        else:
-            inv.total_hosts = 1
 
     # if YAML input was used, update test_params object with this
     # YAML parameters override CLI parameters
@@ -210,6 +205,18 @@ def parse():
         if not yaml_parser_installed:
             raise SmfParseException('python yaml module not available - is this PyPy?')
         yaml_parser.parse_yaml(test_params, args.yaml_input_file)
+
+    # total_hosts is a parameter that allows pod workloads to know
+    # how many other pods are doing the same thing
+
+    if inv.total_hosts == 0:
+        if test_params.host_set != None:
+            inv.total_hosts = len(test_params.host_set)
+        else:
+            inv.total_hosts = 1
+
+    # network_sync_dir is where python processes share state 
+
     if not test_params.network_sync_dir:
         test_params.network_sync_dir = os.path.join(test_params.top_dirs[0], 'network_shared')
 
