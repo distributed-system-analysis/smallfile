@@ -186,6 +186,7 @@ class smf_test_params:
         p['hash-to-dir'] = bool2YN(inv.hash_to_dir)
         p['fsync-after-modify'] = bool2YN(inv.fsync)
         p['pause-between-files'] = str(inv.pause_between_files)
+        p['auto-pause'] = str(inv.auto_pause)
         p['cleanup-delay-usec-per-file'] = str(inv.cleanup_delay_usec_per_file)
         p['finish-all-requests'] = bool2YN(inv.finish_all_rq)
         p['stonewall'] = bool2YN(inv.stonewall)
