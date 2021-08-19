@@ -196,6 +196,7 @@ class smf_test_params:
         p['permute-host-dirs'] = bool2YN(self.permute_host_dirs)
         p['network-sync-dir'] = self.network_sync_dir
         p['min-directories-per-sec'] = self.min_directories_per_sec
+        p['total-hosts'] = inv.total_hosts
 
         # include startup-timeout and host-timeout to make possible
         # diagnosis of timeout problems, but we don't normally need them 
