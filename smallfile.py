@@ -41,6 +41,7 @@ import threading
 import socket
 import errno
 import codecs
+from math import sqrt, log2
 
 OK = 0  # system call return code for success
 NOTOK = 1
@@ -83,6 +84,10 @@ except ImportError as e:
     import unittest
     unittest_module = unittest
 
+# python threading module method name isAlive changed to is_alive in python3
+
+use_isAlive = (sys.version_info[0] < 3)
+
 # Windows 2008 server seemed to have this environment variable
 # didn't check if it's universal
 
@@ -116,14 +121,10 @@ class MFRdWrExc(Exception):
 
 
 class SMFResultException(Exception):
+    pass
 
-    def __init__(self, msg):
-        Exception.__init__(self)
-        self.msg = msg
-
-    def __str__(self):
-        return self.msg
-
+class SMFRunException(Exception):
+    pass
 
 # avoid exception if file we wish to delete is not there
 
@@ -170,7 +171,7 @@ def ensure_dir_exists(dirpath):
     if not os.path.exists(dirpath):
         parent_path = os.path.dirname(dirpath)
         if parent_path == dirpath:
-            raise Exception('ensure_dir_exists: ' +
+            raise SMFRunException('ensure_dir_exists: ' +
                             'cannot obtain parent path ' +
                             'of non-existent path: ' +
                             dirpath)
@@ -183,7 +184,7 @@ def ensure_dir_exists(dirpath):
                 raise e
     else:
         if not os.path.isdir(dirpath):
-            raise Exception('%s already exists and is not a directory!'
+            raise SMFRunException('%s already exists and is not a directory!'
                             % dirpath)
 
 
@@ -388,14 +389,17 @@ class SmallfileWorkload:
         # , compare read data to what was written
         self.verify_read = True
 
-        # how many microsec to sleep between each file
-        self.pause_between_files = 0
+        # should we attempt to adjust pause between files 
+        self.auto_pause = False
+
+        # sleep this long between each file op
+        self.pause_between_files = 0.0
+
+        # collect samples for this long, then add to start time
+        self.pause_history_duration = 1.0
 
         # wait this long after cleanup for async. deletion activity to finish
         self.cleanup_delay_usec_per_file = 0
-
-        # same as pause_between_files but in floating-point seconds
-        self.pause_sec = 0.0
 
         # which host the invocation ran on
         self.onhost = get_hostname(None)
@@ -432,10 +436,17 @@ class SmallfileWorkload:
         # default to different sequence every time
         self.randstate = random.Random()
 
+        # number of hosts/pods in test, default is 1 smallfile host/pod
+        self.total_hosts = 1
+
+        # number of threads in each host/pod
+        self.threads = 1
+
         # reset object state variables
 
         self.reset()
 
+    # FIXME: should be converted to dictionary and output in JSON
     # convert object to string for logging, etc.
 
     def __str__(self):
@@ -462,6 +473,9 @@ class SmallfileWorkload:
         s += ' stonewall=' + str(self.stonewall)
         s += ' cleanup_delay_usec_per_file=' + str(self.cleanup_delay_usec_per_file)
         s += ' files_between_checks=' + str(self.files_between_checks)
+        s += ' pause=' + str(self.pause_between_files)
+        s += ' pause_sec=' + str(self.pause_sec)
+        s += ' auto_pause=' + str(self.auto_pause)
         s += ' verify_read=' + str(self.verify_read)
         s += ' incompressible=' + str(self.incompressible)
         s += ' finish_all_rq=' + str(self.finish_all_rq)
@@ -472,6 +486,8 @@ class SmallfileWorkload:
         s += ' filenum_final=' + str(self.filenum_final)
         s += ' rq=' + str(self.rq)
         s += ' rq_final=' + str(self.rq_final)
+        s += ' total_hosts=' + str(self.total_hosts)
+        s += ' threads=' + str(self.threads)
         s += ' start=' + str(self.start_time)
         s += ' end=' + str(self.end_time)
         s += ' elapsed=' + str(self.elapsed_time)
@@ -495,7 +511,21 @@ class SmallfileWorkload:
         self.abort = False
         self.file_dirs = []  # subdirectores within per-thread dir
         self.status = self.NOTOK
+
+        # response time samples for auto-pause feature
+        self.pause_rsptime_count = 100
+        # special value that means no response times have been measured yet
+        self.pause_rsptime_unmeasured = -11
+        self.files_between_pause = 5
+        self.pause_rsptime_index = self.pause_rsptime_unmeasured
+        self.pause_rsptime_history = [0 for k in range(0, self.pause_rsptime_count)]
+        self.pause_sample_count = 0
+        # start time for this history interval
+        self.pause_history_start_time = 0.0
         self.pause_sec = self.pause_between_files / self.MICROSEC_PER_SEC
+        # recalculate this to capture any changes in self.total_hosts and self.threads
+        self.total_threads = self.total_hosts * self.threads
+        self.throttling_factor = 0.01 * log2(self.total_threads + 1)
 
         # to measure per-thread elapsed time
         self.start_time = None
@@ -551,21 +581,24 @@ class SmallfileWorkload:
     # indicate start of an operation
 
     def op_starttime(self, starttime=None):
-        if self.measure_rsptimes:
-            if not starttime:
-                self.op_start_time = time.time()
-            else:
-                self.op_start_time = starttime
+        if not starttime:
+            self.op_start_time = time.time()
+        else:
+            self.op_start_time = starttime
+
 
     # indicate end of an operation,
     # this appends the elapsed time of the operation to .rsptimes array
 
     def op_endtime(self, opname):
+        end_time = time.time()
+        rsp_time = end_time - self.op_start_time
         if self.measure_rsptimes:
-            end_time = time.time()
-            rsp_time = end_time - self.op_start_time
             self.rsptimes.append((opname, self.op_start_time, rsp_time))
-            self.op_start_time = None
+        self.op_start_time = None
+        if self.auto_pause:
+            self.adjust_pause_time(end_time, rsp_time)
+
 
     # save response times seen by this thread
 
@@ -579,6 +612,62 @@ class SmallfileWorkload:
                 f.write('%8s, %9.6f, %9.6f\n' %
                         (opname, start_time - self.start_time, rsp_time))
             os.fsync(f.fileno())  # particularly for NFS this is needed
+
+
+    # compute pause time based on available response time samples,
+    # assuming all threads converge to roughly the same average response time
+    # we treat the whole system as one big queueing center and apply
+    # little's law U = XS to it to estimate what pause time should be
+    # to achieve max throughput without excessive queueing and unfairness
+
+    def calculate_pause_time(self, end_time):
+        # there are samples to process
+        mean_rsptime = sum(self.pause_rsptime_history)/self.pause_rsptime_count
+        time_so_far = end_time - self.pause_history_start_time
+        # estimate system throughput assuming all threads are same
+        # per-thread throughput is measured by number of rsptime samples
+        # in this interval divided by length of interval
+        est_throughput = self.pause_sample_count * self.total_threads / time_so_far
+        # assumption: all threads converge to the same throughput
+        mean_utilization = mean_rsptime * est_throughput
+        old_pause = self.pause_sec
+        new_pause = mean_utilization * mean_rsptime * self.throttling_factor
+        self.pause_sec = (old_pause + 2*new_pause) / 3.0
+        self.log.debug('time_so_far %f samples %d index %d mean_rsptime %f throttle %f est_throughput %f mean_util %f' %
+                        (time_so_far, self.pause_sample_count, self.pause_rsptime_index, mean_rsptime, self.throttling_factor,
+                         est_throughput, mean_utilization))
+        self.log.info('per-thread pause changed from %9.6f to %9.6f' % (old_pause, self.pause_sec))
+
+    # adjust pause time based on whether response time was significantly bigger than pause time
+    # we lower the pause time until 
+
+    def adjust_pause_time(self, end_time, rsp_time):
+        self.log.debug('adjust_pause_time %f %f %f %f' % 
+                       (end_time, rsp_time, self.pause_sec, self.pause_history_start_time))
+        if self.pause_rsptime_index == self.pause_rsptime_unmeasured:
+            self.pause_sec = 0.00001
+            self.pause_history_start_time = end_time - rsp_time
+            # try to get the right order of magnitude for response time estimate immediately
+            self.pause_rsptime_history = [ rsp_time for k in range(0, self.pause_rsptime_count) ]
+            self.pause_rsptime_index = 1
+            self.pause_sample_count = 1
+            self.pause_sec = self.throttling_factor * rsp_time
+            #self.calculate_pause_time(end_time)
+            self.log.info('per-thread pause initialized to %9.6f' % self.pause_sec)
+        else:
+            # insert response time into ring buffer of most recent response times
+            self.pause_rsptime_history[self.pause_rsptime_index] = rsp_time
+            self.pause_rsptime_index += 1
+            if self.pause_rsptime_index >= self.pause_rsptime_count:
+                self.pause_rsptime_index = 0
+            self.pause_sample_count += 1
+
+            # if it's time to adjust pause_sec...
+            if self.pause_history_start_time + self.pause_history_duration < end_time or \
+                    self.pause_sample_count > self.pause_rsptime_count / 2:
+                self.calculate_pause_time(end_time)
+                self.pause_history_start_time = end_time
+                self.pause_sample_count = 0
 
     # determine if test interval is over for this thread
 
@@ -673,7 +762,7 @@ class SmallfileWorkload:
             delay_time = 0.1
             while not os.path.exists(self.starting_gate):
                 if os.path.exists(self.abort_fn()):
-                    raise Exception('thread ' + str(self.tid)
+                    raise SMFRunException('thread ' + str(self.tid)
                                     + ' saw abort flag')
                 # wait a little longer so that
                 # other clients have time to see that gate exists
@@ -734,11 +823,11 @@ class SmallfileWorkload:
                 self.end_test()
             return False
         if self.abort:
-            raise Exception('thread ' + str(self.tid)
+            raise SMFRunException('thread ' + str(self.tid)
                             + ' saw abort flag')
         self.filenum += 1
-        if self.pause_sec > 0.0:
-            time.sleep(self.pause_sec)
+        if self.pause_sec > 0.0 and self.iterations % self.files_between_pause == 0:
+            time.sleep(self.pause_sec * self.files_between_pause)
         return True
 
     # in this method of directory selection, as filenum increments upwards,
@@ -1032,7 +1121,7 @@ class SmallfileWorkload:
                         topdir = t
                         break
                 if not topdir:
-                    raise Exception(('directory %s is not part of ' +
+                    raise SMFRunException(('directory %s is not part of ' +
                                      'any top-level directory in %s')
                                     % (unique_dpath, str(tree)))
 
@@ -1067,7 +1156,7 @@ class SmallfileWorkload:
 
     def do_create(self):
         if self.record_ctime_size and not xattr_installed:
-            raise Exception(
+            raise SMFRunException(
                 'no python xattr module, cannot record create time + size')
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
@@ -1154,7 +1243,7 @@ class SmallfileWorkload:
 
     def do_getxattr(self):
         if not xattr_installed:
-            raise Exception('xattr module not present, ' +
+            raise SMFRunException('xattr module not present, ' +
                             'getxattr and setxattr operations will not work')
 
         while self.do_another_file():
@@ -1170,7 +1259,7 @@ class SmallfileWorkload:
 
     def do_setxattr(self):
         if not xattr_installed:
-            raise Exception('xattr module not present, ' +
+            raise SMFRunException('xattr module not present, ' +
                             'getxattr and setxattr operations will not work')
 
         while self.do_another_file():
@@ -1195,7 +1284,7 @@ class SmallfileWorkload:
 
     def do_write(self, append=False):
         if self.record_ctime_size and not xattr_installed:
-            raise Exception('xattr module not present ' +
+            raise SMFRunException('xattr module not present ' +
                             'but record-ctime-size specified')
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
@@ -1263,7 +1352,7 @@ class SmallfileWorkload:
 
     def do_readdir(self):
         if self.hash_to_dir:
-            raise Exception('cannot do readdir test with ' +
+            raise SMFRunException('cannot do readdir test with ' +
                             '--hash-into-dirs option')
         prev_dir = ''
         dir_map = {}
@@ -1277,7 +1366,7 @@ class SmallfileWorkload:
                     common_dir = dir[len(self.top_dirs[0]):]
                     break
             if not common_dir:
-                raise Exception(('readdir: filename %s is not ' +
+                raise SMFRunException(('readdir: filename %s is not ' +
                                  'in any top dir in %s')
                                 % (fn, str(self.top_dirs)))
             if common_dir != prev_dir:
@@ -1309,7 +1398,7 @@ class SmallfileWorkload:
 
     def do_ls_l(self):
         if self.hash_to_dir:
-            raise Exception('cannot do readdir test with ' +
+            raise SMFRunException('cannot do readdir test with ' +
                             '--hash-into-dirs option')
         prev_dir = ''
         dir_map = {}
@@ -1323,7 +1412,7 @@ class SmallfileWorkload:
                     common_dir = dir[len(self.top_dirs[0]):]
                     break
             if not common_dir:
-                raise Exception('ls-l: filename %s is not in any top dir in %s'
+                raise SMFRunException('ls-l: filename %s is not in any top dir in %s'
                                 % (fn, str(self.top_dirs)))
             if common_dir != prev_dir:
                 self.op_starttime()
@@ -1355,7 +1444,7 @@ class SmallfileWorkload:
 
     def do_await_create(self):
         if not xattr_installed:
-            raise Exception(
+            raise SMFRunException(
                 'no python xattr module, so cannot read xattrs')
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
@@ -1375,7 +1464,7 @@ class SmallfileWorkload:
             while True:
                 st = os.stat(fn)
                 if st.st_size > original_sz_kb * self.BYTES_PER_KB:
-                    raise Exception(('asynchronously created replica ' +
+                    raise SMFRunException(('asynchronously created replica ' +
                                      'in %s is %u bytes, ' +
                                      'larger than original %u KB')
                                     % (fn, st.st_size, original_sz_kb))
@@ -1418,7 +1507,7 @@ class SmallfileWorkload:
 
     def do_swift_get(self):
         if not xattr_installed:
-            raise Exception('xattr module not present, ' +
+            raise SMFRunException('xattr module not present, ' +
                             'getxattr and setxattr operations will not work')
         l = self.log
         while self.do_another_file():
@@ -1474,7 +1563,7 @@ class SmallfileWorkload:
         if not xattr_installed or \
            not fallocate_installed or \
            not fadvise_installed:
-            raise Exception('one of necessary modules not available')
+            raise SMFRunException('one of necessary modules not available')
 
         l = self.log
         while self.do_another_file():
@@ -1490,7 +1579,7 @@ class SmallfileWorkload:
                 # os.ftruncate(fd, fszbytes)
                 ret = fallocate.fallocate(fd, 0, 0, fszbytes)
                 if ret != OK:
-                    raise Exception('fallocate call returned %d' % ret)
+                    raise SMFRunException('fallocate call returned %d' % ret)
                 rszkb = self.get_record_size_to_use()
                 remaining_kb = next_fsz
                 while remaining_kb > 0:
@@ -1609,7 +1698,7 @@ class SmallfileWorkload:
             try:
                 func = SmallfileWorkload.workloads[o]
             except KeyError as e:
-                raise Exception('invalid workload type ' + o)
+                raise SMFRunException('invalid workload type ' + o)
             func(self)  # call the do_ function for that workload type
             self.status = ok
         except KeyboardInterrupt as e:
@@ -1628,7 +1717,7 @@ class SmallfileWorkload:
         if self.rq_final < 0:
             self.end_test()
         self.elapsed_time = self.end_time - self.start_time
-
+        self.log.info('finished %s' % self.opname)
         # this next call works fine with python 2.7
         # but not with python 2.6, why? do we need it?
         #    logging.shutdown()
@@ -1718,7 +1807,7 @@ class Test(unittest_module.TestCase):
 
     def chk_status(self):
         if self.invok.status != ok:
-            raise Exception('test failed, check log file %s'
+            raise SMFRunException('test failed, check log file %s'
                             % self.invok.log_fn())
 
     def runTest(self, opName):
@@ -1941,7 +2030,8 @@ class Test(unittest_module.TestCase):
         self.invok.filesize_distr = self.invok.fsdistr_random_exponential
         self.invok.incompressible = True
         self.invok.verify_read = True
-        self.invok.invocations = 40
+        self.invok.pause_between_files = 500
+        self.invok.iterations = 2000
         self.invok.record_sz_kb = 0
         self.invok.total_sz_kb = 16
         self.runTest('create')
@@ -2018,6 +2108,18 @@ class Test(unittest_module.TestCase):
         self.assertTrue(exists(self.lastFileNameInTest(self.invok.src_dirs)))
         self.cleanup_files()
 
+    def test_j1a_pause(self):
+        self.invok.iterations = 2000
+        self.invok.pause_between_files = 0
+        self.invok.total_hosts = 10
+        self.invok.auto_pause = True
+        self.mk_files()
+        self.invok.auto_pause = False
+        self.invok.pause_between_files = 0
+        self.invok.pause_sec = 0.0
+        self.invok.total_hosts = 1
+        self.cleanup_files()
+
     def test_j2_deep_hashed_tree(self):
         self.invok.suffix = 'deep_hashed'
         self.invok.total_sz_kb = 0
@@ -2082,15 +2184,15 @@ class Test(unittest_module.TestCase):
             abort_test(self.invok.abort_fn(), threadList)
             for t in threadList:
                 t.join(1.1)
-            raise Exception('threads did not show up within %d seconds'
+            raise SMFRunException('threads did not show up within %d seconds'
                             % thread_ready_timeout)
         touch(sgate_file)
         for t in threadList:
             t.join()
             if thrd_is_alive(t):
-                raise Exception('thread join timeout:' + str(t))
+                raise SMFRunException('thread join timeout:' + str(t))
             if t.invocation.status != ok:
-                raise Exception('thread did not complete iterations: '
+                raise SMFRunException('thread did not complete iterations: '
                                 + str(t))
 
 

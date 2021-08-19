@@ -4,6 +4,9 @@ import ctypes.util
 import os
 import sys
 
+class DropBufferCacheException(Exception):
+    pass
+
 # Drop 'buffer' cache for the given range of the given file.
 
 POSIX_FADV_DONTNEED = 4
@@ -41,7 +44,7 @@ def drop_buffer_cache(fd, offset, length):
                          ctypes.c_uint64(length),
                          POSIX_FADV_DONTNEED)
     if ret != OK:
-        raise Exception('posix_fadvise64(%s, %s, %s, 4) -> %s' %
+        raise DropBufferCacheException('posix_fadvise64(%s, %s, %s, 4) -> %s' %
                         (fd, offset, length, ret))
 
 # unit test
@@ -53,7 +56,7 @@ if __name__ == '__main__':
     elif sys.version.startswith('2'):
         ret = os.write(fd, 'hi there')
     else:
-        raise Exception('unrecognized python version %s' % sys.version)
+        raise DropBufferCacheException('unrecognized python version %s' % sys.version)
     assert ret == 8
     drop_buffer_cache(fd, 0, 8)
     os.close(fd)

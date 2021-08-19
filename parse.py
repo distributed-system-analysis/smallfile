@@ -97,6 +97,9 @@ def parse():
     add('--pause',
             type=non_negative_integer, default=inv.pause_between_files,
             help='pause between each file (microsec)')
+    add('--auto-pause',
+            type=boolean, default=inv.auto_pause,
+            help='adjust pause between files automatically based on response times')
     add('--cleanup-delay-usec-per-file',
             type=non_negative_integer, default=inv.cleanup_delay_usec_per_file,
             help='time to delay after cleanup per file (microsec)')
@@ -147,6 +150,9 @@ def parse():
             help=argparse.SUPPRESS)
     add('--as-host',
             help=argparse.SUPPRESS)
+    add('--host-count',
+            type=positive_integer, default=0,
+            help='total number of hosts/pods participating in smallfile test')
 
     args = parser.parse_args()
 
@@ -154,19 +160,24 @@ def parse():
     test_params.top_dirs = [ os.path.abspath(p) for p in args.top ]
     test_params.launch_by_daemon = args.launch_by_daemon
     inv.iterations = args.files
-    test_params.thread_count = args.threads
+    test_params.thread_count = inv.threads = args.threads
     inv.files_per_dir = args.files_per_dir
     inv.dirs_per_dir = args.dirs_per_dir
     inv.record_sz_kb = args.record_size
     inv.total_sz_kb = args.file_size
-    test_params.size_distribution = inv.filesize_distr = args.file_size_distribution
+    test_params.size_distribution = \
+            inv.filesize_distr = \
+            args.file_size_distribution
     inv.xattr_size = args.xattr_size
     inv.xattr_count = args.xattr_count
     inv.prefix = args.prefix
     inv.suffix = args.suffix
     inv.hash_to_dir = args.hash_into_dirs
     inv.pause_between_files = args.pause
-    test_params.cleanup_delay_usec_per_file = inv.cleanup_delay_usec_per_file = args.cleanup_delay_usec_per_file
+    inv.auto_pause = args.auto_pause
+    test_params.cleanup_delay_usec_per_file = \
+            inv.cleanup_delay_usec_per_file = \
+            args.cleanup_delay_usec_per_file
     inv.stonewall = args.stonewall
     inv.finish_all_rq = args.finish
     inv.measure_rsptimes = args.response_times
@@ -185,6 +196,7 @@ def parse():
     test_params.is_slave = args.slave
     inv.onhost = smallfile.get_hostname(args.as_host)
     test_params.host_set = args.host_set
+    inv.total_hosts = args.host_count
 
     # if YAML input was used, update test_params object with this
     # YAML parameters override CLI parameters
@@ -193,6 +205,18 @@ def parse():
         if not yaml_parser_installed:
             raise SmfParseException('python yaml module not available - is this PyPy?')
         yaml_parser.parse_yaml(test_params, args.yaml_input_file)
+
+    # total_hosts is a parameter that allows pod workloads to know
+    # how many other pods are doing the same thing
+
+    if inv.total_hosts == 0:
+        if test_params.host_set != None:
+            inv.total_hosts = len(test_params.host_set)
+        else:
+            inv.total_hosts = 1
+
+    # network_sync_dir is where python processes share state 
+
     if not test_params.network_sync_dir:
         test_params.network_sync_dir = os.path.join(test_params.top_dirs[0], 'network_shared')
 
@@ -241,5 +265,18 @@ def parse():
         for (prm_name, prm_value) in prm_list:
             print('%40s : %s' % (prm_name, prm_value))
 
+    if inv.opname == 'cleanup' and (inv.auto_pause or (inv.pause_between_files > 0)):
+        inv.auto_pause = False
+        inv.pause_between_files = 0
+        print('do not need pause between files during cleanup')
+    if inv.total_hosts * inv.threads == 1:
+        inv.auto_pause = False
+        inv.pause_between_files = 0
+        print('do not need pause between files for single-threaded workload')
+    if inv.auto_pause and inv.pause_between_files > 0:
+        inv.pause_between_files = 0
+        print('pause parameter not needed with auto-pause Y, setting pause to 0')
+
+    inv.reset()
     test_params.recalculate_timeouts()
     return test_params

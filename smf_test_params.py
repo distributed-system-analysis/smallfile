@@ -29,7 +29,7 @@ class smf_test_params:
         self.min_directories_per_sec = 50
         self.cleanup_delay_usec_per_sec = 0
         self.output_json = output_json
-        self.version = '3.1'
+        self.version = '3.2'
         self.as_host = None
         self.host_set = host_set
         self.thread_count = thread_count
@@ -124,9 +124,11 @@ class smf_test_params:
             ('hash file number into dir.?', bool2YN(inv.hash_to_dir)),
             ('fsync after modify?', bool2YN(inv.fsync)),
             ('pause between files (microsec)', '%d' % inv.pause_between_files),
+            ('auto-pause?', bool2YN(inv.auto_pause)),
             ('delay after cleanup per file (microsec)', '%d' % inv.cleanup_delay_usec_per_file),
             ('minimum directories per sec', '%d' 
              % int(self.min_directories_per_sec)),
+            ('total hosts', '%d' % inv.total_hosts),
             ('finish all requests?', '%s' % bool2YN(inv.finish_all_rq)),
             ('stonewall?', '%s' % bool2YN(inv.stonewall)),
             ('measure response times?', '%s' % bool2YN(inv.measure_rsptimes)),
@@ -184,6 +186,7 @@ class smf_test_params:
         p['hash-to-dir'] = bool2YN(inv.hash_to_dir)
         p['fsync-after-modify'] = bool2YN(inv.fsync)
         p['pause-between-files'] = str(inv.pause_between_files)
+        p['auto-pause'] = str(inv.auto_pause)
         p['cleanup-delay-usec-per-file'] = str(inv.cleanup_delay_usec_per_file)
         p['finish-all-requests'] = bool2YN(inv.finish_all_rq)
         p['stonewall'] = bool2YN(inv.stonewall)
@@ -193,6 +196,7 @@ class smf_test_params:
         p['permute-host-dirs'] = bool2YN(self.permute_host_dirs)
         p['network-sync-dir'] = self.network_sync_dir
         p['min-directories-per-sec'] = self.min_directories_per_sec
+        p['total-hosts'] = inv.total_hosts
 
         # include startup-timeout and host-timeout to make possible
         # diagnosis of timeout problems, but we don't normally need them 
