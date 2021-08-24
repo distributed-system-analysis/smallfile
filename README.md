@@ -3,13 +3,8 @@ smallfile
 
 A distributed workload generator for POSIX-like filesystems.
 
-NOTE: **Ben has just moved this repo** from https://github.com/bengland2/smallfile to 
-https://github.com/distributed-system-analysis/smallfile as part of a change 
-in its management.  Please update any scripts, etc. that clone it to point 
-to this new location.
-
 New features:
-* support for docker containers
+* support for Kubernetes and benchmark-operator
 * YAML input format for parameters
 
 # Table of contents
@@ -32,7 +27,7 @@ New features:
 
 [Avoiding caching effects](#avoiding-caching-effects)
 
-[Use of pause option](#use-of-pause-option)
+[Use of pause and auto-pause option](#use-of-pause-and-auto-pause-options)
 
 [Use with distributed filesystems](#use-with-distributed-filesystems)
 
@@ -165,6 +160,7 @@ The parameters are (from most useful to least useful):
  * --launch-by-daemon - if specified, then ssh will not be used to launch test, see section titled "launching remote worker threads"
  * --files -- how many files should each thread process? 
  * --threads -- how many workload generator threads should each smallfile_cli.py process create? 
+ * --auto-pause -- if Y then smallfile will auto-adjust the pause time between files
  * --file-size -- total amount of data accessed per file.   If zero then no
   reads or writes are performed. 
  * --file-size-distribution – only supported value today is exponential.
@@ -174,6 +170,7 @@ The parameters are (from most useful to least useful):
  * --files-per-dir -- maximum number of files contained in any one directory.
  * --dirs-per-dir -- maximum number of subdirectories contained in any one
   directory.
+ * --fsync -- if Y then an fsync() call is inserted before closing a created/modified/appended file.
  * --hash-into-dirs – if Y then assign next file to a directory using a hash
   function, otherwise assign next –files-per-dir files to next directory.
  * --same-dir -- if Y then threads will share a single directory.
@@ -263,7 +260,7 @@ To run just one unit test module, for example:
 How to specify parameters in YAML
 =============
 
-Sometimes it's more convenient to specify inputs in a YAML file when using a CI system such as Jenkins.  Smallfile has a flat YAML file format where the parameter name in yaml is the same as on the CLI except that the leading "--" is removed.  For example:
+Sometimes it's more convenient to specify inputs in a YAML file when using a CI system such as Jenkins.  Smallfile has a flat YAML file format where the parameter name in yaml is the same as on the CLI except that the leading "--" is removed and a colon is appended to the parameter name.  For example:
 ```
 top: /mnt/xfs1/smf
 host-set: host1,host2
@@ -351,7 +348,7 @@ must be cleared. In part this is done using the command: "echo 1 > /proc/sys/vm/
 Gluster have their own internal caches - in that case you might even need to
 remount the filesystem or even restart the storage pool/volume.
 
-Use of pause option
+Use of pause and auto pause options
 ==========
 
 Normally, smallfile stops the throughput measurement for the test as soon as
@@ -366,6 +363,16 @@ microseconds.  For  example, if you know that you cannot do better than 100000
 files/sec and you have 20 threads running,try a 60/100000 = 600 microsecond
 pause.  Verify that this isn't affecting throughput by reducing the pause and
 running a longer test.
+
+However, this pause parameter is hard to use and requires you to run tests before you set it.
+To get all threads to run at a speed closer to each other, the auto-pause parameter has been added.
+This parameter is a boolean defaulting to False for now, so the same test doesn't start to give different results unexpectedly.
+If set to True, then smallfile will continually adjust the time between files based on the response time it measures during the run (for that thread).
+It does this by maintaining a record of the last N response times, taking the average, and then computing a pause time from that.
+Why should this work?   If we think of the cluster as a black box, all the smallfile filesystem calls have to pass through that black box
+and this means that threads exert backpressure on each other indirectly through the response time that they experience.  We want to keep the pause time low enough that the system stays busy, but not so low that one thread can finish before another one even gets started.  One problem with this approach is client-side caching, which can decouple response times of the threads on different hosts.   However, it is usually possible to drop cache on all hosts to prevent client-side caching.
+
+Clearly the pause and auto-pause parameters are mutually exclusive - you only use 1 of the 2.
 
 Use of cleanup-delay-usec-per-file option
 =========================================
@@ -621,7 +628,8 @@ In order to run prolonged small-file tests (which is a requirement for scalabili
 Synchronization
 --------------
 
-A single directory is used to synchronize the threads and hosts. This may seem
+For non-kubernetes environments, 
+a single directory is used to synchronize the threads and hosts. This may seem
 problematic, but we assume here that the file system is not very busy when the
 test is run (otherwise why would you run a load test on it?). So if a file is
 created by one thread, it will quickly be visible on the others, as long as the
@@ -683,9 +691,12 @@ command and read this file to discover test parameters.
 Launching remote worker threads
 ----------
 
-For multi-host non-Windows environments, the test driver launches worker threads using parallel ssh commands to invoke the smallfile_remote.py program, and when this program exits, that is how the test driver discovers that the remote threads on this host have completed.  This works both for bare metal hosts and for virtual machines.
+With Kubernetes, smallfile relies on Kubernetes to launch remote "pods" that each contain a smallfile_cli.py process.   In the case of the benchmark-operator
+implementation, the redis key-value store is used to synchronize these pods so that all pods start running smallfile_cli.py at the same time.
 
-For Windows or containerized environments, ssh usage is more problematic. In Windows, ssh daemon "sshd" requires installation of cygwin, a Windows app that emulates a Linux-like environment, but we really want to test with native win32 environment instead. For containers, sshd is not typically available as a way to get inside the container.  So a different launching method is used (and this method works on non-Windows environments as well). 
+For multi-host non-Windows non-Kubernetes environments, the test driver launches worker threads using parallel ssh commands to invoke the smallfile_remote.py program, and when this program exits, that is how the test driver discovers that the remote threads on this host have completed.  This works both for bare metal hosts and for virtual machines.
+
+For Windows environments, ssh usage is more problematic. In Windows, ssh daemon "sshd" requires installation of cygwin, a Windows app that emulates a Linux-like environment, but we really want to test with native win32 environment instead. For containers, sshd is not typically available as a way to get inside the container.  So a different launching method is used (and this method works on non-Windows environments as well). 
 
 First you start launch_smf_host.py in each workload generator.    You must specify --top parameter for each remote host or container.  
 
@@ -712,6 +723,4 @@ returned by using python "pickle" files to serialize the state of these
 per-thread objects containing details of each thread's progress during the
 test.  The pickle files are stored in the shared synchronization directory.
 
-
-
-
+smallfile_cli.py has the option to output all results in a JSON format for easy parsing.  In the case of benchmark-operator, this data is pushed to Elasticsearch as "documents" which can then be viewed or visualized with Kibana or Grafana, for example.
