@@ -525,7 +525,7 @@ class SmallfileWorkload:
         self.pause_sec = self.pause_between_files / self.MICROSEC_PER_SEC
         # recalculate this to capture any changes in self.total_hosts and self.threads
         self.total_threads = self.total_hosts * self.threads
-        self.throttling_factor = 0.01 * log2(self.total_threads + 1)
+        self.throttling_factor = 0.1 * log2(self.total_threads + 1)
 
         # to measure per-thread elapsed time
         self.start_time = None
