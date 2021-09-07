@@ -493,7 +493,7 @@ worker_pids="$worker_pids $!"
 sleep 2
 daemon_params=\
 "$PYTHON smallfile_cli.py --launch-by-daemon Y --host-set foo,bar --top $testdir \
---verify-read Y --response-times N --remote-pgm-dir `pwd` \
+--verify-read Y --response-times N --remote-pgm-dir `pwd` --cleanup-delay-usec-per-file 200 \
 --files 1000 --files-per-dir 5 --dirs-per-dir 2 --threads 4 --file-size 4"
 
 for op in `supported_ops $xattrs ''` ; do
