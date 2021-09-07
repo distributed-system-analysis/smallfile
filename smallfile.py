@@ -1671,7 +1671,8 @@ class SmallfileWorkload:
         self.stonewall = save_stonewall
         self.finish_all_rq = save_finish
         if self.cleanup_delay_usec_per_file > 0:
-            total_sleep_time = self.cleanup_delay_usec_per_file * self.filenum_final / USEC_PER_SEC
+            total_threads = self.threads * self.total_hosts
+            total_sleep_time = self.cleanup_delay_usec_per_file * self.iterations * total_threads / USEC_PER_SEC
             self.log.info('waiting %f sec to give storage time to recycle deleted files' % total_sleep_time)
             time.sleep(total_sleep_time)
         self.status = ok
