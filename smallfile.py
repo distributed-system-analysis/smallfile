@@ -525,7 +525,7 @@ class SmallfileWorkload:
         self.pause_sec = self.pause_between_files / self.MICROSEC_PER_SEC
         # recalculate this to capture any changes in self.total_hosts and self.threads
         self.total_threads = self.total_hosts * self.threads
-        self.throttling_factor = 0.01 * log2(self.total_threads + 1)
+        self.throttling_factor = 0.1 * log2(self.total_threads + 1)
 
         # to measure per-thread elapsed time
         self.start_time = None
@@ -1671,7 +1671,8 @@ class SmallfileWorkload:
         self.stonewall = save_stonewall
         self.finish_all_rq = save_finish
         if self.cleanup_delay_usec_per_file > 0:
-            total_sleep_time = self.cleanup_delay_usec_per_file * self.filenum_final / USEC_PER_SEC
+            total_threads = self.threads * self.total_hosts
+            total_sleep_time = self.cleanup_delay_usec_per_file * self.iterations * total_threads / USEC_PER_SEC
             self.log.info('waiting %f sec to give storage time to recycle deleted files' % total_sleep_time)
             time.sleep(total_sleep_time)
         self.status = ok
