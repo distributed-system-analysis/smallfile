@@ -271,6 +271,7 @@ class SmallfileWorkload:
         'swift-put',
         'ls-l',
         'await-create',
+        'truncate-overwrite',
         ]
     OK = 0
     NOTOK = 1
@@ -1282,17 +1283,26 @@ class SmallfileWorkload:
     def do_overwrite(self):
         return self.do_write()
 
-    def do_write(self, append=False):
+    def do_truncate_overwrite(self):
+        return self.do_write(truncate=True)
+
+    def do_write(self, append=False, truncate=False):
         if self.record_ctime_size and not xattr_installed:
             raise SMFRunException('xattr module not present ' +
                             'but record-ctime-size specified')
+        if append and truncate:
+            raise Exception('can not appent and truncate at the same time')
+
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
             self.op_starttime()
             fd = -1
             try:
                 # don't use O_APPEND, it has different semantics!
-                fd = os.open(fn, os.O_WRONLY | O_BINARY)
+                open_mode = os.O_WRONLY | O_BINARY
+                if truncate:
+                    open_mode |= os.O_TRUNC
+                fd = os.open(fn, open_mode)
                 if append: os.lseek(fd, 0, os.SEEK_END)
                 remaining_kb = self.get_next_file_size()
                 self.prepare_buf()
@@ -1742,6 +1752,7 @@ class SmallfileWorkload:
         'chmod': do_chmod,
         'append': do_append,
         'overwrite': do_overwrite,
+        'truncate-overwrite': do_truncate_overwrite,
         'read': do_read,
         'rename': do_rename,
         'delete-renamed': do_delete_renamed,
