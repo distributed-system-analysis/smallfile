@@ -92,6 +92,18 @@ try:
 except ImportError as e:
     pass
 
+# makes using python -m pdb easier with unit tests
+# set .pdbrc file to contain something like:
+#   b run_unit_tests
+#   c
+#   b Test.test_whatever
+
+def run_unit_tests():
+    if unittest_module:
+        unittest_module.main()
+    else:
+        raise SMFRunException('no python unittest module available')
+
 # python threading module method name isAlive changed to is_alive in python3
 
 use_isAlive = (sys.version_info[0] < 3)
@@ -471,9 +483,9 @@ class SmallfileWorkload:
 
         # results returned in variables below
         self.filenum = 0  # how many files have been accessed so far
-        self.filenum_final = 0  # how many files accessed when test ended
+        self.filenum_final = None  # how many files accessed when test ended
         self.rq = 0  # how many reads/writes have been attempted so far
-        self.rq_final = 0  # how many reads/writes completed when test ended
+        self.rq_final = None  # how many reads/writes completed when test ended
         self.abort = False
         self.file_dirs = []  # subdirectores within per-thread dir
         self.status = self.NOTOK
@@ -496,7 +508,7 @@ class SmallfileWorkload:
         # to measure per-thread elapsed time
         self.start_time = None
         self.end_time = None
-        self.elapsed_time = 0
+        self.elapsed_time = None
 
         # to measure file operation response times
         self.op_start_time = None
@@ -766,15 +778,20 @@ class SmallfileWorkload:
     # record info needed to compute test statistics
 
     def end_test(self):
+
+        # be sure end_test is not called more than once
+        # during do_workload()
+        assert self.end_time is None and self.rq_final is None and self.filenum_final is None
+
         self.rq_final = self.rq
         self.filenum_final = self.filenum
         self.end_time = time.time()
+        stonewall_path = self.stonewall_fn()
         if self.filenum >= self.iterations \
-           and not os.path.exists(self.stonewall_fn()):
+           and not os.path.exists(stonewall_path):
             try:
-                touch(self.stonewall_fn())
-                self.log.info('stonewall file written by thread %s on host %s'
-                              % (self.tid, get_hostname(None)))
+                touch(stonewall_path)
+                self.log.info('stonewall file %s written' % stonewall_path)
             except IOError as e:
                 err = e.errno
                 if err != errno.EEXIST:
@@ -785,17 +802,22 @@ class SmallfileWorkload:
                         self.log.info('saw EINVAL on stonewall, ignoring it')
 
     def test_ended(self):
-        return self.end_time > self.start_time
+        return (self.end_time is not None) and (self.end_time > self.start_time)
 
     # see if we should do one more file
     # to minimize overhead, do not check stonewall file before every iteration
 
     def do_another_file(self):
-        if self.stonewall and self.filenum % self.files_between_checks == 0:
-            if not self.test_ended() and os.path.exists(self.stonewall_fn()):
-                self.log.info('stonewalled after ' + str(self.filenum)
-                              + ' iterations')
+        if self.stonewall and (((self.filenum + 1) % self.files_between_checks) == 0):
+            stonewall_path = self.stonewall_fn()
+            if self.verbose:
+                self.log.debug('checking for stonewall file %s after %s iterations' %
+                            (stonewall_path, self.filenum))
+            if os.path.exists(stonewall_path):
+                self.log.info('stonewall file %s seen after %d iterations' %
+                        (stonewall_path, self.filenum))
                 self.end_test()
+                return False
 
         # if user doesn't want to finish all requests and test has ended, stop
 
@@ -1682,9 +1704,8 @@ class SmallfileWorkload:
         self.biggest_buf = self.create_biggest_buf(False)
         if self.total_sz_kb > 0:
             self.files_between_checks = \
-                max(10, self.max_files_between_checks - self.total_sz_kb / 100)
+                max(10, int(self.max_files_between_checks - self.total_sz_kb / 100))
         try:
-            self.end_time = 0.0
             self.wait_for_gate()
             self.start_time = time.time()
             o = self.opname
@@ -1707,7 +1728,7 @@ class SmallfileWorkload:
         if self.filenum != self.iterations:
             self.log.info('recorded throughput after '
                           + str(self.filenum) + ' files')
-        if self.rq_final < 0:
+        if self.rq_final is None:
             self.end_test()
         self.elapsed_time = self.end_time - self.start_time
         self.log.info('finished %s' % self.opname)
@@ -1807,6 +1828,7 @@ if unittest_module:
                             % self.invok.log_fn())
 
     def runTest(self, opName):
+        ensure_deleted(self.invok.stonewall_fn())
         self.invok.opname = opName
         self.invok.do_workload()
         self.chk_status()
@@ -1887,7 +1909,6 @@ if unittest_module:
     def test_c3_Symlink(self):
         if is_windows_os:
             return
-        self.cleanup_files()
         self.mk_files()
         self.runTest('symlink')
         lastSymlinkFile = self.lastFileNameInTest(self.invok.dest_dirs)
@@ -1895,28 +1916,23 @@ if unittest_module:
         self.assertTrue(exists(lastSymlinkFile))
 
     def test_c4_Stat(self):
-        self.cleanup_files()
         self.mk_files()
         self.runTest('stat')
 
     def test_c44_Readdir(self):
-        self.cleanup_files()
         self.mk_files()
         self.runTest('readdir')
 
     def test_c45_Ls_l(self):
-        self.cleanup_files()
         self.mk_files()
         self.runTest('ls-l')
 
     def test_c5_Chmod(self):
-        self.cleanup_files()
         self.mk_files()
         self.runTest('chmod')
 
     def test_c6_xattr(self):
         if xattr_installed:
-            self.cleanup_files()
             self.mk_files()
             self.fsync = True
             self.xattr_size = 256
@@ -2022,7 +2038,6 @@ if unittest_module:
         self.assertTrue(self.invok.status != ok)
 
     def test_z1_create(self):
-        self.cleanup_files()
         self.invok.filesize_distr = self.invok.fsdistr_random_exponential
         self.invok.incompressible = True
         self.invok.verify_read = True
@@ -2030,6 +2045,7 @@ if unittest_module:
         self.invok.iterations = 2000
         self.invok.record_sz_kb = 0
         self.invok.total_sz_kb = 16
+        self.cleanup_files()
         self.runTest('create')
 
     # inherits files from the z1_create test
@@ -2058,7 +2074,6 @@ if unittest_module:
     def test_i1_do_swift_put(self):
         if not xattr_installed:
             return
-        self.cleanup_files()
         self.invok.invocations = 10
         self.invok.record_sz_kb = 5
         self.invok.total_sz_kb = 64
@@ -2066,6 +2081,7 @@ if unittest_module:
         self.invok.xattr_count = 2
         self.invok.fsync = True
         self.invok.filesize_distr = self.invok.fsdistr_random_exponential
+        self.cleanup_files()
         self.runTest('swift-put')
 
     # inherits files from the i1_do_swift_put test
@@ -2195,7 +2211,4 @@ if unittest_module:
 # so you can just do "python smallfile.py" to test it
 
 if __name__ == '__main__':
-    if unittest_module:
-        unittest_module.main()
-    else:
-        raise SMFRunException('no python unittest module available')
+    run_unit_tests()

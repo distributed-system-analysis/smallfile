@@ -27,9 +27,9 @@ class result_stats:
     def get_from_invoke(self, invk, record_sz_kb):
         self.status = invk.status
         self.elapsed = invk.elapsed_time
-        self.files = invk.filenum_final
-        self.records = invk.rq_final
-        if invk.elapsed_time > 0.0:
+        self.files = invk.filenum_final if invk.filenum_final is not None else 0
+        self.records = invk.rq_final if invk.rq_final is not None else 0
+        if invk.elapsed_time is not None and invk.elapsed_time > 0.0:
             self.files_per_sec = invk.filenum_final / invk.elapsed_time
             if invk.rq_final > 0:
                 self.IOPS = invk.rq_final / invk.elapsed_time
@@ -93,11 +93,11 @@ def output_results(invoke_list, test_params):
             status = 'ERR: ' + os.strerror(invk.status)
         else:
             status = 'ok'
-        fmt = 'host = %s,thr = %s,elapsed = %f'
-        fmt += ',files = %d,records = %d,status = %s'
+        fmt = 'host = %s,thr = %s,elapsed = %s'
+        fmt += ',files = %s,records = %s,status = %s'
         print(fmt %
-              (invk.onhost, invk.tid, invk.elapsed_time,
-               invk.filenum_final, invk.rq_final, status))
+              (invk.onhost, invk.tid, str(invk.elapsed_time),
+               str(invk.filenum_final), str(invk.rq_final), status))
 
         per_thread = result_stats()
         per_thread.get_from_invoke(invk, rszkb)
