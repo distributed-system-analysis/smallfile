@@ -41,7 +41,9 @@ import threading
 import socket
 import errno
 import codecs
+from shutil import rmtree
 from math import sqrt, log2
+from sync_files import ensure_dir_exists, ensure_deleted, write_sync_file, touch
 
 OK = 0  # system call return code for success
 NOTOK = 1
@@ -123,29 +125,9 @@ class MFRdWrExc(Exception):
 class SMFResultException(Exception):
     pass
 
+
 class SMFRunException(Exception):
     pass
-
-# avoid exception if file we wish to delete is not there
-
-def ensure_deleted(fn):
-    try:
-        if os.path.lexists(fn):
-            os.unlink(fn)
-    except Exception as e:
-        # could be race condition with other client processes/hosts
-        # if was race condition, file will no longer be there
-        if os.path.exists(fn):
-            raise Exception('exception while ensuring %s deleted: %s'
-                            % (fn, str(e)))
-
-
-# just create an empty file
-# leave exception handling to caller
-
-def touch(fn):
-    with open(fn, 'w'):
-        pass
 
 
 # abort routine just cleans up threads
@@ -163,29 +145,6 @@ def abort_test(abort_fn, thread_list):
 def thrd_is_alive(thrd):
     use_isAlive = (sys.version_info[0] < 3)
     return (thrd.isAlive() if use_isAlive else thrd.is_alive())
-
-
-# create directory if it's not already there
-
-def ensure_dir_exists(dirpath):
-    if not os.path.exists(dirpath):
-        parent_path = os.path.dirname(dirpath)
-        if parent_path == dirpath:
-            raise SMFRunException('ensure_dir_exists: ' +
-                            'cannot obtain parent path ' +
-                            'of non-existent path: ' +
-                            dirpath)
-        ensure_dir_exists(parent_path)
-        try:
-            os.mkdir(dirpath)
-            if debug_timeout: time.sleep(1)
-        except os.error as e:
-            if e.errno != errno.EEXIST:  # workaround for filesystem bug
-                raise e
-    else:
-        if not os.path.isdir(dirpath):
-            raise SMFRunException('%s already exists and is not a directory!'
-                            % dirpath)
 
 
 # next two routines are for asynchronous replication
@@ -553,6 +512,23 @@ class SmallfileWorkload:
         self.network_dir = join(top_dirs[0], 'network_shared')
         if network_dir:
             self.network_dir = network_dir
+
+
+    def create_top_dirs(self, is_multi_host):
+        if os.path.exists(self.network_dir):
+            rmtree(self.network_dir)
+            if is_multi_host:
+                # so all remote clients see that directory was recreated
+                time.sleep(2.1)
+        ensure_dir_exists(self.network_dir)
+        for dlist in [self.src_dirs, self.dest_dirs]:
+            for d in dlist:
+                ensure_dir_exists(d)
+        if is_multi_host:
+            # workaround to force cross-host synchronization
+            time.sleep(1.1)  # lets NFS mount option actimeo=1 take effect
+            os.listdir(self.network_dir)
+
 
     # create per-thread log file
     # we have to avoid getting the logger for self.tid more than once,
