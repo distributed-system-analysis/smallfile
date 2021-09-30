@@ -1348,11 +1348,12 @@ class SmallfileWorkload:
                     if len(bytesread) != rszbytes:
                         raise MFRdWrExc(self.opname, self.filenum,
                                         self.rq, len(bytesread))
-                    if self.verify_read and self.verbose:
-                        self.log.debug(('read fn %s next_fsz %u remain %u ' +
-                                        'rszbytes %u bytesread %u')
-                                       % (fn, next_fsz, remaining_kb,
-                                          rszbytes, len(bytesread)))
+                    if self.verify_read:
+                        if self.verbose:
+                            self.log.debug(('read fn %s next_fsz %u remain %u ' +
+                                            'rszbytes %u bytesread %u')
+                                            % (fn, next_fsz, remaining_kb,
+                                               rszbytes, len(bytesread)))
                         if self.buf[0:rszbytes] != bytesread:
                             raise MFRdWrExc('read: buffer contents wrong',
                                             self.filenum,
