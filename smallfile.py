@@ -79,12 +79,18 @@ try:
 except ImportError as e:
     pass
 
+unittest_module = None
 try:
     import unittest2
     unittest_module = unittest2
 except ImportError as e:
+    pass
+
+try:
     import unittest
     unittest_module = unittest
+except ImportError as e:
+    pass
 
 # python threading module method name isAlive changed to is_alive in python3
 
@@ -1766,7 +1772,8 @@ class TestThread(threading.Thread):
 
 ok = 0
 
-class Test(unittest_module.TestCase):
+if unittest_module:
+ class Test(unittest_module.TestCase):
 
     def setUp(self):
         self.invok = SmallfileWorkload()
@@ -2187,4 +2194,7 @@ class Test(unittest_module.TestCase):
 # so you can just do "python smallfile.py" to test it
 
 if __name__ == '__main__':
-    unittest_module.main()
+    if unittest_module:
+        unittest_module.main()
+    else:
+        raise SMFRunException('no python unittest module available')
