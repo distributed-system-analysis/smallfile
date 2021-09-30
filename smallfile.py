@@ -344,7 +344,7 @@ class SmallfileWorkload:
         self.stonewall = True
 
         # finish remaining requests after test ends
-        self.finish_all_rq = True
+        self.finish_all_rq = False
 
         # append response times to .rsptimes
         self.measure_rsptimes = False
@@ -1785,6 +1785,7 @@ if unittest_module:
         self.invok.prefix = 'p'
         self.invok.suffix = 's'
         self.invok.tid = 'regtest'
+        self.invok.finish_all_rq = True
         self.deltree(self.invok.network_dir)
         ensure_dir_exists(self.invok.network_dir)
 

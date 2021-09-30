@@ -277,6 +277,13 @@ def parse():
         inv.pause_between_files = 0
         print('pause parameter not needed with auto-pause Y, setting pause to 0')
 
+    # create must finish all files so that subsequent ops have the files they need 
+    # cleanup must finish all files so that all remnants of last test are removed
+
+    if (inv.opname == 'cleanup' or inv.opname == 'create') and not inv.finish_all_rq:
+        print('changing --finish to true for op type %s' % inv.opname)
+        inv.finish_all_rq = True
+
     inv.reset()
     test_params.recalculate_timeouts()
     return test_params
