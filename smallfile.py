@@ -1797,6 +1797,8 @@ ok = 0
 if unittest_module:
  class Test(unittest_module.TestCase):
 
+
+    # run before every test
     def setUp(self):
         self.invok = SmallfileWorkload()
         self.invok.opname = 'create'
@@ -1893,19 +1895,23 @@ if unittest_module:
         self.mk_files()  # depends on cleanup_files
         fn = self.lastFileNameInTest(self.invok.src_dirs)
         assert exists(fn)
+        self.cleanup_files()
 
     def test_c1_Mkdir(self):
         self.cleanup_files()
         self.runTest('mkdir')
         last_dir = self.lastFileNameInTest(self.invok.src_dirs) + '.d'
         self.assertTrue(exists(last_dir))
+        self.cleanup_files()
 
     def test_c2_Rmdir(self):
         self.cleanup_files()
         self.runTest('mkdir')
-        self.runTest('rmdir')
         last_dir = self.lastFileNameInTest(self.invok.src_dirs) + '.d'
+        self.assertTrue(exists(last_dir))
+        self.runTest('rmdir')
         self.assertTrue(not exists(last_dir))
+        self.cleanup_files()
 
     def test_c3_Symlink(self):
         if is_windows_os:
@@ -1915,22 +1921,38 @@ if unittest_module:
         lastSymlinkFile = self.lastFileNameInTest(self.invok.dest_dirs)
         lastSymlinkFile += '.s'
         self.assertTrue(exists(lastSymlinkFile))
+        self.cleanup_files()
 
     def test_c4_Stat(self):
         self.mk_files()
         self.runTest('stat')
+        self.cleanup_files()
 
     def test_c44_Readdir(self):
+        self.invok.iterations = 50
+        self.invok.files_per_dir = 5
+        self.invok.dirs_per_dir = 2
         self.mk_files()
         self.runTest('readdir')
+        self.cleanup_files()
+
+    def test_c44a_Readdir_bigdir(self):
+        self.invok.iterations = 5000
+        self.invok.files_per_dir = 1000
+        self.invok.dirs_per_dir = 2
+        self.mk_files()
+        self.runTest('readdir')
+        self.cleanup_files()
 
     def test_c45_Ls_l(self):
         self.mk_files()
         self.runTest('ls-l')
+        self.cleanup_files()
 
     def test_c5_Chmod(self):
         self.mk_files()
         self.runTest('chmod')
+        self.cleanup_files()
 
     def test_c6_xattr(self):
         if xattr_installed:
@@ -1940,13 +1962,15 @@ if unittest_module:
             self.xattr_count = 10
             self.runTest('setxattr')
             self.runTest('getxattr')
+            self.cleanup_files()
 
     def test_d_Delete(self):
         self.invok.measure_rsptimes = True
         self.mk_files()
+        lastFn = self.lastFileNameInTest(self.invok.src_dirs)
         self.runTest('delete')
-        self.invok.clean_all_subdirs()
-        self.checkDirListEmpty(self.invok.src_dirs)
+        self.assertTrue(not exists(lastFn))
+        self.cleanup_files()
 
     def test_e_Rename(self):
         self.invok.measure_rsptimes = False
@@ -1954,15 +1978,16 @@ if unittest_module:
         self.runTest('rename')
         fn = self.invok.mk_file_nm(self.invok.dest_dirs)
         self.assertTrue(exists(fn))
+        self.cleanup_files()
 
     def test_f_DeleteRenamed(self):
         self.mk_files()
         self.runTest('rename')
         self.runTest('delete-renamed')
+        lastfn = self.invok.mk_file_nm(self.invok.dest_dirs)
         # won't delete any files or directories that contain them
-        self.invok.clean_all_subdirs()
-        self.checkDirListEmpty(self.invok.src_dirs)
-        self.checkDirListEmpty(self.invok.dest_dirs)
+        self.assertTrue(not exists(lastfn))
+        self.cleanup_files()
 
     def test_g0_Overwrite(self):
         self.mk_files()
@@ -1971,6 +1996,7 @@ if unittest_module:
         fn = self.lastFileNameInTest(self.invok.src_dirs)
         self.assertTrue(self.file_size(fn) == orig_kb
                         * self.invok.BYTES_PER_KB)
+        self.cleanup_files()
 
     def test_g1_Append(self):
         self.mk_files()
@@ -1980,6 +2006,7 @@ if unittest_module:
         fn = self.lastFileNameInTest(self.invok.src_dirs)
         self.assertTrue(self.file_size(fn) == 3 * orig_kb
                         * self.invok.BYTES_PER_KB)
+        self.cleanup_files()
 
     def test_g2_Append_Rsz_0_big_file(self):
         self.mk_files()
@@ -1991,6 +2018,7 @@ if unittest_module:
         fn = self.lastFileNameInTest(self.invok.src_dirs)
         self.assertTrue(self.file_size(fn) == (orig_kb + 2048)
                         * self.invok.BYTES_PER_KB)
+        self.cleanup_files()
 
     def test_h00_read(self):
         if not xattr_installed:
@@ -2014,6 +2042,7 @@ if unittest_module:
         ivk.iterations = 5
         # boundary condition where we want record size < max buffer space
         ivk.record_sz_kb = 0
+        self.mk_files()
         self.runTest('read')
         self.assertTrue(ivk.total_sz_kb * ivk.BYTES_PER_KB
                         > ivk.biggest_buf_size)
@@ -2021,6 +2050,7 @@ if unittest_module:
             // ivk.biggest_buf_size
         self.assertTrue(ivk.rq == ivk.iterations
                         * expected_reads_per_file)
+        self.cleanup_files()
 
     def test_h2_read_bad_data(self):
         self.mk_files()
@@ -2037,8 +2067,9 @@ if unittest_module:
         except MFRdWrExc:
             pass
         self.assertTrue(self.invok.status != ok)
+        self.cleanup_files()
 
-    def test_z1_create(self):
+    def common_z_params(self):
         self.invok.filesize_distr = self.invok.fsdistr_random_exponential
         self.invok.incompressible = True
         self.invok.verify_read = True
@@ -2046,35 +2077,27 @@ if unittest_module:
         self.invok.iterations = 2000
         self.invok.record_sz_kb = 0
         self.invok.total_sz_kb = 16
+
+    def test_z1_create(self):
+        self.common_z_params()
         self.cleanup_files()
         self.runTest('create')
 
-    # inherits files from the z1_create test
+    # test_z2_read inherits files from the z1_create test
+    # to inherit files, you must establish same test parameters as before
 
     def test_z2_read(self):
-        self.invok.filesize_distr = self.invok.fsdistr_random_exponential
-        self.invok.incompressible = True
-        self.invok.verify_read = True
-        self.invok.invocations = 40
-        self.invok.record_sz_kb = 0
-        self.invok.total_sz_kb = 16
+        self.common_z_params()
         self.runTest('read')
 
     # inherits files from the z1_create test
 
     def test_z3_append(self):
-        self.invok.filesize_distr = \
-            self.invok.fsdistr_random_exponential
-        self.invok.incompressible = True
-        self.invok.verify_read = True
-        self.invok.invocations = 40
-        self.invok.record_sz_kb = 0
-        self.invok.total_sz_kb = 16
+        self.common_z_params()
         self.runTest('append')
+        self.cleanup_files()
 
-    def test_i1_do_swift_put(self):
-        if not xattr_installed:
-            return
+    def common_swift_params(self):
         self.invok.invocations = 10
         self.invok.record_sz_kb = 5
         self.invok.total_sz_kb = 64
@@ -2082,21 +2105,21 @@ if unittest_module:
         self.invok.xattr_count = 2
         self.invok.fsync = True
         self.invok.filesize_distr = self.invok.fsdistr_random_exponential
+
+    def test_i1_do_swift_put(self):
+        if not xattr_installed:
+            return
+        self.common_swift_params()
         self.cleanup_files()
         self.runTest('swift-put')
 
-    # inherits files from the i1_do_swift_put test
+    # swift_get inherits files from the i1_do_swift_put test
 
     def test_i2_do_swift_get(self):
         if not xattr_installed:
             return
-        self.invok.invocations = 10
-        self.invok.record_sz_kb = 5
-        self.invok.total_sz_kb = 64
-        self.invok.xattr_size = 128
-        self.invok.xattr_count = 2
-        self.invok.filesize_distr = self.invok.fsdistr_random_exponential
-        self.runTest('swift-get')
+        self.common_swift_params()
+        self.cleanup_files()
 
     def test_j0_dir_name(self):
         self.invok.files_per_dir = 20
