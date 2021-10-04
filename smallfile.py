@@ -817,7 +817,7 @@ class SmallfileWorkload:
                 self.log.info('stonewall file %s seen after %d iterations' %
                         (stonewall_path, self.filenum))
                 self.end_test()
-                return False
+                if not self.finish_all_rq: return False
 
         # if user doesn't want to finish all requests and test has ended, stop
 
