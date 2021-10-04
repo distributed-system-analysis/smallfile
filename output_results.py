@@ -25,8 +25,11 @@ class result_stats:
         self.MiBps = 0.0
 
     def get_from_invoke(self, invk, record_sz_kb):
+        if invk.elapsed_time is None:
+            print('WARNING: thread %s on host %s never completed' %
+                    (invk.tid, invk.host))
         self.status = invk.status
-        self.elapsed = invk.elapsed_time
+        self.elapsed = invk.elapsed_time if invk.elapsed_time is not None else 100000000.0
         self.files = invk.filenum_final if invk.filenum_final is not None else 0
         self.records = invk.rq_final if invk.rq_final is not None else 0
         if invk.elapsed_time is not None and invk.elapsed_time > 0.0:
@@ -159,7 +162,7 @@ def output_results(invoke_list, test_params):
         print('WARNING: failed to get some responses from workload generators')
     max_files = my_host_invoke.iterations * len(invoke_list)
     pct_files = 100.0 * cluster.files / max_files
-    print('%6.2f%% of requested files processed, warning threshold is %6.2f' %
+    print('%6.2f%% of requested files processed, warning threshold is %6.2f%%' %
           (pct_files, smallfile.pct_files_min))
     rslt['pct-files-done'] = pct_files
 
