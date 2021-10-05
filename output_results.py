@@ -27,7 +27,7 @@ class result_stats:
     def get_from_invoke(self, invk, record_sz_kb):
         if invk.elapsed_time is None:
             print('WARNING: thread %s on host %s never completed' %
-                    (invk.tid, invk.host))
+                    (invk.tid, invk.onhost))
         self.status = invk.status
         self.elapsed = invk.elapsed_time if invk.elapsed_time is not None else 100000000.0
         self.files = invk.filenum_final if invk.filenum_final is not None else 0
