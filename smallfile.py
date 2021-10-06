@@ -488,7 +488,7 @@ class SmallfileWorkload:
         self.rq_final = None  # how many reads/writes completed when test ended
         self.abort = False
         self.file_dirs = []  # subdirectores within per-thread dir
-        self.status = self.NOTOK
+        self.status = ok
 
         # response time samples for auto-pause feature
         self.pause_rsptime_count = 100
@@ -780,11 +780,14 @@ class SmallfileWorkload:
 
         # be sure end_test is not called more than once
         # during do_workload()
+        if self.test_ended():
+            return
         assert self.end_time is None and self.rq_final is None and self.filenum_final is None
 
         self.rq_final = self.rq
         self.filenum_final = self.filenum
         self.end_time = time.time()
+        self.elapsed_time = self.end_time - self.start_time
         stonewall_path = self.stonewall_fn()
         if self.filenum >= self.iterations \
            and not os.path.exists(stonewall_path):
@@ -823,9 +826,11 @@ class SmallfileWorkload:
 
         if not self.finish_all_rq and self.test_ended():
             return False
+        if self.status != ok:
+            self.end_test()
+            return False
         if self.filenum >= self.iterations:
-            if not self.test_ended():
-                self.end_test()
+            self.end_test()
             return False
         if self.abort:
             raise SMFRunException('thread ' + str(self.tid)
@@ -1181,6 +1186,7 @@ class SmallfileWorkload:
                 fd = os.open(fn,
                              os.O_CREAT | os.O_EXCL | os.O_WRONLY | O_BINARY)
                 if fd < 0:
+                    self.log.error('failed to open file %s' % fn)
                     raise MFRdWrExc(self.opname, self.filenum, 0, 0)
                 remaining_kb = self.get_next_file_size()
                 self.prepare_buf()
@@ -1201,7 +1207,8 @@ class SmallfileWorkload:
                     os.makedirs(os.path.dirname(fn))
                     self.filenum -= 1  # retry this file now that dir. exists
                     continue
-                raise e
+                self.log.error('OSError on file %s' % fn)
+                self.status = e.errno
             finally:
                 if fd >= 0:
                     if self.fsync:
@@ -1708,7 +1715,6 @@ class SmallfileWorkload:
             total_sleep_time = self.cleanup_delay_usec_per_file * self.iterations * total_threads / USEC_PER_SEC
             self.log.info('waiting %f sec to give storage time to recycle deleted files' % total_sleep_time)
             time.sleep(total_sleep_time)
-        self.status = ok
 
     def do_workload(self):
         self.reset()
@@ -1729,18 +1735,22 @@ class SmallfileWorkload:
             self.wait_for_gate()
             self.start_time = time.time()
             o = self.opname
-            try:
-                func = SmallfileWorkload.workloads[o]
-            except KeyError as e:
-                raise SMFRunException('invalid workload type ' + o)
+            func = SmallfileWorkload.workloads[o]
             func(self)  # call the do_ function for that workload type
             self.status = ok
+        except KeyError as e:
+            self.log.error('invalid workload type ' + o)
+            self.status = e.ENOKEY
         except KeyboardInterrupt as e:
             self.log.error('control-C (SIGINT) signal received, ending test')
             self.status = ok
         except OSError as e:
             self.status = e.errno
             self.log.error('OSError status %d seen' % e.errno)
+            self.log.exception(e)
+        except MFRdWrExc as e:
+            self.status = errno.EIO
+            self.log.error('MFRdWrExc seen')
             self.log.exception(e)
         if self.measure_rsptimes:
             self.save_rsptimes()
@@ -1749,9 +1759,6 @@ class SmallfileWorkload:
         if self.filenum != self.iterations:
             self.log.info('recorded throughput after '
                           + str(self.filenum) + ' files')
-        if self.rq_final is None:
-            self.end_test()
-        self.elapsed_time = self.end_time - self.start_time
         self.log.info('finished %s' % self.opname)
         # this next call works fine with python 2.7
         # but not with python 2.6, why? do we need it?
@@ -2086,6 +2093,8 @@ if unittest_module:
         try:
             self.runTest('read')
         except MFRdWrExc:
+            pass
+        except SMFRunException:
             pass
         self.assertTrue(self.invok.status != ok)
         self.cleanup_files()
