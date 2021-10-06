@@ -16,14 +16,16 @@ import os
 
 def parse_yaml(test_params, input_yaml_file):
     inv = test_params.master_invoke
+    y = {}
     with open(input_yaml_file, 'r') as f:
         try:
             y = yaml.safe_load(f)
             if y == None:
                 y = {}
+            if type(y) is not dict:
+                raise SmfParseException('yaml.safe_load did not return dictionary - check input file format')
         except yaml.YAMLError as e:
-            emsg = "YAML parse error: " + str(e)
-            raise SmfParseException(emsg)
+            raise SmfParseException("YAML parse error: %s" % e)
     
     try:
         for k in y.keys():
@@ -107,15 +109,19 @@ def parse_yaml(test_params, input_yaml_file):
         raise SmfParseException(emsg)
 
 
-if __name__ == '__main__':
-
-
-    class YamlParseTest(unittest_module.TestCase):
+class TestYamlParse(unittest_module.TestCase):
         def setUp(self):
             self.params = smf_test_params.smf_test_params()
 
         def tearDown(self):
             self.params = None
+
+        def test_parse_empty(self):
+            fn = '/tmp/sample_parse_empty.yaml'
+            with open(fn, 'w') as f:
+                f.write('\n')
+            parse_yaml(self.params, fn)
+            # just looking for no exception here
 
         def test_parse_all(self):
             fn = '/tmp/sample_parse.yaml'
@@ -158,4 +164,5 @@ if __name__ == '__main__':
             topdirs = [ os.path.join(mydir, d) for d in [ 'foo', 'bar' ] ]
             assert(self.params.top_dirs == topdirs)
 
+if __name__ == '__main__':
     unittest_module.main()

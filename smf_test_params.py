@@ -123,6 +123,7 @@ class smf_test_params:
             ('filename suffix', inv.suffix),
             ('hash file number into dir.?', bool2YN(inv.hash_to_dir)),
             ('fsync after modify?', bool2YN(inv.fsync)),
+            ('incompressible?', bool2YN(inv.incompressible)),
             ('pause between files (microsec)', '%d' % inv.pause_between_files),
             ('auto-pause?', bool2YN(inv.auto_pause)),
             ('delay after cleanup per file (microsec)', '%d' % inv.cleanup_delay_usec_per_file),
@@ -133,8 +134,8 @@ class smf_test_params:
             ('stonewall?', '%s' % bool2YN(inv.stonewall)),
             ('measure response times?', '%s' % bool2YN(inv.measure_rsptimes)),
             ('verify read?', '%s' % bool2YN(inv.verify_read)),
-            ('verbose?', inv.verbose),
-            ('log to stderr?', inv.log_to_stderr),
+            ('verbose?', bool2YN(inv.verbose)),
+            ('log to stderr?', bool2YN(inv.log_to_stderr)),
             ]
         if smallfile.xattr_installed:
             prm_list.extend([('ext.attr.size', '%d' % inv.xattr_size),
