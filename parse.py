@@ -275,7 +275,7 @@ def parse():
     # create must finish all files so that subsequent ops have the files they need 
     # cleanup must finish all files so that all remnants of last test are removed
 
-    if (inv.opname == 'cleanup' or inv.opname == 'create') and not inv.finish_all_rq:
+    if (['cleanup', 'create', 'mkdir'].__contains__(inv.opname)) and not inv.finish_all_rq:
         print('changing --finish to true for op type %s' % inv.opname)
         inv.finish_all_rq = True
 
