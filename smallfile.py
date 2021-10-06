@@ -712,8 +712,6 @@ class SmallfileWorkload:
     # what file size is for thread T's file j without having to stat the file
 
     def init_random_seed(self):
-        if self.filesize_distr == self.fsdistr_fixed:
-            return
         fn = self.gen_thread_ready_fname(self.tid,
                                          hostname=self.onhost) + '.seed'
         thread_seed = str(time.time())
@@ -724,7 +722,8 @@ class SmallfileWorkload:
             with open(fn, 'w') as seedfile:
                 seedfile.write(str(thread_seed))
                 self.log.debug('write seed %s ' % thread_seed)
-        elif ['append', 'read', 'swift-get'].__contains__(self.opname):
+        #elif ['append', 'read', 'swift-get'].__contains__(self.opname):
+        else:
             with open(fn, 'r') as seedfile:
                 thread_seed = seedfile.readlines()[0].strip()
                 self.log.debug('read seed %s ' % thread_seed)
@@ -797,7 +796,9 @@ class SmallfileWorkload:
                 if err != errno.EEXIST:
                     # workaround for possible bug in Gluster
                     if err != errno.EINVAL:
-                        raise e
+                        self.log.error('unable to write stonewall file %s' % stonewall_path)
+                        self.log.exception(e)
+                        self.status = err
                     else:
                         self.log.info('saw EINVAL on stonewall, ignoring it')
 
@@ -817,7 +818,6 @@ class SmallfileWorkload:
                 self.log.info('stonewall file %s seen after %d iterations' %
                         (stonewall_path, self.filenum))
                 self.end_test()
-                if not self.finish_all_rq: return False
 
         # if user doesn't want to finish all requests and test has ended, stop
 
@@ -1009,14 +1009,20 @@ class SmallfileWorkload:
 
         # create a buffer with somewhat unique contents for this file,
         # so we'll know if there is a read error
-        # FIXME: think harder about this
-
-        unique_offset = (hash(self.tid) + self.filenum) % 1024
-        assert total_space + unique_offset < len(self.biggest_buf)
+        # unique_offset has to have same value across smallfile runs
+        # so that we can write data and then 
+        # know what to expect in written data later on
         # NOTE: this means self.biggest_buf must be
         # 1K larger than SmallfileWorkload.biggest_buf_size
+
+        unique_offset = ((int(self.tid)+1) * self.filenum) % 1024
+        assert total_space + unique_offset < len(self.biggest_buf)
+        #if self.verbose:
+        #    self.log.debug('unique_offset: %d' % unique_offset)
+
         self.buf = self.biggest_buf[unique_offset:total_space + unique_offset]
-        # assert len(self.buf) == total_space
+        #if self.verbose:
+        #    self.log.debug('start of prepared buf: %s' % self.buf.hex()[0:40])
 
     # determine record size to use in test
     # if record size is 0, that means to use largest possible value
@@ -1295,7 +1301,7 @@ class SmallfileWorkload:
             raise SMFRunException('xattr module not present ' +
                             'but record-ctime-size specified')
         if append and truncate:
-            raise Exception('can not appent and truncate at the same time')
+            raise Exception('can not append and truncate at the same time')
 
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
@@ -1349,13 +1355,21 @@ class SmallfileWorkload:
                         raise MFRdWrExc(self.opname, self.filenum,
                                         self.rq, len(bytesread))
                     if self.verify_read:
+                        # this is in fast path so avoid evaluating self.log.debug
+                        # unless people really want to see it
                         if self.verbose:
                             self.log.debug(('read fn %s next_fsz %u remain %u ' +
                                             'rszbytes %u bytesread %u')
                                             % (fn, next_fsz, remaining_kb,
                                                rszbytes, len(bytesread)))
                         if self.buf[0:rszbytes] != bytesread:
-                            raise MFRdWrExc('read: buffer contents wrong',
+                            bytes_matched = len(bytesread)
+                            for k in range(0, rszbytes):
+                                if self.buf[k] != bytesread[k]:
+                                    bytes_matched = k
+                                    break
+                            #self.log.debug('front of read buffer: %s' % bytesread.hex()[0:40])
+                            raise MFRdWrExc('read: buffer contents matched up through byte %d' % bytes_matched,
                                             self.filenum,
                                             self.rq,
                                             len(bytesread))
@@ -1701,6 +1715,7 @@ class SmallfileWorkload:
         ensure_dir_exists(self.network_dir)
         if ['create', 'mkdir', 'swift-put'].__contains__(self.opname):
             self.make_all_subdirs()
+        # create_biggest_buf() depends on init_random_seed()
         self.init_random_seed()
         self.biggest_buf = self.create_biggest_buf(False)
         if self.total_sz_kb > 0:
@@ -1721,6 +1736,7 @@ class SmallfileWorkload:
             self.status = ok
         except OSError as e:
             self.status = e.errno
+            self.log.error('OSError status %d seen' % e.errno)
             self.log.exception(e)
         if self.measure_rsptimes:
             self.save_rsptimes()
@@ -2043,6 +2059,7 @@ if unittest_module:
         # boundary condition where we want record size < max buffer space
         ivk.record_sz_kb = 0
         self.mk_files()
+        self.verify_read = True
         self.runTest('read')
         self.assertTrue(ivk.total_sz_kb * ivk.BYTES_PER_KB
                         > ivk.biggest_buf_size)
@@ -2073,10 +2090,10 @@ if unittest_module:
         self.invok.filesize_distr = self.invok.fsdistr_random_exponential
         self.invok.incompressible = True
         self.invok.verify_read = True
-        self.invok.pause_between_files = 500
-        self.invok.iterations = 2000
-        self.invok.record_sz_kb = 0
-        self.invok.total_sz_kb = 16
+        self.invok.pause_between_files = 50
+        self.invok.iterations = 300
+        self.invok.record_sz_kb = 1
+        self.invok.total_sz_kb = 4
 
     def test_z1_create(self):
         self.common_z_params()
@@ -2095,6 +2112,27 @@ if unittest_module:
     def test_z3_append(self):
         self.common_z_params()
         self.runTest('append')
+        self.cleanup_files()
+
+    # test read verification without incompressible true
+
+    def test_y_read_verify_incompressible_false(self):
+        self.invok.incompressible = False
+        self.invok.verify_read = True
+        self.invok.finish_all_rq = True
+        self.invok.iterations = 300
+        self.invok.record_sz_kb = 1
+        self.invok.total_sz_kb = 4
+        self.mk_files()
+        self.runTest('read')
+
+    def test_y2_cleanup(self):
+        self.invok.incompressible = False
+        self.invok.verify_read = True
+        self.invok.finish_all_rq = True
+        self.invok.iterations = 300
+        self.invok.record_sz_kb = 1
+        self.invok.total_sz_kb = 4
         self.cleanup_files()
 
     def common_swift_params(self):
@@ -2150,10 +2188,6 @@ if unittest_module:
         self.invok.total_hosts = 10
         self.invok.auto_pause = True
         self.mk_files()
-        self.invok.auto_pause = False
-        self.invok.pause_between_files = 0
-        self.invok.pause_sec = 0.0
-        self.invok.total_hosts = 1
         self.cleanup_files()
 
     def test_j2_deep_hashed_tree(self):
