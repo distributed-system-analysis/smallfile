@@ -6,10 +6,9 @@ import random
 import copy
 
 import smallfile
-from smallfile import ensure_deleted, ensure_dir_exists, OK, NOTOK, \
-    SMFResultException, SMFRunException, abort_test
+from smallfile import OK, NOTOK, SMFResultException, SMFRunException, abort_test
 import invoke_process
-import sync_files
+from sync_files import touch, write_sync_file, write_pickle, ensure_dir_exists, ensure_deleted
 import output_results
 
 
@@ -45,7 +44,7 @@ def run_multi_thread_workload(prm):
     host = master_invoke.onhost
 
     if not prm_slave:
-        sync_files.create_top_dirs(master_invoke, False)
+        master_invoke.create_top_dirs(False)
 
     if prm_slave:
         time.sleep(1.1)
@@ -113,12 +112,12 @@ def run_multi_thread_workload(prm):
         if my_host_invoke.verbose:
             print('host %s creating ready file %s' %
                   (my_host_invoke.onhost, host_ready_fn))
-        smallfile.touch(host_ready_fn)
+        touch(host_ready_fn)
 
     sg = my_host_invoke.starting_gate
     if not prm_slave:  # special case of no --host-set parameter
         try:
-            sync_files.write_sync_file(sg, 'hi there')
+            write_sync_file(sg, 'hi there')
             if verbose:
                 print('wrote starting gate file')
         except IOError as e:
@@ -184,7 +183,7 @@ def run_multi_thread_workload(prm):
         for ivk in invok_list:
             ivk.buf = None
             ivk.biggest_buf = None
-        sync_files.write_pickle(result_filename, invok_list)
+        write_pickle(result_filename, invok_list)
         time.sleep(1.2)  # for benefit of NFS with actimeo=1
 
     sys.exit(exit_status)

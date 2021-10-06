@@ -11,6 +11,7 @@ See Appendix on this page for instructions pertaining to license.
 import multiprocessing
 import smallfile
 from smallfile import unittest_module, SMFRunException
+from sync_files import touch
 import os
 import time
 
@@ -134,11 +135,14 @@ class Test(unittest_module.TestCase):
             raise SMFRunException('threads did not show up within %d seconds'
                             % thread_ready_timeout)
         time.sleep(1)
-        smallfile.touch(sgate_file)
+        touch(sgate_file)
         for t in threadList:
             rtnd_invok = t.receiver.recv()
             t.join()
             self.invok.log.info(str(rtnd_invok))
+            assert rtnd_invok.elapsed_time is not None
+            assert rtnd_invok.rq_final is not None
+            assert rtnd_invok.filenum_final is not None
             if rtnd_invok.status != ok:
                 raise SMFRunException('subprocess failure for %s invocation %s: '
                                 % (str(t), str(rtnd_invok)))

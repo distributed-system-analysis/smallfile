@@ -69,7 +69,7 @@ def run_multi_host_workload(prm):
 
     # construct list of ssh threads to invoke in parallel
 
-    sync_files.create_top_dirs(master_invoke, True)
+    master_invoke.create_top_dirs(True)
     pickle_fn = os.path.join(prm.master_invoke.network_dir, 'param.pickle')
 
     # if verbose: print('writing ' + pickle_fn))

@@ -41,7 +41,9 @@ import threading
 import socket
 import errno
 import codecs
+from shutil import rmtree
 from math import sqrt, log2
+from sync_files import ensure_dir_exists, ensure_deleted, write_sync_file, touch
 
 OK = 0  # system call return code for success
 NOTOK = 1
@@ -77,12 +79,30 @@ try:
 except ImportError as e:
     pass
 
+unittest_module = None
 try:
     import unittest2
     unittest_module = unittest2
 except ImportError as e:
+    pass
+
+try:
     import unittest
     unittest_module = unittest
+except ImportError as e:
+    pass
+
+# makes using python -m pdb easier with unit tests
+# set .pdbrc file to contain something like:
+#   b run_unit_tests
+#   c
+#   b Test.test_whatever
+
+def run_unit_tests():
+    if unittest_module:
+        unittest_module.main()
+    else:
+        raise SMFRunException('no python unittest module available')
 
 # python threading module method name isAlive changed to is_alive in python3
 
@@ -123,29 +143,9 @@ class MFRdWrExc(Exception):
 class SMFResultException(Exception):
     pass
 
+
 class SMFRunException(Exception):
     pass
-
-# avoid exception if file we wish to delete is not there
-
-def ensure_deleted(fn):
-    try:
-        if os.path.lexists(fn):
-            os.unlink(fn)
-    except Exception as e:
-        # could be race condition with other client processes/hosts
-        # if was race condition, file will no longer be there
-        if os.path.exists(fn):
-            raise Exception('exception while ensuring %s deleted: %s'
-                            % (fn, str(e)))
-
-
-# just create an empty file
-# leave exception handling to caller
-
-def touch(fn):
-    with open(fn, 'w'):
-        pass
 
 
 # abort routine just cleans up threads
@@ -163,29 +163,6 @@ def abort_test(abort_fn, thread_list):
 def thrd_is_alive(thrd):
     use_isAlive = (sys.version_info[0] < 3)
     return (thrd.isAlive() if use_isAlive else thrd.is_alive())
-
-
-# create directory if it's not already there
-
-def ensure_dir_exists(dirpath):
-    if not os.path.exists(dirpath):
-        parent_path = os.path.dirname(dirpath)
-        if parent_path == dirpath:
-            raise SMFRunException('ensure_dir_exists: ' +
-                            'cannot obtain parent path ' +
-                            'of non-existent path: ' +
-                            dirpath)
-        ensure_dir_exists(parent_path)
-        try:
-            os.mkdir(dirpath)
-            if debug_timeout: time.sleep(1)
-        except os.error as e:
-            if e.errno != errno.EEXIST:  # workaround for filesystem bug
-                raise e
-    else:
-        if not os.path.isdir(dirpath):
-            raise SMFRunException('%s already exists and is not a directory!'
-                            % dirpath)
 
 
 # next two routines are for asynchronous replication
@@ -379,7 +356,7 @@ class SmallfileWorkload:
         self.stonewall = True
 
         # finish remaining requests after test ends
-        self.finish_all_rq = True
+        self.finish_all_rq = False
 
         # append response times to .rsptimes
         self.measure_rsptimes = False
@@ -506,12 +483,12 @@ class SmallfileWorkload:
 
         # results returned in variables below
         self.filenum = 0  # how many files have been accessed so far
-        self.filenum_final = 0  # how many files accessed when test ended
+        self.filenum_final = None  # how many files accessed when test ended
         self.rq = 0  # how many reads/writes have been attempted so far
-        self.rq_final = 0  # how many reads/writes completed when test ended
+        self.rq_final = None  # how many reads/writes completed when test ended
         self.abort = False
         self.file_dirs = []  # subdirectores within per-thread dir
-        self.status = self.NOTOK
+        self.status = ok
 
         # response time samples for auto-pause feature
         self.pause_rsptime_count = 100
@@ -531,7 +508,7 @@ class SmallfileWorkload:
         # to measure per-thread elapsed time
         self.start_time = None
         self.end_time = None
-        self.elapsed_time = 0
+        self.elapsed_time = None
 
         # to measure file operation response times
         self.op_start_time = None
@@ -553,6 +530,23 @@ class SmallfileWorkload:
         self.network_dir = join(top_dirs[0], 'network_shared')
         if network_dir:
             self.network_dir = network_dir
+
+
+    def create_top_dirs(self, is_multi_host):
+        if os.path.exists(self.network_dir):
+            rmtree(self.network_dir)
+            if is_multi_host:
+                # so all remote clients see that directory was recreated
+                time.sleep(2.1)
+        ensure_dir_exists(self.network_dir)
+        for dlist in [self.src_dirs, self.dest_dirs]:
+            for d in dlist:
+                ensure_dir_exists(d)
+        if is_multi_host:
+            # workaround to force cross-host synchronization
+            time.sleep(1.1)  # lets NFS mount option actimeo=1 take effect
+            os.listdir(self.network_dir)
+
 
     # create per-thread log file
     # we have to avoid getting the logger for self.tid more than once,
@@ -718,8 +712,6 @@ class SmallfileWorkload:
     # what file size is for thread T's file j without having to stat the file
 
     def init_random_seed(self):
-        if self.filesize_distr == self.fsdistr_fixed:
-            return
         fn = self.gen_thread_ready_fname(self.tid,
                                          hostname=self.onhost) + '.seed'
         thread_seed = str(time.time())
@@ -730,7 +722,8 @@ class SmallfileWorkload:
             with open(fn, 'w') as seedfile:
                 seedfile.write(str(thread_seed))
                 self.log.debug('write seed %s ' % thread_seed)
-        elif ['append', 'read', 'swift-get'].__contains__(self.opname):
+        #elif ['append', 'read', 'swift-get'].__contains__(self.opname):
+        else:
             with open(fn, 'r') as seedfile:
                 thread_seed = seedfile.readlines()[0].strip()
                 self.log.debug('read seed %s ' % thread_seed)
@@ -784,44 +777,60 @@ class SmallfileWorkload:
     # record info needed to compute test statistics
 
     def end_test(self):
+
+        # be sure end_test is not called more than once
+        # during do_workload()
+        if self.test_ended():
+            return
+        assert self.end_time is None and self.rq_final is None and self.filenum_final is None
+
         self.rq_final = self.rq
         self.filenum_final = self.filenum
         self.end_time = time.time()
+        self.elapsed_time = self.end_time - self.start_time
+        stonewall_path = self.stonewall_fn()
         if self.filenum >= self.iterations \
-           and not os.path.exists(self.stonewall_fn()):
+           and not os.path.exists(stonewall_path):
             try:
-                touch(self.stonewall_fn())
-                self.log.info('stonewall file written by thread %s on host %s'
-                              % (self.tid, get_hostname(None)))
+                touch(stonewall_path)
+                self.log.info('stonewall file %s written' % stonewall_path)
             except IOError as e:
                 err = e.errno
                 if err != errno.EEXIST:
                     # workaround for possible bug in Gluster
                     if err != errno.EINVAL:
-                        raise e
+                        self.log.error('unable to write stonewall file %s' % stonewall_path)
+                        self.log.exception(e)
+                        self.status = err
                     else:
                         self.log.info('saw EINVAL on stonewall, ignoring it')
 
     def test_ended(self):
-        return self.end_time > self.start_time
+        return (self.end_time is not None) and (self.end_time > self.start_time)
 
     # see if we should do one more file
     # to minimize overhead, do not check stonewall file before every iteration
 
     def do_another_file(self):
-        if self.stonewall and self.filenum % self.files_between_checks == 0:
-            if not self.test_ended() and os.path.exists(self.stonewall_fn()):
-                self.log.info('stonewalled after ' + str(self.filenum)
-                              + ' iterations')
+        if self.stonewall and (((self.filenum + 1) % self.files_between_checks) == 0):
+            stonewall_path = self.stonewall_fn()
+            if self.verbose:
+                self.log.debug('checking for stonewall file %s after %s iterations' %
+                            (stonewall_path, self.filenum))
+            if os.path.exists(stonewall_path):
+                self.log.info('stonewall file %s seen after %d iterations' %
+                        (stonewall_path, self.filenum))
                 self.end_test()
 
         # if user doesn't want to finish all requests and test has ended, stop
 
         if not self.finish_all_rq and self.test_ended():
             return False
+        if self.status != ok:
+            self.end_test()
+            return False
         if self.filenum >= self.iterations:
-            if not self.test_ended():
-                self.end_test()
+            self.end_test()
             return False
         if self.abort:
             raise SMFRunException('thread ' + str(self.tid)
@@ -1005,14 +1014,24 @@ class SmallfileWorkload:
 
         # create a buffer with somewhat unique contents for this file,
         # so we'll know if there is a read error
-        # FIXME: think harder about this
-
-        unique_offset = (hash(self.tid) + self.filenum) % 1024
-        assert total_space + unique_offset < len(self.biggest_buf)
+        # unique_offset has to have same value across smallfile runs
+        # so that we can write data and then 
+        # know what to expect in written data later on
         # NOTE: this means self.biggest_buf must be
         # 1K larger than SmallfileWorkload.biggest_buf_size
+
+        max_buffer_offset = 1 << 10
+        try:
+            unique_offset = ((int(self.tid)+1) * self.filenum) % max_buffer_offset
+        except ValueError:
+            unique_offset = self.filenum % max_buffer_offset
+        assert total_space + unique_offset < len(self.biggest_buf)
+        #if self.verbose:
+        #    self.log.debug('unique_offset: %d' % unique_offset)
+
         self.buf = self.biggest_buf[unique_offset:total_space + unique_offset]
-        # assert len(self.buf) == total_space
+        #if self.verbose:
+        #    self.log.debug('start of prepared buf: %s' % self.buf.hex()[0:40])
 
     # determine record size to use in test
     # if record size is 0, that means to use largest possible value
@@ -1167,6 +1186,7 @@ class SmallfileWorkload:
                 fd = os.open(fn,
                              os.O_CREAT | os.O_EXCL | os.O_WRONLY | O_BINARY)
                 if fd < 0:
+                    self.log.error('failed to open file %s' % fn)
                     raise MFRdWrExc(self.opname, self.filenum, 0, 0)
                 remaining_kb = self.get_next_file_size()
                 self.prepare_buf()
@@ -1187,7 +1207,8 @@ class SmallfileWorkload:
                     os.makedirs(os.path.dirname(fn))
                     self.filenum -= 1  # retry this file now that dir. exists
                     continue
-                raise e
+                self.log.error('OSError on file %s' % fn)
+                self.status = e.errno
             finally:
                 if fd >= 0:
                     if self.fsync:
@@ -1291,7 +1312,7 @@ class SmallfileWorkload:
             raise SMFRunException('xattr module not present ' +
                             'but record-ctime-size specified')
         if append and truncate:
-            raise Exception('can not appent and truncate at the same time')
+            raise Exception('can not append and truncate at the same time')
 
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
@@ -1344,13 +1365,22 @@ class SmallfileWorkload:
                     if len(bytesread) != rszbytes:
                         raise MFRdWrExc(self.opname, self.filenum,
                                         self.rq, len(bytesread))
-                    if self.verify_read and self.verbose:
-                        self.log.debug(('read fn %s next_fsz %u remain %u ' +
-                                        'rszbytes %u bytesread %u')
-                                       % (fn, next_fsz, remaining_kb,
-                                          rszbytes, len(bytesread)))
+                    if self.verify_read:
+                        # this is in fast path so avoid evaluating self.log.debug
+                        # unless people really want to see it
+                        if self.verbose:
+                            self.log.debug(('read fn %s next_fsz %u remain %u ' +
+                                            'rszbytes %u bytesread %u')
+                                            % (fn, next_fsz, remaining_kb,
+                                               rszbytes, len(bytesread)))
                         if self.buf[0:rszbytes] != bytesread:
-                            raise MFRdWrExc('read: buffer contents wrong',
+                            bytes_matched = len(bytesread)
+                            for k in range(0, rszbytes):
+                                if self.buf[k] != bytesread[k]:
+                                    bytes_matched = k
+                                    break
+                            #self.log.debug('front of read buffer: %s' % bytesread.hex()[0:40])
+                            raise MFRdWrExc('read: buffer contents matched up through byte %d' % bytes_matched,
                                             self.filenum,
                                             self.rq,
                                             len(bytesread))
@@ -1685,7 +1715,6 @@ class SmallfileWorkload:
             total_sleep_time = self.cleanup_delay_usec_per_file * self.iterations * total_threads / USEC_PER_SEC
             self.log.info('waiting %f sec to give storage time to recycle deleted files' % total_sleep_time)
             time.sleep(total_sleep_time)
-        self.status = ok
 
     def do_workload(self):
         self.reset()
@@ -1696,27 +1725,32 @@ class SmallfileWorkload:
         ensure_dir_exists(self.network_dir)
         if ['create', 'mkdir', 'swift-put'].__contains__(self.opname):
             self.make_all_subdirs()
+        # create_biggest_buf() depends on init_random_seed()
         self.init_random_seed()
         self.biggest_buf = self.create_biggest_buf(False)
         if self.total_sz_kb > 0:
             self.files_between_checks = \
-                max(10, self.max_files_between_checks - self.total_sz_kb / 100)
+                max(10, int(self.max_files_between_checks - self.total_sz_kb / 100))
         try:
-            self.end_time = 0.0
             self.wait_for_gate()
             self.start_time = time.time()
             o = self.opname
-            try:
-                func = SmallfileWorkload.workloads[o]
-            except KeyError as e:
-                raise SMFRunException('invalid workload type ' + o)
+            func = SmallfileWorkload.workloads[o]
             func(self)  # call the do_ function for that workload type
             self.status = ok
+        except KeyError as e:
+            self.log.error('invalid workload type ' + o)
+            self.status = e.ENOKEY
         except KeyboardInterrupt as e:
             self.log.error('control-C (SIGINT) signal received, ending test')
             self.status = ok
         except OSError as e:
             self.status = e.errno
+            self.log.error('OSError status %d seen' % e.errno)
+            self.log.exception(e)
+        except MFRdWrExc as e:
+            self.status = errno.EIO
+            self.log.error('MFRdWrExc seen')
             self.log.exception(e)
         if self.measure_rsptimes:
             self.save_rsptimes()
@@ -1725,9 +1759,6 @@ class SmallfileWorkload:
         if self.filenum != self.iterations:
             self.log.info('recorded throughput after '
                           + str(self.filenum) + ' files')
-        if self.rq_final < 0:
-            self.end_test()
-        self.elapsed_time = self.end_time - self.start_time
         self.log.info('finished %s' % self.opname)
         # this next call works fine with python 2.7
         # but not with python 2.6, why? do we need it?
@@ -1790,8 +1821,11 @@ class TestThread(threading.Thread):
 
 ok = 0
 
-class Test(unittest_module.TestCase):
+if unittest_module:
+ class Test(unittest_module.TestCase):
 
+
+    # run before every test
     def setUp(self):
         self.invok = SmallfileWorkload()
         self.invok.opname = 'create'
@@ -1802,6 +1836,7 @@ class Test(unittest_module.TestCase):
         self.invok.prefix = 'p'
         self.invok.suffix = 's'
         self.invok.tid = 'regtest'
+        self.invok.finish_all_rq = True
         self.deltree(self.invok.network_dir)
         ensure_dir_exists(self.invok.network_dir)
 
@@ -1823,6 +1858,7 @@ class Test(unittest_module.TestCase):
                             % self.invok.log_fn())
 
     def runTest(self, opName):
+        ensure_deleted(self.invok.stonewall_fn())
         self.invok.opname = opName
         self.invok.do_workload()
         self.chk_status()
@@ -1886,66 +1922,82 @@ class Test(unittest_module.TestCase):
         self.mk_files()  # depends on cleanup_files
         fn = self.lastFileNameInTest(self.invok.src_dirs)
         assert exists(fn)
+        self.cleanup_files()
 
     def test_c1_Mkdir(self):
         self.cleanup_files()
         self.runTest('mkdir')
         last_dir = self.lastFileNameInTest(self.invok.src_dirs) + '.d'
         self.assertTrue(exists(last_dir))
+        self.cleanup_files()
 
     def test_c2_Rmdir(self):
         self.cleanup_files()
         self.runTest('mkdir')
-        self.runTest('rmdir')
         last_dir = self.lastFileNameInTest(self.invok.src_dirs) + '.d'
+        self.assertTrue(exists(last_dir))
+        self.runTest('rmdir')
         self.assertTrue(not exists(last_dir))
+        self.cleanup_files()
 
     def test_c3_Symlink(self):
         if is_windows_os:
             return
-        self.cleanup_files()
         self.mk_files()
         self.runTest('symlink')
         lastSymlinkFile = self.lastFileNameInTest(self.invok.dest_dirs)
         lastSymlinkFile += '.s'
         self.assertTrue(exists(lastSymlinkFile))
+        self.cleanup_files()
 
     def test_c4_Stat(self):
-        self.cleanup_files()
         self.mk_files()
         self.runTest('stat')
+        self.cleanup_files()
 
     def test_c44_Readdir(self):
-        self.cleanup_files()
+        self.invok.iterations = 50
+        self.invok.files_per_dir = 5
+        self.invok.dirs_per_dir = 2
         self.mk_files()
         self.runTest('readdir')
+        self.cleanup_files()
+
+    def test_c44a_Readdir_bigdir(self):
+        self.invok.iterations = 5000
+        self.invok.files_per_dir = 1000
+        self.invok.dirs_per_dir = 2
+        self.mk_files()
+        self.runTest('readdir')
+        self.cleanup_files()
 
     def test_c45_Ls_l(self):
-        self.cleanup_files()
         self.mk_files()
         self.runTest('ls-l')
+        self.cleanup_files()
 
     def test_c5_Chmod(self):
-        self.cleanup_files()
         self.mk_files()
         self.runTest('chmod')
+        self.cleanup_files()
 
     def test_c6_xattr(self):
         if xattr_installed:
-            self.cleanup_files()
             self.mk_files()
             self.fsync = True
             self.xattr_size = 256
             self.xattr_count = 10
             self.runTest('setxattr')
             self.runTest('getxattr')
+            self.cleanup_files()
 
     def test_d_Delete(self):
         self.invok.measure_rsptimes = True
         self.mk_files()
+        lastFn = self.lastFileNameInTest(self.invok.src_dirs)
         self.runTest('delete')
-        self.invok.clean_all_subdirs()
-        self.checkDirListEmpty(self.invok.src_dirs)
+        self.assertTrue(not exists(lastFn))
+        self.cleanup_files()
 
     def test_e_Rename(self):
         self.invok.measure_rsptimes = False
@@ -1953,15 +2005,16 @@ class Test(unittest_module.TestCase):
         self.runTest('rename')
         fn = self.invok.mk_file_nm(self.invok.dest_dirs)
         self.assertTrue(exists(fn))
+        self.cleanup_files()
 
     def test_f_DeleteRenamed(self):
         self.mk_files()
         self.runTest('rename')
         self.runTest('delete-renamed')
+        lastfn = self.invok.mk_file_nm(self.invok.dest_dirs)
         # won't delete any files or directories that contain them
-        self.invok.clean_all_subdirs()
-        self.checkDirListEmpty(self.invok.src_dirs)
-        self.checkDirListEmpty(self.invok.dest_dirs)
+        self.assertTrue(not exists(lastfn))
+        self.cleanup_files()
 
     def test_g0_Overwrite(self):
         self.mk_files()
@@ -1970,6 +2023,7 @@ class Test(unittest_module.TestCase):
         fn = self.lastFileNameInTest(self.invok.src_dirs)
         self.assertTrue(self.file_size(fn) == orig_kb
                         * self.invok.BYTES_PER_KB)
+        self.cleanup_files()
 
     def test_g1_Append(self):
         self.mk_files()
@@ -1979,6 +2033,7 @@ class Test(unittest_module.TestCase):
         fn = self.lastFileNameInTest(self.invok.src_dirs)
         self.assertTrue(self.file_size(fn) == 3 * orig_kb
                         * self.invok.BYTES_PER_KB)
+        self.cleanup_files()
 
     def test_g2_Append_Rsz_0_big_file(self):
         self.mk_files()
@@ -1990,6 +2045,7 @@ class Test(unittest_module.TestCase):
         fn = self.lastFileNameInTest(self.invok.src_dirs)
         self.assertTrue(self.file_size(fn) == (orig_kb + 2048)
                         * self.invok.BYTES_PER_KB)
+        self.cleanup_files()
 
     def test_h00_read(self):
         if not xattr_installed:
@@ -2013,6 +2069,8 @@ class Test(unittest_module.TestCase):
         ivk.iterations = 5
         # boundary condition where we want record size < max buffer space
         ivk.record_sz_kb = 0
+        self.mk_files()
+        self.verify_read = True
         self.runTest('read')
         self.assertTrue(ivk.total_sz_kb * ivk.BYTES_PER_KB
                         > ivk.biggest_buf_size)
@@ -2020,6 +2078,7 @@ class Test(unittest_module.TestCase):
             // ivk.biggest_buf_size
         self.assertTrue(ivk.rq == ivk.iterations
                         * expected_reads_per_file)
+        self.cleanup_files()
 
     def test_h2_read_bad_data(self):
         self.mk_files()
@@ -2035,46 +2094,61 @@ class Test(unittest_module.TestCase):
             self.runTest('read')
         except MFRdWrExc:
             pass
+        except SMFRunException:
+            pass
         self.assertTrue(self.invok.status != ok)
+        self.cleanup_files()
+
+    def common_z_params(self):
+        self.invok.filesize_distr = self.invok.fsdistr_random_exponential
+        self.invok.incompressible = True
+        self.invok.verify_read = True
+        self.invok.pause_between_files = 50
+        self.invok.iterations = 300
+        self.invok.record_sz_kb = 1
+        self.invok.total_sz_kb = 4
 
     def test_z1_create(self):
+        self.common_z_params()
         self.cleanup_files()
-        self.invok.filesize_distr = self.invok.fsdistr_random_exponential
-        self.invok.incompressible = True
-        self.invok.verify_read = True
-        self.invok.pause_between_files = 500
-        self.invok.iterations = 2000
-        self.invok.record_sz_kb = 0
-        self.invok.total_sz_kb = 16
         self.runTest('create')
 
-    # inherits files from the z1_create test
+    # test_z2_read inherits files from the z1_create test
+    # to inherit files, you must establish same test parameters as before
 
     def test_z2_read(self):
-        self.invok.filesize_distr = self.invok.fsdistr_random_exponential
-        self.invok.incompressible = True
-        self.invok.verify_read = True
-        self.invok.invocations = 40
-        self.invok.record_sz_kb = 0
-        self.invok.total_sz_kb = 16
+        self.common_z_params()
         self.runTest('read')
 
     # inherits files from the z1_create test
 
     def test_z3_append(self):
-        self.invok.filesize_distr = \
-            self.invok.fsdistr_random_exponential
-        self.invok.incompressible = True
-        self.invok.verify_read = True
-        self.invok.invocations = 40
-        self.invok.record_sz_kb = 0
-        self.invok.total_sz_kb = 16
+        self.common_z_params()
         self.runTest('append')
-
-    def test_i1_do_swift_put(self):
-        if not xattr_installed:
-            return
         self.cleanup_files()
+
+    # test read verification without incompressible true
+
+    def test_y_read_verify_incompressible_false(self):
+        self.invok.incompressible = False
+        self.invok.verify_read = True
+        self.invok.finish_all_rq = True
+        self.invok.iterations = 300
+        self.invok.record_sz_kb = 1
+        self.invok.total_sz_kb = 4
+        self.mk_files()
+        self.runTest('read')
+
+    def test_y2_cleanup(self):
+        self.invok.incompressible = False
+        self.invok.verify_read = True
+        self.invok.finish_all_rq = True
+        self.invok.iterations = 300
+        self.invok.record_sz_kb = 1
+        self.invok.total_sz_kb = 4
+        self.cleanup_files()
+
+    def common_swift_params(self):
         self.invok.invocations = 10
         self.invok.record_sz_kb = 5
         self.invok.total_sz_kb = 64
@@ -2082,20 +2156,21 @@ class Test(unittest_module.TestCase):
         self.invok.xattr_count = 2
         self.invok.fsync = True
         self.invok.filesize_distr = self.invok.fsdistr_random_exponential
+
+    def test_i1_do_swift_put(self):
+        if not xattr_installed:
+            return
+        self.common_swift_params()
+        self.cleanup_files()
         self.runTest('swift-put')
 
-    # inherits files from the i1_do_swift_put test
+    # swift_get inherits files from the i1_do_swift_put test
 
     def test_i2_do_swift_get(self):
         if not xattr_installed:
             return
-        self.invok.invocations = 10
-        self.invok.record_sz_kb = 5
-        self.invok.total_sz_kb = 64
-        self.invok.xattr_size = 128
-        self.invok.xattr_count = 2
-        self.invok.filesize_distr = self.invok.fsdistr_random_exponential
-        self.runTest('swift-get')
+        self.common_swift_params()
+        self.cleanup_files()
 
     def test_j0_dir_name(self):
         self.invok.files_per_dir = 20
@@ -2126,10 +2201,6 @@ class Test(unittest_module.TestCase):
         self.invok.total_hosts = 10
         self.invok.auto_pause = True
         self.mk_files()
-        self.invok.auto_pause = False
-        self.invok.pause_between_files = 0
-        self.invok.pause_sec = 0.0
-        self.invok.total_hosts = 1
         self.cleanup_files()
 
     def test_j2_deep_hashed_tree(self):
@@ -2211,4 +2282,4 @@ class Test(unittest_module.TestCase):
 # so you can just do "python smallfile.py" to test it
 
 if __name__ == '__main__':
-    unittest_module.main()
+    run_unit_tests()

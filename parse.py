@@ -260,11 +260,6 @@ def parse():
     if inv.iterations < 10:
         inv.stonewall = False
 
-    if not test_params.is_slave:
-        prm_list = test_params.human_readable()
-        for (prm_name, prm_value) in prm_list:
-            print('%40s : %s' % (prm_name, prm_value))
-
     if inv.opname == 'cleanup' and (inv.auto_pause or (inv.pause_between_files > 0)):
         inv.auto_pause = False
         inv.pause_between_files = 0
@@ -276,6 +271,18 @@ def parse():
     if inv.auto_pause and inv.pause_between_files > 0:
         inv.pause_between_files = 0
         print('pause parameter not needed with auto-pause Y, setting pause to 0')
+
+    # create must finish all files so that subsequent ops have the files they need 
+    # cleanup must finish all files so that all remnants of last test are removed
+
+    if (['cleanup', 'create', 'mkdir'].__contains__(inv.opname)) and not inv.finish_all_rq:
+        print('changing --finish to true for op type %s' % inv.opname)
+        inv.finish_all_rq = True
+
+    if not test_params.is_slave:
+        prm_list = test_params.human_readable()
+        for (prm_name, prm_value) in prm_list:
+            print('%40s : %s' % (prm_name, prm_value))
 
     inv.reset()
     test_params.recalculate_timeouts()
