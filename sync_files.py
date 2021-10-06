@@ -11,10 +11,14 @@ class SyncFileException(Exception):
 notyet = '.notyet'
 
 def touch(fpath):
-    with open(fpath, 'w') as sgf:
-        sgf.write('hi')
-        sgf.flush()
-        os.fsync(sgf.fileno())
+    try:
+        with open(fpath, 'w') as sgf:
+            sgf.write('hi')
+            sgf.flush()
+            os.fsync(sgf.fileno())
+    except OSError as e:
+        if e.errno != EEXIST:
+            raise e
 
 def write_sync_file(fpath, contents):
     with open(fpath+notyet, 'w') as sgf:
