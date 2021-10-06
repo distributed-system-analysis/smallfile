@@ -1015,7 +1015,11 @@ class SmallfileWorkload:
         # NOTE: this means self.biggest_buf must be
         # 1K larger than SmallfileWorkload.biggest_buf_size
 
-        unique_offset = ((int(self.tid)+1) * self.filenum) % 1024
+        max_buffer_offset = 1 << 10
+        try:
+            unique_offset = ((int(self.tid)+1) * self.filenum) % max_buffer_offset
+        except ValueError:
+            unique_offset = self.filenum % max_buffer_offset
         assert total_space + unique_offset < len(self.biggest_buf)
         #if self.verbose:
         #    self.log.debug('unique_offset: %d' % unique_offset)
