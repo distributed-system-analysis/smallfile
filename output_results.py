@@ -84,7 +84,8 @@ def output_results(invoke_list, test_params):
 
     rslt = {}
     rslt['in-host'] = {}
-    cluster = result_stats()
+    stats_by_host = {}
+    cluster = stats_by_host['stats'] = result_stats()
 
     for invk in invoke_list:  # for each parallel SmallfileWorkload
 
@@ -108,33 +109,37 @@ def output_results(invoke_list, test_params):
         # for JSON, show nesting of threads within hosts
 
         try:
-            per_host_json = rslt['in-host'][invk.onhost]
+            per_host = stats_by_host[invk.onhost]
         except KeyError:
-            rslt['in-host'] = {}
-            per_host_json = { 'in-thread':{} }
-            rslt['in-host'][invk.onhost] = per_host_json
-            per_host = result_stats()
-            
-        # update per-host stats in JSON
-
-        per_host.add_to(per_thread)
-        per_host.add_to_dict(per_host_json)
-
-        # insert per-thread stats into JSON
-
-        per_thread_json = {}
-        per_host_json['in-thread'][invk.tid] = per_thread_json
-        per_thread.add_to_dict(per_thread_json)
-        
-        # aggregate to get stats for entire cluster
-
+            # first time this host was seen
+            stats_by_host[invk.onhost] = per_host = {}
+            per_host['thread'] = {}
+            per_host['stats'] = result_stats()
+        per_host['thread'][invk.tid] = per_thread
+        per_host['stats'].add_to(per_thread)
         cluster.add_to(per_thread)
-        cluster.add_to_dict(rslt)
+
+    # now counters are all added up, generate JSON
+
+    for invk in invoke_list:  # for each parallel SmallfileWorkload
+        per_host = stats_by_host[invk.onhost]
+        try:
+            per_host_json = rslt['in-host'][invk.onhost] 
+        except KeyError:
+            rslt['in-host'][invk.onhost] = per_host_json = {}
+            per_host['stats'].add_to_dict(per_host_json)
+            per_host_json['in-thread'] = {}
+        per_host_json['in-thread'][invk.tid] = per_thread_json = {}
+        per_thread = per_host['thread'][invk.tid]
+        per_thread.add_to_dict(per_thread_json)
+
+    cluster.add_to_dict(rslt)
 
     # if there is only 1 host in results, 
     # and no host was specified, 
     # then remove that level from
     # result hierarchy, not needed
+    # NOTE: required for backwards compatibility with benchmark-operator
 
     if len(rslt['in-host'].keys()) == 1 and test_params.host_set == None:
         hostkey = list(rslt['in-host'].keys())[0]
