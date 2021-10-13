@@ -65,7 +65,7 @@ class result_stats:
         target['elapsed'] = self.elapsed
         target['files'] = self.files
         target['records'] = self.records
-        target['files-per-sec'] = self.files_per_sec
+        target['filesPerSec'] = self.files_per_sec
         if self.records > 0:
             target['IOPS'] = self.IOPS
             target['MiBps'] = self.MiBps
@@ -83,8 +83,9 @@ def output_results(invoke_list, test_params):
         rszkb = my_host_invoke.biggest_buf_size / my_host_invoke.BYTES_PER_KB
 
     rslt = {}
-    rslt['in-host'] = {}
-    cluster = result_stats()
+    rslt['host'] = {}
+    stats_by_host = {}
+    cluster = stats_by_host['stats'] = result_stats()
 
     for invk in invoke_list:  # for each parallel SmallfileWorkload
 
@@ -108,42 +109,45 @@ def output_results(invoke_list, test_params):
         # for JSON, show nesting of threads within hosts
 
         try:
-            per_host_json = rslt['in-host'][invk.onhost]
+            per_host = stats_by_host[invk.onhost]
         except KeyError:
-            rslt['in-host'] = {}
-            per_host_json = { 'in-thread':{} }
-            rslt['in-host'][invk.onhost] = per_host_json
-            per_host = result_stats()
-            
-        # update per-host stats in JSON
-
-        per_host.add_to(per_thread)
-        per_host.add_to_dict(per_host_json)
-
-        # insert per-thread stats into JSON
-
-        per_thread_json = {}
-        per_host_json['in-thread'][invk.tid] = per_thread_json
-        per_thread.add_to_dict(per_thread_json)
-        
-        # aggregate to get stats for entire cluster
-
+            # first time this host was seen
+            stats_by_host[invk.onhost] = per_host = {}
+            per_host['thread'] = {}
+            per_host['stats'] = result_stats()
+        per_host['thread'][invk.tid] = per_thread
+        per_host['stats'].add_to(per_thread)
         cluster.add_to(per_thread)
-        cluster.add_to_dict(rslt)
+
+    # now counters are all added up, generate JSON
+
+    for invk in invoke_list:  # for each parallel SmallfileWorkload
+        per_host = stats_by_host[invk.onhost]
+        try:
+            per_host_json = rslt['host'][invk.onhost] 
+        except KeyError:
+            rslt['host'][invk.onhost] = per_host_json = {}
+            per_host['stats'].add_to_dict(per_host_json)
+            per_host_json['thread'] = {}
+        per_host_json['thread'][invk.tid] = per_thread_json = {}
+        per_thread = per_host['thread'][invk.tid]
+        per_thread.add_to_dict(per_thread_json)
+
+    cluster.add_to_dict(rslt)
 
     # if there is only 1 host in results, 
     # and no host was specified, 
     # then remove that level from
     # result hierarchy, not needed
 
-    if len(rslt['in-host'].keys()) == 1 and test_params.host_set == None:
-        hostkey = list(rslt['in-host'].keys())[0]
-        threads_in_host = rslt['in-host'][hostkey]['in-thread']
-        rslt['in-thread'] = threads_in_host
-        del rslt['in-host']
+    if len(rslt['host'].keys()) == 1 and test_params.host_set == None:
+        hostkey = list(rslt['host'].keys())[0]
+        threads_in_host = rslt['host'][hostkey]['thread']
+        rslt['thread'] = threads_in_host
+        del rslt['host']
 
     print('total threads = %d' % len(invoke_list))
-    rslt['total-threads'] = len(invoke_list)
+    rslt['totalhreads'] = len(invoke_list)
 
     print('total files = %d' % cluster.files)
 
@@ -151,7 +155,7 @@ def output_results(invoke_list, test_params):
         print('total IOPS = %d' % cluster.IOPS)
         total_data_gb = cluster.records * rszkb * 1.0 / KB_PER_GB
         print('total data = %9.3f GiB' % total_data_gb)
-        rslt['total-data-GB'] = total_data_gb
+        rslt['totalDataGB'] = total_data_gb
 
     if not test_params.host_set:
         test_params.host_set = [ 'localhost' ]
@@ -164,10 +168,10 @@ def output_results(invoke_list, test_params):
     pct_files = 100.0 * cluster.files / max_files
     print('%6.2f%% of requested files processed, warning threshold is %6.2f%%' %
           (pct_files, smallfile.pct_files_min))
-    rslt['pct-files-done'] = pct_files
+    rslt['pctFilesDone'] = pct_files
 
     print('elapsed time = %9.3f' % cluster.elapsed)
-    rslt['start-time'] = test_params.test_start_time
+    rslt['startTime'] = test_params.test_start_time
     rslt['status'] = os.strerror(cluster.status)
 
     # output start time in elasticsearch-friendly format

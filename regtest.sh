@@ -459,7 +459,7 @@ cleanup_test_params="$common_params --threads 1 --files 1000000 --files-per-dir 
 rm -fv /tmp/smf.json $testdir/*rsptime*csv
 runsmf "$cleanup_test_params --top $testdir --operation create --response-times Y --output-json /tmp/smf.json"
 
-start_time=$(tr '",' '  ' < /tmp/smf.json | awk '/start-time/{print $NF}')
+start_time=$(tr '",' '  ' < /tmp/smf.json | awk '/startTime/{print $NF}')
 echo "start time was $start_time"
 $PYTHON smallfile_rsptimes_stats.py --start-time $start_time --time-interval 1 $testdir/network_shared
 int_start_time=$(echo $start_time | awk -F. '{ print $1 }')
