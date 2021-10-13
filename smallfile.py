@@ -724,9 +724,13 @@ class SmallfileWorkload:
                 self.log.debug('write seed %s ' % thread_seed)
         #elif ['append', 'read', 'swift-get'].__contains__(self.opname):
         else:
-            with open(fn, 'r') as seedfile:
-                thread_seed = seedfile.readlines()[0].strip()
-                self.log.debug('read seed %s ' % thread_seed)
+            try:
+                with open(fn, 'r') as seedfile:
+                    thread_seed = seedfile.readlines()[0].strip()
+                    self.log.debug('read seed %s ' % thread_seed)
+            except OSError as e:
+                if e.errno == errno.ENOENT and self.opname in ['cleanup', 'rmdir', 'delete']:
+                    self.log.info('no saved random seed found in %s but it does not matter for deletes' % fn)
         self.randstate.seed(thread_seed)
 
     def get_next_file_size(self):
@@ -1207,8 +1211,8 @@ class SmallfileWorkload:
                     os.makedirs(os.path.dirname(fn))
                     self.filenum -= 1  # retry this file now that dir. exists
                     continue
-                self.log.error('OSError on file %s' % fn)
                 self.status = e.errno
+                raise e
             finally:
                 if fd >= 0:
                     if self.fsync:
@@ -1227,6 +1231,7 @@ class SmallfileWorkload:
                     os.makedirs(os.path.dirname(dir))
                     self.filenum -= 1
                     continue
+                raise e
             finally:
                 self.op_endtime(self.opname)
 
@@ -1737,13 +1742,12 @@ class SmallfileWorkload:
             o = self.opname
             func = SmallfileWorkload.workloads[o]
             func(self)  # call the do_ function for that workload type
-            self.status = ok
         except KeyError as e:
             self.log.error('invalid workload type ' + o)
             self.status = e.ENOKEY
         except KeyboardInterrupt as e:
             self.log.error('control-C (SIGINT) signal received, ending test')
-            self.status = ok
+            self.status = e.EINTR
         except OSError as e:
             self.status = e.errno
             self.log.error('OSError status %d seen' % e.errno)
