@@ -171,39 +171,39 @@ class smf_test_params:
         # put host-set at top because it can be very long
         # and we want rest of parameters to be grouped together
 
-        p['host-set'] = self.host_set
-        p['launch-by-daemon'] = self.launch_by_daemon
+        p['host_set'] = self.host_set
+        p['launch_by_daemon'] = self.launch_by_daemon
         p['version'] = self.version
         p['top'] = ','.join(self.top_dirs)
         p['operation'] = inv.opname
-        p['files-per-thread'] = inv.iterations
+        p['files_per_thread'] = inv.iterations
         p['threads'] = self.thread_count
-        p['file-size'] = inv.total_sz_kb
-        p['file-size-distr'] = self.size_distribution
-        p['files-per-dir'] = inv.files_per_dir
-        p['share-dir'] = bool2YN(inv.is_shared_dir)
-        p['fname-prefix'] = inv.prefix
-        p['fname-suffix'] = inv.suffix
-        p['hash-to-dir'] = bool2YN(inv.hash_to_dir)
-        p['fsync-after-modify'] = bool2YN(inv.fsync)
-        p['pause-between-files'] = str(inv.pause_between_files)
-        p['auto-pause'] = str(inv.auto_pause)
-        p['cleanup-delay-usec-per-file'] = str(inv.cleanup_delay_usec_per_file)
-        p['finish-all-requests'] = bool2YN(inv.finish_all_rq)
+        p['file_size'] = inv.total_sz_kb
+        p['file_size_distr'] = self.size_distribution
+        p['files_per_dir'] = inv.files_per_dir
+        p['share_dir'] = bool2YN(inv.is_shared_dir)
+        p['fname_prefix'] = inv.prefix
+        p['fname_suffix'] = inv.suffix
+        p['hash_to_dir'] = bool2YN(inv.hash_to_dir)
+        p['fsync_after_modify'] = bool2YN(inv.fsync)
+        p['pause_between_files'] = str(inv.pause_between_files)
+        p['auto_pause'] = str(inv.auto_pause)
+        p['cleanup_delay_usec_per_file'] = str(inv.cleanup_delay_usec_per_file)
+        p['finish_all_requests'] = bool2YN(inv.finish_all_rq)
         p['stonewall'] = bool2YN(inv.stonewall)
-        p['verify-read'] = bool2YN(inv.verify_read)
-        p['xattr-size'] = str(inv.xattr_size)
-        p['xattr-count'] = str(inv.xattr_count)
-        p['permute-host-dirs'] = bool2YN(self.permute_host_dirs)
-        p['network-sync-dir'] = self.network_sync_dir
-        p['min-directories-per-sec'] = self.min_directories_per_sec
-        p['total-hosts'] = inv.total_hosts
+        p['verify_read'] = bool2YN(inv.verify_read)
+        p['xattr_size'] = str(inv.xattr_size)
+        p['xattr_count'] = str(inv.xattr_count)
+        p['permute_host_dirs'] = bool2YN(self.permute_host_dirs)
+        p['network_sync_dir'] = self.network_sync_dir
+        p['min_directories_per_sec'] = self.min_directories_per_sec
+        p['total_hosts'] = inv.total_hosts
 
         # include startup-timeout and host-timeout to make possible
         # diagnosis of timeout problems, but we don't normally need them 
         # so don't include in human-readable output
 
-        p['startup-timeout'] = self.startup_timeout
-        p['host-timeout'] = self.host_startup_timeout
+        p['startup_timeout'] = self.startup_timeout
+        p['host_timeout'] = self.host_startup_timeout
 
         return json_dictionary
