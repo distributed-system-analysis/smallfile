@@ -42,7 +42,7 @@ import socket
 import errno
 import codecs
 from shutil import rmtree
-from math import sqrt, log2
+import math
 from sync_files import ensure_dir_exists, ensure_deleted, write_sync_file, touch
 
 OK = 0  # system call return code for success
@@ -503,7 +503,7 @@ class SmallfileWorkload:
         self.pause_sec = self.pause_between_files / self.MICROSEC_PER_SEC
         # recalculate this to capture any changes in self.total_hosts and self.threads
         self.total_threads = self.total_hosts * self.threads
-        self.throttling_factor = 0.1 * log2(self.total_threads + 1)
+        self.throttling_factor = 0.1 * math.log(self.total_threads + 1, 2)
 
         # to measure per-thread elapsed time
         self.start_time = None
@@ -1317,7 +1317,7 @@ class SmallfileWorkload:
             raise SMFRunException('xattr module not present ' +
                             'but record-ctime-size specified')
         if append and truncate:
-            raise Exception('can not append and truncate at the same time')
+            raise SMFRunException('can not append and truncate at the same time')
 
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)

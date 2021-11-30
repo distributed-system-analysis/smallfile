@@ -61,7 +61,8 @@ if __name__ == '__main__':
     elif sys.version.startswith('2'):
         ret = os.write(fd, 'hi there')
     else:
-        raise Exception('unrecognized python version %s' % sys.version)
+        print('unrecognized python version %s' % sys.version)
+        sys.exit(NOTOK)
     assert ret == 8
     os.close(fd)
     print('SUCCESS')
