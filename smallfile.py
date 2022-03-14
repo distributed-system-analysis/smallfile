@@ -147,6 +147,9 @@ class SMFResultException(Exception):
 class SMFRunException(Exception):
     pass
 
+def myassert(bool_expr):
+    if (not bool_expr):
+        raise SMFRunException('assertion failed!')
 
 # abort routine just cleans up threads
 
@@ -786,8 +789,9 @@ class SmallfileWorkload:
         # during do_workload()
         if self.test_ended():
             return
-        assert self.end_time is None and self.rq_final is None and self.filenum_final is None
-
+        myassert(self.end_time is None and 
+                 self.rq_final is None and 
+                 self.filenum_final is None)
         self.rq_final = self.rq
         self.filenum_final = self.filenum
         self.end_time = time.time()
@@ -968,11 +972,11 @@ class SmallfileWorkload:
 
             # initialize to a single random byte
             biggest_buf = bytearray([self.randstate.randrange(0, 255)])
-            assert len(biggest_buf) == 1
+            myassert(len(biggest_buf) == 1)
             powerof2 = 1
             powersum = 1
             for j in range(0, self.biggest_buf_size_bits - 1):
-                assert len(biggest_buf) == powersum
+                myassert(len(biggest_buf) == powersum)
                 powerof2 *= 2
                 powersum += powerof2
                 # biggest_buf length is now 2^j - 1
@@ -987,8 +991,8 @@ class SmallfileWorkload:
         # by just using different offset into biggest_buf
 
         biggest_buf.extend(biggest_buf[0:self.buf_offset_range])
-        assert (len(biggest_buf) ==
-                self.biggest_buf_size + self.buf_offset_range)
+        myassert(
+            len(biggest_buf) == self.biggest_buf_size + self.buf_offset_range)
         return biggest_buf
 
     # allocate buffer of correct size with offset based on filenum, tid, etc.
@@ -1029,7 +1033,7 @@ class SmallfileWorkload:
             unique_offset = ((int(self.tid)+1) * self.filenum) % max_buffer_offset
         except ValueError:
             unique_offset = self.filenum % max_buffer_offset
-        assert total_space + unique_offset < len(self.biggest_buf)
+        myassert(total_space + unique_offset < len(self.biggest_buf))
         #if self.verbose:
         #    self.log.debug('unique_offset: %d' % unique_offset)
 
