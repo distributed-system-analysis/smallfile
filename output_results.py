@@ -92,7 +92,8 @@ def output_results(invoke_list, test_params):
         # add up work that it did
         # and determine time interval over which test ran
 
-        assert isinstance(invk, smallfile.SmallfileWorkload)
+        if not isinstance(invk, smallfile.SmallfileWorkload):
+            raise SMFResultException('invoke is of wrong type: %s' % str(invk))
         if invk.status:
             status = 'ERR: ' + os.strerror(invk.status)
         else:

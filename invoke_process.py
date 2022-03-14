@@ -9,11 +9,13 @@ See Appendix on this page for instructions pertaining to license.
 '''
 
 import multiprocessing
+import shutil
+import os
+import time
+
 import smallfile
 from smallfile import unittest_module, SMFRunException
 from sync_files import touch
-import os
-import time
 
 
 # this class launches multiple threads with SmallfileWorkload instances
@@ -60,22 +62,6 @@ class subprocess(multiprocessing.Process):
 # including multi-threaded test
 # to run, just do "python invoke_process.py"
 
-def deltree(dir_tree):
-    assert len(dir_tree) > 6
-    if not os.path.exists(dir_tree):
-        return
-    assert os.path.isdir(dir_tree)
-    for (dir, subdirs, files) in os.walk(dir_tree, topdown=False):
-        for f in files:
-            os.unlink(os.path.join(dir, f))
-        for d in subdirs:
-            os.rmdir(os.path.join(dir, d))
-    os.rmdir(dir_tree)
-
-
-ok = 0
-
-
 class Test(unittest_module.TestCase):
 
     def setUp(self):
@@ -84,7 +70,7 @@ class Test(unittest_module.TestCase):
         self.invok.verbose = True
         self.invok.tid = 'regtest'
         self.invok.start_log()
-        deltree(self.invok.src_dirs[0])
+        shutil.rmtree(self.invok.src_dirs[0], ignore_errors=True)
         os.makedirs(self.invok.src_dirs[0], 0o644)
 
     def test_multiproc_stonewall(self):
@@ -92,7 +78,7 @@ class Test(unittest_module.TestCase):
         thread_ready_timeout = 4
         thread_count = 4
         for tree in self.invok.top_dirs:
-            deltree(tree)
+            shutil.rmtree(tree)
             os.mkdir(tree)
         for dir in self.invok.src_dirs:
             os.mkdir(dir)
@@ -143,7 +129,7 @@ class Test(unittest_module.TestCase):
             assert rtnd_invok.elapsed_time is not None
             assert rtnd_invok.rq_final is not None
             assert rtnd_invok.filenum_final is not None
-            if rtnd_invok.status != ok:
+            if rtnd_invok.status != rtnd_invok.OK:
                 raise SMFRunException('subprocess failure for %s invocation %s: '
                                 % (str(t), str(rtnd_invok)))
 
