@@ -8,28 +8,31 @@ import sys, os, smallfile
 
 # convert boolean value into 'Y' or 'N'
 
+
 def bool2YN(boolval):
     if boolval:
-        return 'Y'
-    return 'N'
+        return "Y"
+    return "N"
+
 
 class smf_test_params:
-
-    def __init__(self,
-                 host_set = None, 
-                 thread_count = 2, 
-                 remote_pgm_dir = os.path.abspath(os.path.dirname(sys.argv[0])),
-                 top_dirs = None,
-                 network_sync_dir = None, 
-                 slave = False, 
-                 permute_host_dirs = False,
-                 output_json = None):
+    def __init__(
+        self,
+        host_set=None,
+        thread_count=2,
+        remote_pgm_dir=os.path.abspath(os.path.dirname(sys.argv[0])),
+        top_dirs=None,
+        network_sync_dir=None,
+        slave=False,
+        permute_host_dirs=False,
+        output_json=None,
+    ):
 
         # this field used to calculate timeouts
         self.min_directories_per_sec = 50
         self.cleanup_delay_usec_per_sec = 0
         self.output_json = output_json
-        self.version = '3.2'
+        self.version = "3.2"
         self.as_host = None
         self.host_set = host_set
         self.thread_count = thread_count
@@ -59,25 +62,27 @@ class smf_test_params:
 
         # we have to create both src_dir and dst_dir trees so times 2
         # allow some time for thread synchronization
-        dir_creation_overhead = (self.thread_count // 30) + ((dirs * 2) // self.min_directories_per_sec)
+        dir_creation_overhead = (self.thread_count // 30) + (
+            (dirs * 2) // self.min_directories_per_sec
+        )
 
         # allow for creating list of pathnames if millions of files per dir
         file_creation_overhead = max(1, self.master_invoke.files_per_dir // 300000)
 
         # allow no less than 2 seconds to account for NTP inaccuracy
         self.startup_timeout = 2 + file_creation_overhead + dir_creation_overhead
-        
+
         self.host_startup_timeout = self.startup_timeout
         if self.host_set is not None:
             # allow extra time for inter-host synchronization
             self.host_startup_timeout += 5 + (len(self.host_set) // 2)
 
     def __str__(self):
-        fmt = 'smf_test_params: version=%s json=%s as_host=%s host_set=%s '
-        fmt += 'launch_by_daemon=%s '
-        fmt += 'thread_count=%d remote_pgm_dir=%s '
-        fmt += 'slave=%s permute_host_dirs=%s startup_timeout=%d '
-        fmt += 'host_timeout=%d smf_invoke=%s '
+        fmt = "smf_test_params: version=%s json=%s as_host=%s host_set=%s "
+        fmt += "launch_by_daemon=%s "
+        fmt += "thread_count=%d remote_pgm_dir=%s "
+        fmt += "slave=%s permute_host_dirs=%s startup_timeout=%d "
+        fmt += "host_timeout=%d smf_invoke=%s "
         return fmt % (
             str(self.version),
             str(self.output_json),
@@ -91,7 +96,7 @@ class smf_test_params:
             self.startup_timeout,
             self.host_startup_timeout,
             str(self.master_invoke),
-            )
+        )
 
     # display results of parse so user knows what default values are
     # most important parameters come first
@@ -102,56 +107,61 @@ class smf_test_params:
     def human_readable(self):
         inv = self.master_invoke
         if inv.filesize_distr == smallfile.SmallfileWorkload.fsdistr_fixed:
-            fsdistr_str = 'fixed'
+            fsdistr_str = "fixed"
         else:
-            fsdistr_str = 'random exponential'
+            fsdistr_str = "random exponential"
         prm_list = [
-            ('version', self.version),
-            ('hosts in test', '%s' % self.host_set),
-            ('launch by daemon', '%s' % str(self.launch_by_daemon)),
-            ('top test directory(s)', str(self.top_dirs)),
-            ('operation', inv.opname),
-            ('files/thread', '%d' % inv.iterations),
-            ('threads', '%d' % self.thread_count),
-            ('record size (KB, 0 = maximum)', '%d' % inv.record_sz_kb),
-            ('file size (KB)', '%d' % inv.total_sz_kb),
-            ('file size distribution', fsdistr_str),
-            ('files per dir', '%d' % inv.files_per_dir),
-            ('dirs per dir', '%d' % inv.dirs_per_dir),
-            ('threads share directories?', '%s' % bool2YN(inv.is_shared_dir)),
-            ('filename prefix', inv.prefix),
-            ('filename suffix', inv.suffix),
-            ('hash file number into dir.?', bool2YN(inv.hash_to_dir)),
-            ('fsync after modify?', bool2YN(inv.fsync)),
-            ('incompressible?', bool2YN(inv.incompressible)),
-            ('pause between files (microsec)', '%d' % inv.pause_between_files),
-            ('auto-pause?', bool2YN(inv.auto_pause)),
-            ('delay after cleanup per file (microsec)', '%d' % inv.cleanup_delay_usec_per_file),
-            ('minimum directories per sec', '%d' 
-             % int(self.min_directories_per_sec)),
-            ('total hosts', '%d' % inv.total_hosts),
-            ('finish all requests?', '%s' % bool2YN(inv.finish_all_rq)),
-            ('stonewall?', '%s' % bool2YN(inv.stonewall)),
-            ('measure response times?', '%s' % bool2YN(inv.measure_rsptimes)),
-            ('verify read?', '%s' % bool2YN(inv.verify_read)),
-            ('verbose?', bool2YN(inv.verbose)),
-            ('log to stderr?', bool2YN(inv.log_to_stderr)),
-            ]
+            ("version", self.version),
+            ("hosts in test", "%s" % self.host_set),
+            ("launch by daemon", "%s" % str(self.launch_by_daemon)),
+            ("top test directory(s)", str(self.top_dirs)),
+            ("operation", inv.opname),
+            ("files/thread", "%d" % inv.iterations),
+            ("threads", "%d" % self.thread_count),
+            ("record size (KB, 0 = maximum)", "%d" % inv.record_sz_kb),
+            ("file size (KB)", "%d" % inv.total_sz_kb),
+            ("file size distribution", fsdistr_str),
+            ("files per dir", "%d" % inv.files_per_dir),
+            ("dirs per dir", "%d" % inv.dirs_per_dir),
+            ("threads share directories?", "%s" % bool2YN(inv.is_shared_dir)),
+            ("filename prefix", inv.prefix),
+            ("filename suffix", inv.suffix),
+            ("hash file number into dir.?", bool2YN(inv.hash_to_dir)),
+            ("fsync after modify?", bool2YN(inv.fsync)),
+            ("incompressible?", bool2YN(inv.incompressible)),
+            ("pause between files (microsec)", "%d" % inv.pause_between_files),
+            ("auto-pause?", bool2YN(inv.auto_pause)),
+            (
+                "delay after cleanup per file (microsec)",
+                "%d" % inv.cleanup_delay_usec_per_file,
+            ),
+            ("minimum directories per sec", "%d" % int(self.min_directories_per_sec)),
+            ("total hosts", "%d" % inv.total_hosts),
+            ("finish all requests?", "%s" % bool2YN(inv.finish_all_rq)),
+            ("stonewall?", "%s" % bool2YN(inv.stonewall)),
+            ("measure response times?", "%s" % bool2YN(inv.measure_rsptimes)),
+            ("verify read?", "%s" % bool2YN(inv.verify_read)),
+            ("verbose?", bool2YN(inv.verbose)),
+            ("log to stderr?", bool2YN(inv.log_to_stderr)),
+        ]
         if smallfile.xattr_installed:
-            prm_list.extend([('ext.attr.size', '%d' % inv.xattr_size),
-                            ('ext.attr.count', '%d' % inv.xattr_count)])
+            prm_list.extend(
+                [
+                    ("ext.attr.size", "%d" % inv.xattr_size),
+                    ("ext.attr.count", "%d" % inv.xattr_count),
+                ]
+            )
         if self.host_set:
-            prm_list.extend([('permute host directories?', '%s'
-                            % bool2YN(self.permute_host_dirs))])
+            prm_list.extend(
+                [("permute host directories?", "%s" % bool2YN(self.permute_host_dirs))]
+            )
             if self.remote_pgm_dir:
-                prm_list.append(('remote program directory',
-                                self.remote_pgm_dir))
+                prm_list.append(("remote program directory", self.remote_pgm_dir))
             if self.network_sync_dir:
-                prm_list.append(('network thread sync. dir.',
-                                self.network_sync_dir))
+                prm_list.append(("network thread sync. dir.", self.network_sync_dir))
         return prm_list
 
-    # add any parameters that might be relevant to 
+    # add any parameters that might be relevant to
     # data analysis here, can skip parameters that
     # don't affect test results
     # don't convert to JSON here, so that caller
@@ -159,51 +169,51 @@ class smf_test_params:
 
     def to_json(self):
 
-        # put params a level down so results can be 
+        # put params a level down so results can be
         # inserted at same level
 
         json_dictionary = {}
         p = {}
-        json_dictionary['params'] = p
+        json_dictionary["params"] = p
 
         inv = self.master_invoke
 
         # put host-set at top because it can be very long
         # and we want rest of parameters to be grouped together
 
-        p['host_set'] = self.host_set
-        p['launch_by_daemon'] = self.launch_by_daemon
-        p['version'] = self.version
-        p['top'] = ','.join(self.top_dirs)
-        p['operation'] = inv.opname
-        p['files_per_thread'] = inv.iterations
-        p['threads'] = self.thread_count
-        p['file_size'] = inv.total_sz_kb
-        p['file_size_distr'] = self.size_distribution
-        p['files_per_dir'] = inv.files_per_dir
-        p['share_dir'] = bool2YN(inv.is_shared_dir)
-        p['fname_prefix'] = inv.prefix
-        p['fname_suffix'] = inv.suffix
-        p['hash_to_dir'] = bool2YN(inv.hash_to_dir)
-        p['fsync_after_modify'] = bool2YN(inv.fsync)
-        p['pause_between_files'] = str(inv.pause_between_files)
-        p['auto_pause'] = str(inv.auto_pause)
-        p['cleanup_delay_usec_per_file'] = str(inv.cleanup_delay_usec_per_file)
-        p['finish_all_requests'] = bool2YN(inv.finish_all_rq)
-        p['stonewall'] = bool2YN(inv.stonewall)
-        p['verify_read'] = bool2YN(inv.verify_read)
-        p['xattr_size'] = str(inv.xattr_size)
-        p['xattr_count'] = str(inv.xattr_count)
-        p['permute_host_dirs'] = bool2YN(self.permute_host_dirs)
-        p['network_sync_dir'] = self.network_sync_dir
-        p['min_directories_per_sec'] = self.min_directories_per_sec
-        p['total_hosts'] = inv.total_hosts
+        p["host_set"] = self.host_set
+        p["launch_by_daemon"] = self.launch_by_daemon
+        p["version"] = self.version
+        p["top"] = ",".join(self.top_dirs)
+        p["operation"] = inv.opname
+        p["files_per_thread"] = inv.iterations
+        p["threads"] = self.thread_count
+        p["file_size"] = inv.total_sz_kb
+        p["file_size_distr"] = self.size_distribution
+        p["files_per_dir"] = inv.files_per_dir
+        p["share_dir"] = bool2YN(inv.is_shared_dir)
+        p["fname_prefix"] = inv.prefix
+        p["fname_suffix"] = inv.suffix
+        p["hash_to_dir"] = bool2YN(inv.hash_to_dir)
+        p["fsync_after_modify"] = bool2YN(inv.fsync)
+        p["pause_between_files"] = str(inv.pause_between_files)
+        p["auto_pause"] = str(inv.auto_pause)
+        p["cleanup_delay_usec_per_file"] = str(inv.cleanup_delay_usec_per_file)
+        p["finish_all_requests"] = bool2YN(inv.finish_all_rq)
+        p["stonewall"] = bool2YN(inv.stonewall)
+        p["verify_read"] = bool2YN(inv.verify_read)
+        p["xattr_size"] = str(inv.xattr_size)
+        p["xattr_count"] = str(inv.xattr_count)
+        p["permute_host_dirs"] = bool2YN(self.permute_host_dirs)
+        p["network_sync_dir"] = self.network_sync_dir
+        p["min_directories_per_sec"] = self.min_directories_per_sec
+        p["total_hosts"] = inv.total_hosts
 
         # include startup-timeout and host-timeout to make possible
-        # diagnosis of timeout problems, but we don't normally need them 
+        # diagnosis of timeout problems, but we don't normally need them
         # so don't include in human-readable output
 
-        p['startup_timeout'] = self.startup_timeout
-        p['host_timeout'] = self.host_startup_timeout
+        p["startup_timeout"] = self.startup_timeout
+        p["host_timeout"] = self.host_startup_timeout
 
         return json_dictionary
