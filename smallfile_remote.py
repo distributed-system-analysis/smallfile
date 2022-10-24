@@ -13,13 +13,13 @@
 
 # smallfile modules
 
-'''
+"""
 smallfile_cli.py
 CLI user interface for generating metadata-intensive workloads
 Copyright 2012 -- Ben England
 Licensed under the Apache License at http://www.apache.org/licenses/LICENSE-2.0
 See Appendix on this page for instructions pertaining to license.
-'''
+"""
 
 import multi_thread_workload
 import parse_slave
@@ -34,7 +34,7 @@ def run_workload():
 
     params = parse_slave.parse()
     if params.master_invoke.verbose:
-        print('slave params: %s' % str(params))
+        print("slave params: %s" % str(params))
     return multi_thread_workload.run_multi_thread_workload(params)
 
 
@@ -43,5 +43,5 @@ def run_workload():
 # must be moved to within a routine unless it's trivial (like constants)
 # because windows doesn't support fork().
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run_workload()

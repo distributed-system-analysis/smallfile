@@ -18,6 +18,7 @@ FALLOC_FL_PUNCH_HOLE = 0x02  # de-allocates range
 
 # this function is used if we can't load the real libc function
 
+
 def noop_libc_function(*args):
     return OK
 
@@ -25,10 +26,11 @@ def noop_libc_function(*args):
 # I have no idea what this code really does, but strace says it works.
 # does this code work under Cygwin?
 
+
 def load_libc_function(func_name):
     func = noop_libc_function
     try:
-        libc = ctypes.CDLL(ctypes.util.find_library('c'))
+        libc = ctypes.CDLL(ctypes.util.find_library("c"))
         func = getattr(libc, func_name)
     except AttributeError:
         # print("Unable to locate %s in libc.  Leaving as a no-op."% func_name)
@@ -38,31 +40,30 @@ def load_libc_function(func_name):
 
 # do this at module load time
 
-_posix_fallocate = load_libc_function('fallocate64')
+_posix_fallocate = load_libc_function("fallocate64")
 
 
 # mode is one of FALLOC constants above
 
+
 def fallocate(fd, mode, offset, length):
-    return _posix_fallocate(fd,
-                            mode,
-                            ctypes.c_uint64(offset),
-                            ctypes.c_uint64(length))
+    return _posix_fallocate(fd, mode, ctypes.c_uint64(offset), ctypes.c_uint64(length))
+
 
 # unit test
 
-if __name__ == '__main__':
-    fd = os.open('/tmp/foo', os.O_WRONLY | os.O_CREAT)
+if __name__ == "__main__":
+    fd = os.open("/tmp/foo", os.O_WRONLY | os.O_CREAT)
     assert fd > 0x02
     ret = fallocate(fd, FALLOC_FL_KEEP_SIZE, 0, 8)
     assert ret == OK
-    if sys.version.startswith('3'):
-        ret = os.write(fd, bytes('hi there', 'UTF-8'))
-    elif sys.version.startswith('2'):
-        ret = os.write(fd, 'hi there')
+    if sys.version.startswith("3"):
+        ret = os.write(fd, bytes("hi there", "UTF-8"))
+    elif sys.version.startswith("2"):
+        ret = os.write(fd, "hi there")
     else:
-        print('unrecognized python version %s' % sys.version)
+        print("unrecognized python version %s" % sys.version)
         sys.exit(NOTOK)
     assert ret == 8
     os.close(fd)
-    print('SUCCESS')
+    print("SUCCESS")

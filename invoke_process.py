@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 
-'''
+"""
 invoke_process.py
 launch multiple subprocesses running SmallfileWorkload instance
 Copyright 2012 -- Ben England
 Licensed under the Apache License at http://www.apache.org/licenses/LICENSE-2.0
 See Appendix on this page for instructions pertaining to license.
-'''
+"""
 
 import multiprocessing
 import shutil
@@ -23,8 +23,8 @@ from sync_files import touch
 # it doesn't really use > 1 core because of the GIL (global lock)
 # occasional status reports could be sent back using pipe as well
 
-class subprocess(multiprocessing.Process):
 
+class subprocess(multiprocessing.Process):
     def __init__(self, invocation):
         multiprocessing.Process.__init__(self)
         (conn1, conn2) = multiprocessing.Pipe(False)
@@ -38,11 +38,14 @@ class subprocess(multiprocessing.Process):
     def run(self):
         try:
             self.invoke.do_workload()
-            self.invoke.log.debug('exiting subprocess and returning invoke '
-                                  + str(self.invoke))
+            self.invoke.log.debug(
+                "exiting subprocess and returning invoke " + str(self.invoke)
+            )
         except Exception as e:
-            print('Exception seen in thread %s host %s (tail %s) ' %
-                  (self.invoke.tid, self.invoke.onhost, self.invoke.log_fn()))
+            print(
+                "Exception seen in thread %s host %s (tail %s) "
+                % (self.invoke.tid, self.invoke.onhost, self.invoke.log_fn())
+            )
             self.invoke.log.error(str(e))
             self.status = self.invoke.NOTOK
         finally:
@@ -62,19 +65,19 @@ class subprocess(multiprocessing.Process):
 # including multi-threaded test
 # to run, just do "python invoke_process.py"
 
-class Test(unittest_module.TestCase):
 
+class Test(unittest_module.TestCase):
     def setUp(self):
         self.invok = smallfile.SmallfileWorkload()
         self.invok.debug = True
         self.invok.verbose = True
-        self.invok.tid = 'regtest'
+        self.invok.tid = "regtest"
         self.invok.start_log()
         shutil.rmtree(self.invok.src_dirs[0], ignore_errors=True)
         os.makedirs(self.invok.src_dirs[0], 0o644)
 
     def test_multiproc_stonewall(self):
-        self.invok.log.info('starting stonewall test')
+        self.invok.log.info("starting stonewall test")
         thread_ready_timeout = 4
         thread_count = 4
         for tree in self.invok.top_dirs:
@@ -85,8 +88,7 @@ class Test(unittest_module.TestCase):
         for dir in self.invok.dest_dirs:
             os.mkdir(dir)
         os.mkdir(self.invok.network_dir)
-        self.invok.starting_gate = os.path.join(self.invok.network_dir,
-                                                'starting-gate')
+        self.invok.starting_gate = os.path.join(self.invok.network_dir, "starting-gate")
         sgate_file = self.invok.starting_gate
         invokeList = []
         for j in range(0, thread_count):
@@ -96,8 +98,8 @@ class Test(unittest_module.TestCase):
 
             s.verbose = True
             s.tid = str(j)
-            s.prefix = 'thr_'
-            s.suffix = 'foo'
+            s.prefix = "thr_"
+            s.suffix = "foo"
             s.iterations = 10
             s.stonewall = False
             s.starting_gate = sgate_file
@@ -118,8 +120,9 @@ class Test(unittest_module.TestCase):
                 break
             time.sleep(1)
         if not threads_ready:
-            raise SMFRunException('threads did not show up within %d seconds'
-                            % thread_ready_timeout)
+            raise SMFRunException(
+                "threads did not show up within %d seconds" % thread_ready_timeout
+            )
         time.sleep(1)
         touch(sgate_file)
         for t in threadList:
@@ -130,11 +133,13 @@ class Test(unittest_module.TestCase):
             assert rtnd_invok.rq_final is not None
             assert rtnd_invok.filenum_final is not None
             if rtnd_invok.status != rtnd_invok.OK:
-                raise SMFRunException('subprocess failure for %s invocation %s: '
-                                % (str(t), str(rtnd_invok)))
+                raise SMFRunException(
+                    "subprocess failure for %s invocation %s: "
+                    % (str(t), str(rtnd_invok))
+                )
 
 
 # so you can just do "python invoke_process.py" to test it
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest_module.main()

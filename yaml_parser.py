@@ -14,155 +14,168 @@ import os
 #  except that the leading "--" is removed
 # modifies test_params object with contents of YAML file
 
+
 def parse_yaml(test_params, input_yaml_file):
     inv = test_params.master_invoke
     y = {}
-    with open(input_yaml_file, 'r') as f:
+    with open(input_yaml_file, "r") as f:
         try:
             y = yaml.safe_load(f)
             if y == None:
                 y = {}
             if type(y) is not dict:
-                raise SmfParseException('yaml.safe_load did not return dictionary - check input file format')
+                raise SmfParseException(
+                    "yaml.safe_load did not return dictionary - check input file format"
+                )
         except yaml.YAMLError as e:
             raise SmfParseException("YAML parse error: %s" % e)
-    
+
     try:
         for k in y.keys():
             v = y[k]
-            if k == 'yaml-input-file':
-                raise SmfParseException('cannot specify YAML input file from within itself!')
-            elif k == 'output-json':
+            if k == "yaml-input-file":
+                raise SmfParseException(
+                    "cannot specify YAML input file from within itself!"
+                )
+            elif k == "output-json":
                 test_params.output_json = v
-            elif k == 'response-times':
+            elif k == "response-times":
                 inv.measure_rsptimes = boolean(v)
-            elif k == 'network-sync-dir':
+            elif k == "network-sync-dir":
                 inv.network_dir = boolean(v)
-            elif k == 'operation':
+            elif k == "operation":
                 if not smallfile.SmallfileWorkload.all_op_names.__contains__(v):
                     raise SmfParseException('operation "%s" not recognized')
                 inv.opname = v
-            elif k == 'top':
-                test_params.top_dirs = [ os.path.abspath(p) for p in y['top'].split(',') ]
-            elif k == 'host-set':
+            elif k == "top":
+                test_params.top_dirs = [os.path.abspath(p) for p in y["top"].split(",")]
+            elif k == "host-set":
                 test_params.host_set = host_set(v)
-            elif k == 'total-hosts':
+            elif k == "total-hosts":
                 inv.total_hosts = positive_integer(v)
-            elif k == 'files':
+            elif k == "files":
                 inv.iterations = positive_integer(v)
-            elif k == 'threads':
+            elif k == "threads":
                 test_params.thread_count = positive_integer(v)
-            elif k == 'files-per-dir':
+            elif k == "files-per-dir":
                 inv.files_per_dir = positive_integer(v)
-            elif k == 'dirs-per-dir':
+            elif k == "dirs-per-dir":
                 inv.dirs_per_dir = positive_integer(v)
-            elif k == 'record-size':
+            elif k == "record-size":
                 inv.record_sz_kb = positive_integer(v)
-            elif k == 'file-size':
+            elif k == "file-size":
                 inv.total_sz_kb = non_negative_integer(v)
-            elif k == 'file-size-distribution':
-                test_params.size_distribution = inv.filesize_distr = file_size_distrib(v)
-            elif k == 'fsync':
+            elif k == "file-size-distribution":
+                test_params.size_distribution = inv.filesize_distr = file_size_distrib(
+                    v
+                )
+            elif k == "fsync":
                 inv.fsync = boolean(v)
-            elif k == 'xattr-size':
+            elif k == "xattr-size":
                 inv.xattr_size = positive_integer(v)
-            elif k == 'xattr-count':
+            elif k == "xattr-count":
                 inv.xattr_count = positive_integer(v)
-            elif k == 'pause':
+            elif k == "pause":
                 inv.pause_between_files = non_negative_integer(v)
-            elif k == 'auto-pause':
+            elif k == "auto-pause":
                 inv.auto_pause = boolean(v)
-            elif k == 'cleanup-delay-usec-per-file':
-                inv.cleanup_delay_usec_per_file = test_params.cleanup_delay_usec_per_file = non_negative_integer(v)
-            elif k == 'stonewall':
+            elif k == "cleanup-delay-usec-per-file":
+                inv.cleanup_delay_usec_per_file = (
+                    test_params.cleanup_delay_usec_per_file
+                ) = non_negative_integer(v)
+            elif k == "stonewall":
                 inv.stonewall = boolean(v)
-            elif k == 'finish':
+            elif k == "finish":
                 inv.finish_all_rq = boolean(v)
-            elif k == 'prefix':
+            elif k == "prefix":
                 inv.prefix = v
-            elif k == 'suffix':
+            elif k == "suffix":
                 inv.suffix = v
-            elif k == 'hash-into-dirs':
+            elif k == "hash-into-dirs":
                 inv.hash_to_dir = boolean(v)
-            elif k == 'same-dir':
+            elif k == "same-dir":
                 inv.is_shared_dir = boolean(v)
-            elif k == 'verbose':
+            elif k == "verbose":
                 inv.verbose = boolean(v)
-            elif k == 'permute-host-dirs':
+            elif k == "permute-host-dirs":
                 test_params.permute_host_dirs = boolean(v)
-            elif k == 'record-time-size':
+            elif k == "record-time-size":
                 inv.record_ctime_size = boolean(v)
-            elif k == 'verify-read':
+            elif k == "verify-read":
                 inv.verify_read = boolean(v)
-            elif k == 'incompressible':
+            elif k == "incompressible":
                 inv.incompressible = boolean(v)
-            elif k == 'min-dirs-per-sec':
+            elif k == "min-dirs-per-sec":
                 test_params.min_directories_per_sec = positive_integer(v)
-            elif k == 'log-to-stderr':
-                raise SmfParseException('%s: not allowed in YAML input' % k)
-            elif k == 'remote-pgm-dir':
-                raise SmfParseException('%s: not allowed in YAML input' % k)
+            elif k == "log-to-stderr":
+                raise SmfParseException("%s: not allowed in YAML input" % k)
+            elif k == "remote-pgm-dir":
+                raise SmfParseException("%s: not allowed in YAML input" % k)
             else:
-                raise SmfParseException('%s: unrecognized input parameter name' % k)
+                raise SmfParseException("%s: unrecognized input parameter name" % k)
     except TypeExc as e:
         emsg = 'YAML parse error for key "%s" : %s' % (k, str(e))
         raise SmfParseException(emsg)
 
 
 class TestYamlParse(unittest_module.TestCase):
-        def setUp(self):
-            self.params = smf_test_params.smf_test_params()
+    def setUp(self):
+        self.params = smf_test_params.smf_test_params()
 
-        def tearDown(self):
-            self.params = None
+    def tearDown(self):
+        self.params = None
 
-        def test_parse_empty(self):
-            fn = '/tmp/sample_parse_empty.yaml'
-            with open(fn, 'w') as f:
-                f.write('\n')
+    def test_parse_empty(self):
+        fn = "/tmp/sample_parse_empty.yaml"
+        with open(fn, "w") as f:
+            f.write("\n")
+        parse_yaml(self.params, fn)
+        # just looking for no exception here
+
+    def test_parse_all(self):
+        fn = "/tmp/sample_parse.yaml"
+        with open(fn, "w") as f:
+            f.write("operation: create\n")
+        parse_yaml(self.params, fn)
+        assert self.params.master_invoke.opname == "create"
+
+    def test_parse_negint(self):
+        fn = "/tmp/sample_parse_negint.yaml"
+        with open(fn, "w") as f:
+            f.write("files: -3\n")
+        try:
             parse_yaml(self.params, fn)
-            # just looking for no exception here
+        except SmfParseException as e:
+            msg = str(e)
+            if not msg.__contains__("greater than zero"):
+                raise e
 
-        def test_parse_all(self):
-            fn = '/tmp/sample_parse.yaml'
-            with open(fn, 'w') as f:
-                f.write('operation: create\n')
-            parse_yaml(self.params, fn)
-            assert(self.params.master_invoke.opname == 'create')
+    def test_parse_hostset(self):
+        fn = "/tmp/sample_parse_hostset.yaml"
+        with open(fn, "w") as f:
+            f.write("host-set: host-foo,host-bar\n")
+        parse_yaml(self.params, fn)
+        assert self.params.host_set == ["host-foo", "host-bar"]
 
-        def test_parse_negint(self):
-            fn = '/tmp/sample_parse_negint.yaml'
-            with open(fn, 'w') as f:
-                f.write('files: -3\n')
-            try:
-                parse_yaml(self.params, fn)
-            except SmfParseException as e:
-                msg = str(e)
-                if not msg.__contains__('greater than zero'):
-                    raise e
+    def test_parse_fsdistr_exponential(self):
+        fn = "/tmp/sample_parse_fsdistr_exponential.yaml"
+        with open(fn, "w") as f:
+            f.write("file-size-distribution: exponential\n")
+        parse_yaml(self.params, fn)
+        assert (
+            self.params.master_invoke.filesize_distr
+            == smallfile.SmallfileWorkload.fsdistr_random_exponential
+        )
 
-        def test_parse_hostset(self):
-            fn = '/tmp/sample_parse_hostset.yaml'
-            with open(fn, 'w') as f:
-                f.write('host-set: host-foo,host-bar\n')
-            parse_yaml(self.params, fn)
-            assert(self.params.host_set == [ 'host-foo', 'host-bar' ])
+    def test_parse_dir_list(self):
+        fn = "/tmp/sample_parse_dirlist.yaml"
+        with open(fn, "w") as f:
+            f.write("top: foo,bar \n")
+        parse_yaml(self.params, fn)
+        mydir = os.getcwd()
+        topdirs = [os.path.join(mydir, d) for d in ["foo", "bar"]]
+        assert self.params.top_dirs == topdirs
 
-        def test_parse_fsdistr_exponential(self):
-            fn = '/tmp/sample_parse_fsdistr_exponential.yaml'
-            with open(fn, 'w') as f:
-                f.write('file-size-distribution: exponential\n')
-            parse_yaml(self.params, fn)
-            assert(self.params.master_invoke.filesize_distr == smallfile.SmallfileWorkload.fsdistr_random_exponential)
 
-        def test_parse_dir_list(self):
-            fn = '/tmp/sample_parse_dirlist.yaml'
-            with open(fn, 'w') as f:
-                f.write('top: foo,bar \n')
-            parse_yaml(self.params, fn)
-            mydir=os.getcwd()
-            topdirs = [ os.path.join(mydir, d) for d in [ 'foo', 'bar' ] ]
-            assert(self.params.top_dirs == topdirs)
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest_module.main()
