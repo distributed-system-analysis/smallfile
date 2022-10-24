@@ -46,7 +46,6 @@ from smallfile import (
 # smallfile modules
 
 
-
 # FIXME: should be monitoring progress, not total elapsed time
 
 min_files_per_sec = 15
