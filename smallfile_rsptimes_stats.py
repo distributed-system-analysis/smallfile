@@ -25,16 +25,17 @@
 # output in the 'start-time' field.
 #
 #
+import bisect
+import os
+import re
+import string
 import sys
 from sys import argv
-import os
-import string
-import re
+
 import numpy
 import scipy
 import scipy.stats
 from scipy.stats import tmean, tstd
-import bisect
 
 time_infinity = 1 << 62
 

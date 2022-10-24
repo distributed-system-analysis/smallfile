@@ -7,13 +7,14 @@ Licensed under the Apache License at http://www.apache.org/licenses/LICENSE-2.0
 See Appendix on this page for instructions pertaining to license.
 """
 
-import sys
-import os
-import smallfile
-from smallfile import SmallfileWorkload, NOTOK
-import smf_test_params
-from smf_test_params import bool2YN
 import argparse
+import os
+import sys
+
+import smallfile
+import smf_test_params
+from smallfile import NOTOK, SmallfileWorkload
+from smf_test_params import bool2YN
 
 yaml_parser_installed = False
 try:
@@ -25,9 +26,15 @@ except ImportError as e:
     pass
 
 import parser_data_types
-from parser_data_types import SmfParseException
-from parser_data_types import boolean, positive_integer, non_negative_integer
-from parser_data_types import host_set, directory_list, file_size_distrib
+from parser_data_types import (
+    SmfParseException,
+    boolean,
+    directory_list,
+    file_size_distrib,
+    host_set,
+    non_negative_integer,
+    positive_integer,
+)
 
 # parse command line
 # return smf_test_params.smf_test_params instance

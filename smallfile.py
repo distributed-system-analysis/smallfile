@@ -29,21 +29,22 @@ Created on Apr 22, 2009
 # on Fedora 33 with python 3.9.2, unittest is built in and no package is needed
 
 
+import codecs
+import copy
+import errno
+import logging
+import math
 import os
 import os.path
-from os.path import exists, join
-import sys
-import time
-import copy
 import random
-import logging
-import threading
 import socket
-import errno
-import codecs
+import sys
+import threading
+import time
+from os.path import exists, join
 from shutil import rmtree
-import math
-from sync_files import ensure_dir_exists, ensure_deleted, write_sync_file, touch
+
+from sync_files import ensure_deleted, ensure_dir_exists, touch, write_sync_file
 
 OK = 0  # system call return code for success
 NOTOK = 1

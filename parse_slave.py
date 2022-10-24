@@ -7,13 +7,14 @@ Licensed under the Apache License at http://www.apache.org/licenses/LICENSE-2.0
 See Appendix on this page for instructions pertaining to license.
 """
 
-import sys
-import os
-import errno
-import time
-import pickle
-import smallfile
 import argparse
+import errno
+import os
+import pickle
+import sys
+import time
+
+import smallfile
 
 # parse command line and return unpickled test params
 # pass via --network-sync-dir option

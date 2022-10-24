@@ -1,13 +1,22 @@
-import yaml
-import smallfile
-from smallfile import unittest_module
 import argparse
-import parser_data_types
-from parser_data_types import SmfParseException, TypeExc
-from parser_data_types import boolean, positive_integer, non_negative_integer
-from parser_data_types import host_set, directory_list, file_size_distrib
-import smf_test_params
 import os
+
+import yaml
+
+import parser_data_types
+import smallfile
+import smf_test_params
+from parser_data_types import (
+    SmfParseException,
+    TypeExc,
+    boolean,
+    directory_list,
+    file_size_distrib,
+    host_set,
+    non_negative_integer,
+    positive_integer,
+)
+from smallfile import unittest_module
 
 # module to parse YAML input file containing smallfile parameters
 # YAML parameter names are identical to CLI parameter names

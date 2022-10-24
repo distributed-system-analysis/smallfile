@@ -20,26 +20,32 @@ Licensed under the Apache License at http://www.apache.org/licenses/LICENSE-2.0
 See Appendix on this page for instructions pertaining to license.
 """
 
-import sys
+import errno
 import os
 import os.path
-import errno
-import time
-import parse
 import pickle
+import sys
+import time
+
+import launcher_thread
+import multi_thread_workload
+import output_results
+import parse
+import smallfile
+import ssh_thread
+import sync_files
+from smallfile import (
+    NOTOK,
+    OK,
+    SMFResultException,
+    SMFRunException,
+    ensure_deleted,
+    use_isAlive,
+)
 
 # smallfile modules
 
-import smallfile
-from smallfile import ensure_deleted, SMFResultException, SMFRunException
-from smallfile import OK, NOTOK
-from smallfile import use_isAlive
-import sync_files
-import output_results
-import multi_thread_workload
 
-import launcher_thread
-import ssh_thread
 
 # FIXME: should be monitoring progress, not total elapsed time
 

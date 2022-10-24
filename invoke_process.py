@@ -9,14 +9,13 @@ See Appendix on this page for instructions pertaining to license.
 """
 
 import multiprocessing
-import shutil
 import os
+import shutil
 import time
 
 import smallfile
-from smallfile import unittest_module, SMFRunException
+from smallfile import SMFRunException, unittest_module
 from sync_files import touch
-
 
 # this class launches multiple threads with SmallfileWorkload instances
 # we do this because we can use > 1 core this way, with python threading,

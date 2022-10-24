@@ -4,7 +4,10 @@
 # calculate timeouts to allow for initialization delays
 # while directory tree is created
 
-import sys, os, smallfile
+import os
+import sys
+
+import smallfile
 
 # convert boolean value into 'Y' or 'N'
 
