@@ -1,5 +1,6 @@
 import argparse
 import os
+
 import smallfile
 from smallfile import SmallfileWorkload
 

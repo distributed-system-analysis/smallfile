@@ -7,9 +7,8 @@ Licensed under the Apache License at http://www.apache.org/licenses/LICENSE-2.0
 See Appendix on this page for instructions pertaining to license.
 """
 
-import threading
 import os
-
+import threading
 
 # this class is just used to create a python thread
 # for each remote host that we want to use as a workload generator

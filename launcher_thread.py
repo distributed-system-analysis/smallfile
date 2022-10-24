@@ -13,9 +13,10 @@ Licensed under the Apache License at http://www.apache.org/licenses/LICENSE-2.0
 See Appendix on this page for instructions pertaining to license.
 """
 
-import threading
 import os
+import threading
 import time
+
 import smallfile
 from smallfile import ensure_deleted
 from sync_files import write_sync_file

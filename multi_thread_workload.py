@@ -1,21 +1,21 @@
 # -*- coding: utf-8 -*-
+import copy
 import os
+import random
 import sys
 import time
-import random
-import copy
 
-import smallfile
-from smallfile import OK, NOTOK, SMFResultException, SMFRunException, abort_test
 import invoke_process
-from sync_files import (
-    touch,
-    write_sync_file,
-    write_pickle,
-    ensure_dir_exists,
-    ensure_deleted,
-)
 import output_results
+import smallfile
+from smallfile import NOTOK, OK, SMFResultException, SMFRunException, abort_test
+from sync_files import (
+    ensure_deleted,
+    ensure_dir_exists,
+    touch,
+    write_pickle,
+    write_sync_file,
+)
 
 
 def create_worker_list(prm):

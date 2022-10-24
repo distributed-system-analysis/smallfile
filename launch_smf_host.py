@@ -29,13 +29,14 @@
 #              --substitute_top z:\smf
 #
 #
-import sys
-import os
-import time
 import errno
-import smallfile
 import logging
+import os
 import socket
+import sys
+import time
+
+import smallfile
 
 OK = 0
 NOTOK = 1

@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 
-from copy import deepcopy
-import os
 import json
+import os
 import time
+from copy import deepcopy
+
 import smallfile
-from smallfile import SMFResultException, KB_PER_GB, OK
+from smallfile import KB_PER_GB, OK, SMFResultException
 
 BYTES_PER_KiB = 1024.0
 KiB_PER_MiB = 1024.0
