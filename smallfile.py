@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 
-
 """
 smallfile.py -- SmallfileWorkload class used in each workload thread
+
 Copyright 2012 -- Ben England
 Licensed under the Apache License at http://www.apache.org/licenses/LICENSE-2.0
 See Appendix on this page for instructions pertaining to license.
 Created on Apr 22, 2009
 """
-
 
 # repeat a file operation N times
 # allow for multi-thread tests with stonewalling
@@ -44,7 +43,7 @@ import time
 from os.path import exists, join
 from shutil import rmtree
 
-from sync_files import ensure_deleted, ensure_dir_exists, touch, write_sync_file
+from sync_files import ensure_deleted, ensure_dir_exists, touch
 
 OK = 0  # system call return code for success
 NOTOK = 1
@@ -64,7 +63,7 @@ try:
     import xattr
 
     xattr_installed = True
-except ImportError as e:
+except ImportError:
     pass
 
 fadvise_installed = False
@@ -72,7 +71,7 @@ try:
     import drop_buffer_cache
 
     fadvise_installed = True
-except ImportError as e:
+except ImportError:
     pass
 
 fallocate_installed = False
@@ -80,7 +79,7 @@ try:
     import fallocate  # not yet in python os module
 
     fallocate_installed = True
-except ImportError as e:
+except ImportError:
     pass
 
 unittest_module = None
@@ -88,14 +87,14 @@ try:
     import unittest2
 
     unittest_module = unittest2
-except ImportError as e:
+except ImportError:
     pass
 
 try:
     import unittest
 
     unittest_module = unittest
-except ImportError as e:
+except ImportError:
     pass
 
 # makes using python -m pdb easier with unit tests
@@ -113,6 +112,7 @@ def run_unit_tests():
 
 
 # python threading module method name isAlive changed to is_alive in python3
+
 
 use_isAlive = sys.version_info[0] < 3
 
@@ -143,15 +143,11 @@ class MFRdWrExc(Exception):
         self.bytesrtnd = bytesrtnd_in
 
     def __str__(self):
-        return (
-            "file "
-            + str(self.filenum)
-            + " request "
-            + str(self.rqnum)
-            + " byte count "
-            + str(self.bytesrtnd)
-            + " "
-            + self.opname
+        return "file {filenum} request {rqnum} byte count {bc} {op}".format(
+            filenum=str(self.filenum),
+            rqnum=str(self.rqnum),
+            bc=str(self.bytesrtnd),
+            op=self.opname,
         )
 
 
@@ -619,16 +615,11 @@ class SmallfileWorkload:
     # save response times seen by this thread
 
     def save_rsptimes(self):
-        fname = (
-            "rsptimes_"
-            + str(self.tid)
-            + "_"
-            + get_hostname(None)
-            + "_"
-            + self.opname
-            + "_"
-            + str(self.start_time)
-            + ".csv"
+        fname = "rsptimes_{tid}_{host}_{op}_{ts}.csv".format(
+            tid=str(self.tid),
+            host=get_hostname(None),
+            op=self.opname,
+            ts=str(self.start_time),
         )
         rsptime_fname = join(self.network_dir, fname)
         with open(rsptime_fname, "w") as f:
@@ -1215,10 +1206,7 @@ class SmallfileWorkload:
                         break
                 if not topdir:
                     raise SMFRunException(
-                        (
-                            "directory %s is not part of "
-                            + "any top-level directory in %s"
-                        )
+                        "directory %s is not part of any top-level directory in %s"
                         % (unique_dpath, str(tree))
                     )
 
@@ -1343,8 +1331,7 @@ class SmallfileWorkload:
     def do_getxattr(self):
         if not xattr_installed:
             raise SMFRunException(
-                "xattr module not present, "
-                + "getxattr and setxattr operations will not work"
+                "xattr module not present, getxattr and setxattr operations will not work"
             )
 
         while self.do_another_file():
@@ -1362,8 +1349,7 @@ class SmallfileWorkload:
     def do_setxattr(self):
         if not xattr_installed:
             raise SMFRunException(
-                "xattr module not present, "
-                + "getxattr and setxattr operations will not work"
+                "xattr module not present, getxattr and setxattr operations will not work"
             )
 
         while self.do_another_file():
@@ -1395,7 +1381,7 @@ class SmallfileWorkload:
     def do_write(self, append=False, truncate=False):
         if self.record_ctime_size and not xattr_installed:
             raise SMFRunException(
-                "xattr module not present " + "but record-ctime-size specified"
+                "xattr module not present but record-ctime-size specified"
             )
         if append and truncate:
             raise SMFRunException("can not append and truncate at the same time")
@@ -1457,10 +1443,7 @@ class SmallfileWorkload:
                         # unless people really want to see it
                         if self.verbose:
                             self.log.debug(
-                                (
-                                    "read fn %s next_fsz %u remain %u "
-                                    + "rszbytes %u bytesread %u"
-                                )
+                                "read fn %s next_fsz %u remain %u rszbytes %u bytesread %u"
                                 % (fn, next_fsz, remaining_kb, rszbytes, len(bytesread))
                             )
                         if self.buf[0:rszbytes] != bytesread:
@@ -1485,9 +1468,7 @@ class SmallfileWorkload:
 
     def do_readdir(self):
         if self.hash_to_dir:
-            raise SMFRunException(
-                "cannot do readdir test with " + "--hash-into-dirs option"
-            )
+            raise SMFRunException("cannot do readdir test with --hash-into-dirs option")
         prev_dir = ""
         dir_map = {}
         file_count = 0
@@ -1501,7 +1482,7 @@ class SmallfileWorkload:
                     break
             if not common_dir:
                 raise SMFRunException(
-                    ("readdir: filename %s is not " + "in any top dir in %s")
+                    "readdir: filename %s is not in any top dir in %s"
                     % (fn, str(self.top_dirs))
                 )
             if common_dir != prev_dir:
@@ -1541,9 +1522,7 @@ class SmallfileWorkload:
 
     def do_ls_l(self):
         if self.hash_to_dir:
-            raise SMFRunException(
-                "cannot do readdir test with " + "--hash-into-dirs option"
-            )
+            raise SMFRunException("cannot do readdir test with --hash-into-dirs option")
         prev_dir = ""
         dir_map = {}
         file_count = 0
@@ -1614,11 +1593,7 @@ class SmallfileWorkload:
                 st = os.stat(fn)
                 if st.st_size > original_sz_kb * self.BYTES_PER_KB:
                     raise SMFRunException(
-                        (
-                            "asynchronously created replica "
-                            + "in %s is %u bytes, "
-                            + "larger than original %u KB"
-                        )
+                        "asynchronously created replica in %s is %u bytes, larger than original %u KB"
                         % (fn, st.st_size, original_sz_kb)
                     )
                 elif st.st_size == original_sz_kb * self.BYTES_PER_KB:
@@ -1661,13 +1636,11 @@ class SmallfileWorkload:
     def do_swift_get(self):
         if not xattr_installed:
             raise SMFRunException(
-                "xattr module not present, "
-                + "getxattr and setxattr operations will not work"
+                "xattr module not present, getxattr and setxattr operations will not work"
             )
-        l = self.log
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs)
-            l.debug("swift_get fn %s " % fn)
+            self.log.debug("swift_get fn %s " % fn)
             next_fsz = self.get_next_file_size()
             self.op_starttime()
             fd = os.open(fn, os.O_RDONLY | O_BINARY)
@@ -1678,9 +1651,8 @@ class SmallfileWorkload:
                 while remaining_kb > 0:
                     next_kb = min(rszkb, remaining_kb)
                     rszbytes = next_kb * self.BYTES_PER_KB
-                    l.debug(
-                        "swift_get fd "
-                        + "%d next_fsz %u remain %u rszbytes %u "
+                    self.log.debug(
+                        "swift_get fd %d next_fsz %u remain %u rszbytes %u "
                         % (fd, next_fsz, remaining_kb, rszbytes)
                     )
                     bytesread = os.read(fd, rszbytes)
@@ -1690,11 +1662,11 @@ class SmallfileWorkload:
                         )
                     if self.verify_read:
                         if self.verbose:
-                            l.debug("swift_get bytesread %u" % len(bytesread))
+                            self.log.debug("swift_get bytesread %u" % len(bytesread))
                         if self.buf[0:rszbytes] != bytesread:
                             xpct_buf = self.buf[0:rszbytes]
-                            l.debug("expect buf: " + binary_buf_str(xpct_buf))
-                            l.debug("saw buf: " + binary_buf_str(bytesread))
+                            self.log.debug("expect buf: " + binary_buf_str(xpct_buf))
+                            self.log.debug("saw buf: " + binary_buf_str(bytesread))
                             raise MFRdWrExc(
                                 "read: buffer contents wrong",
                                 self.filenum,
@@ -1707,7 +1679,7 @@ class SmallfileWorkload:
                     try:
                         v = xattr.getxattr(fd, "user.smallfile-all-%d" % j)
                         if self.verbose:
-                            l.debug("xattr[%d] = %s" % (j, v))
+                            self.log.debug("xattr[%d] = %s" % (j, v))
                     except IOError as e:
                         if e.errno != errno.ENODATA:
                             raise e
@@ -1721,7 +1693,6 @@ class SmallfileWorkload:
         if not xattr_installed or not fallocate_installed or not fadvise_installed:
             raise SMFRunException("one of necessary modules not available")
 
-        l = self.log
         while self.do_another_file():
             fn = self.mk_file_nm(self.src_dirs) + ".tmp"
             next_fsz = self.get_next_file_size()
@@ -1741,23 +1712,23 @@ class SmallfileWorkload:
                 while remaining_kb > 0:
                     next_kb = min(rszkb, remaining_kb)
                     rszbytes = next_kb * self.BYTES_PER_KB
-                    l.debug("reading %d bytes" % rszbytes)
+                    self.log.debug("reading %d bytes" % rszbytes)
                     if rszbytes != len(self.buf):
-                        l.debug(
+                        self.log.debug(
                             "swift put self.buf: "
                             + binary_buf_str(self.buf[0:rszbytes])
                         )
                         written = os.write(fd, self.buf[0:rszbytes])
                     else:
-                        l.debug(
+                        self.log.debug(
                             "swift put entire self.buf: "
                             + binary_buf_str(self.buf[0:rszbytes])
                         )
                         written = os.write(fd, self.buf[:])
                     if written != rszbytes:
-                        l.error(
-                            "written byte count "
-                            + "%u not correct byte count %u" % (written, rszbytes)
+                        self.log.error(
+                            "written byte count %u not correct byte count %u"
+                            % (written, rszbytes)
                         )
                         raise MFRdWrExc(self.opname, self.filenum, self.rq, written)
                     remaining_kb -= next_kb
@@ -1768,12 +1739,12 @@ class SmallfileWorkload:
                     except IOError as e:
                         if e.errno != errno.ENODATA:
                             raise e
-                        l.error("xattr %s does not exist" % xattr_nm)
+                        self.log.error("xattr %s does not exist" % xattr_nm)
                 for j in range(0, self.xattr_count):
                     xattr_nm = "user.smallfile-all-%d" % j
                     v = binary_buf_str(self.buf[j : self.xattr_size + j])
                     xattr.setxattr(fd, xattr_nm, v)
-                    # l.debug('xattr ' + xattr_nm + ' set to ' + v)
+                    # self.log.debug('xattr ' + xattr_nm + ' set to ' + v)
 
                 # alternative to ftruncate/fallocate is
                 # close then open to prevent preallocation

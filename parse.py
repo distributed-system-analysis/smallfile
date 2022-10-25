@@ -2,6 +2,7 @@
 
 """
 parse.py -- parses CLI commands for smallfile_cli.py
+
 Copyright 2012 -- Ben England
 Licensed under the Apache License at http://www.apache.org/licenses/LICENSE-2.0
 See Appendix on this page for instructions pertaining to license.
@@ -9,23 +10,9 @@ See Appendix on this page for instructions pertaining to license.
 
 import argparse
 import os
-import sys
 
 import smallfile
 import smf_test_params
-from smallfile import NOTOK, SmallfileWorkload
-from smf_test_params import bool2YN
-
-yaml_parser_installed = False
-try:
-    import yaml_parser
-    from yaml_parser import parse_yaml
-
-    yaml_parser_installed = True
-except ImportError as e:
-    pass
-
-import parser_data_types
 from parser_data_types import (
     SmfParseException,
     boolean,
@@ -35,6 +22,15 @@ from parser_data_types import (
     non_negative_integer,
     positive_integer,
 )
+from smallfile import SmallfileWorkload
+
+yaml_parser_installed = False
+try:
+    import yaml_parser
+
+    yaml_parser_installed = True
+except ImportError:
+    pass
 
 # parse command line
 # return smf_test_params.smf_test_params instance
@@ -227,7 +223,6 @@ def parse():
     )
 
     # these parameters shouldn't be used by mere mortals
-
     add(
         "--min-dirs-per-sec",
         type=positive_integer,
@@ -304,7 +299,7 @@ def parse():
     # how many other pods are doing the same thing
 
     if inv.total_hosts == 0:
-        if test_params.host_set != None:
+        if test_params.host_set is not None:
             inv.total_hosts = len(test_params.host_set)
         else:
             inv.total_hosts = 1
@@ -320,7 +315,7 @@ def parse():
 
     sdmsg = "directory %s containing network sync dir. must exist on all hosts (including this one)"
     parentdir = os.path.dirname(test_params.network_sync_dir)
-    if not os.path.isdir(parentdir) and args.host_set != None:
+    if not os.path.isdir(parentdir) and args.host_set is not None:
         raise SmfParseException(sdmsg % parentdir)
 
     if inv.record_sz_kb > inv.total_sz_kb and inv.total_sz_kb != 0:
@@ -328,10 +323,7 @@ def parse():
 
     if inv.record_sz_kb == 0 and inv.verbose:
         print(
-            (
-                "record size not specified, "
-                + "large files will default to record size %d KB"
-            )
+            "record size not specified,large files will default to record size %d KB"
             % (SmallfileWorkload.biggest_buf_size / inv.BYTES_PER_KB)
         )
 
@@ -339,15 +331,13 @@ def parse():
         for d in test_params.top_dirs:
             if len(d) < 6:
                 raise SmfParseException(
-                    "directory less than 6 characters, "
-                    + "cannot use top of filesystem, too dangerous"
+                    "directory less than 6 characters, cannot use top of filesystem, too dangerous"
                 )
-            if not os.path.isdir(d) and test_params.network_sync_dir != None:
+            if not os.path.isdir(d) and test_params.network_sync_dir is not None:
                 raise SmfParseException(
                     "you must ensure that shared directory "
                     + d
-                    + " is accessible "
-                    + "from this host and every remote host in test"
+                    + " is accessible from this host and every remote host in test"
                 )
     if test_params.top_dirs:
         inv.set_top(test_params.top_dirs)
