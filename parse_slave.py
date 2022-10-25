@@ -2,27 +2,27 @@
 
 """
 parse_slave.py -- parses SSH cmd for invocation of smallfile_remote.py
+
 Copyright 2012 -- Ben England
 Licensed under the Apache License at http://www.apache.org/licenses/LICENSE-2.0
 See Appendix on this page for instructions pertaining to license.
 """
 
 import argparse
-import errno
 import os
 import pickle
-import sys
 import time
 
 import smallfile
 
-# parse command line and return unpickled test params
-# pass via --network-sync-dir option
-# optionally pass host identity of this remote invocation
-
 
 def parse():
+    """
+    parse command line and return unpickled test params
 
+    pass via --network-sync-dir option
+    optionally pass host identity of this remote invocation
+    """
     parser = argparse.ArgumentParser(description="parse remote smallfile parameters")
     parser.add_argument(
         "--network-sync-dir", help="directory used to synchronize with test driver"

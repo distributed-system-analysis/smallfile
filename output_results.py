@@ -155,7 +155,7 @@ def output_results(invoke_list, test_params):
     # then remove that level from
     # result hierarchy, not needed
 
-    if len(rslt["host"].keys()) == 1 and test_params.host_set == None:
+    if len(rslt["host"].keys()) == 1 and test_params.host_set is None:
         hostkey = list(rslt["host"].keys())[0]
         threads_in_host = rslt["host"][hostkey]["thread"]
         rslt["thread"] = threads_in_host

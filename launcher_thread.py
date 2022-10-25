@@ -2,6 +2,7 @@
 
 """
 launcher_thread.py
+
 manages parallel execution of shell commands on remote hosts
 it assumes there is a poller on each remote host, launch_smf_host.py,
 it waits for files of form '*.smf_launch' in the shared directory
@@ -17,7 +18,6 @@ import os
 import threading
 import time
 
-import smallfile
 from smallfile import ensure_deleted
 from sync_files import write_sync_file
 
