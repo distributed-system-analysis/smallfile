@@ -1,7 +1,6 @@
 import argparse
 import os
 
-import smallfile
 from smallfile import SmallfileWorkload
 
 TypeExc = argparse.ArgumentTypeError
@@ -19,10 +18,8 @@ class SmfParseException(Exception):
 
 
 def boolean(boolstr):
-    if boolstr == True:
-        return True
-    elif boolstr == False:
-        return False
+    if isinstance(boolstr, bool):
+        return boolstr
     b = boolstr.lower()
     if b == "y" or b == "yes" or b == "t" or b == "true":
         bval = True

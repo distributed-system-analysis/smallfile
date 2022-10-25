@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
+import errno
 import os
 import pickle
-import shutil
-import time
 
 
-class SyncFileException(Exception):
+class SMFSyncFileException(Exception):
     pass
 
 
@@ -19,7 +18,7 @@ def touch(fpath):
             sgf.flush()
             os.fsync(sgf.fileno())
     except OSError as e:
-        if e.errno != EEXIST:
+        if e.errno != errno.EEXIST:
             raise e
 
 
@@ -47,9 +46,7 @@ def ensure_dir_exists(dirpath):
         parent_path = os.path.dirname(dirpath)
         if parent_path == dirpath:
             raise SMFSyncFileException(
-                "ensure_dir_exists: "
-                + "cannot obtain parent path "
-                + "of non-existent path: "
+                "ensure_dir_exists: cannot obtain parent path of non-existent path: "
                 + dirpath
             )
         ensure_dir_exists(parent_path)

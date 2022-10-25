@@ -1,27 +1,26 @@
-import argparse
+"""
+module to parse YAML input file containing smallfile parameters
+YAML parameter names are identical to CLI parameter names
+except that the leading "--" is removed
+modifies test_params object with contents of YAML file
+"""
+
 import os
 
 import yaml
 
-import parser_data_types
 import smallfile
 import smf_test_params
 from parser_data_types import (
     SmfParseException,
     TypeExc,
     boolean,
-    directory_list,
     file_size_distrib,
     host_set,
     non_negative_integer,
     positive_integer,
 )
 from smallfile import unittest_module
-
-# module to parse YAML input file containing smallfile parameters
-# YAML parameter names are identical to CLI parameter names
-#  except that the leading "--" is removed
-# modifies test_params object with contents of YAML file
 
 
 def parse_yaml(test_params, input_yaml_file):
@@ -30,7 +29,7 @@ def parse_yaml(test_params, input_yaml_file):
     with open(input_yaml_file, "r") as f:
         try:
             y = yaml.safe_load(f)
-            if y == None:
+            if y is None:
                 y = {}
             if type(y) is not dict:
                 raise SmfParseException(

@@ -28,7 +28,8 @@
 #              --top /mnt/cifs/testshare/smf
 #              --substitute_top z:\smf
 #
-#
+
+
 import errno
 import logging
 import os
@@ -44,7 +45,7 @@ NOTOK = 1
 
 def start_log(prefix=socket.gethostname()):
     log = logging.getLogger(prefix)
-    if os.getenv("LOGLEVEL_DEBUG") != None:
+    if os.getenv("LOGLEVEL_DEBUG") is not None:
         log.setLevel(logging.DEBUG)
     else:
         log.setLevel(logging.INFO)
@@ -126,7 +127,7 @@ while True:
         with open(launch_fn, "r") as f:
             cmd = f.readline().strip()
         os.unlink(launch_fn)
-        if substitute_dir != None:
+        if substitute_dir is not None:
             cmd = cmd.replace(substitute_dir, top_dir)
         log.debug("spawning cmd: %s" % cmd)
         rc = os.system(cmd)

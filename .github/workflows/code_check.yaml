@@ -1,0 +1,46 @@
+name: Code Check
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+jobs:
+  linux_check:
+    name: Code Check on Linux
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+      - name: Install black
+        run: pip install black
+      - name: Run black test
+        run: black --check .
+      - name: Install isort
+        run: pip install isort
+      - name: Run isort test
+        run: isort --profile=black --check *.py
+      - name: Install flake8
+        run: pip install flake8
+      - name: Run flake8 test
+        run: flake8 *.py
+      - name: Install coverage
+        run: pip install coverage html2text
+      - name: Install required dependencies
+        run: pip install PyYAML
+      - name: Run unit tests
+        run: python3 -m coverage run -m unittest yaml_parser.py
+      - name: Collect coverage report
+        run: |
+          python3 -m coverage html
+      - name: Publish coverage report to job summary
+        run: html2text --ignore-images --ignore-links -b 0 htmlcov/index.html >> $GITHUB_STEP_SUMMARY
+      - name: Upload coverage results
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage
+          path: htmlcov
+          if-no-files-found: error

@@ -14,6 +14,7 @@
 
 """
 smallfile_cli.py
+
 CLI user interface for generating metadata-intensive workloads
 Copyright 2012 -- Ben England
 Licensed under the Apache License at http://www.apache.org/licenses/LICENSE-2.0
@@ -34,17 +35,7 @@ import parse
 import smallfile
 import ssh_thread
 import sync_files
-from smallfile import (
-    NOTOK,
-    OK,
-    SMFResultException,
-    SMFRunException,
-    ensure_deleted,
-    use_isAlive,
-)
-
-# smallfile modules
-
+from smallfile import NOTOK, OK, SMFRunException, ensure_deleted
 
 # FIXME: should be monitoring progress, not total elapsed time
 
@@ -191,14 +182,13 @@ def run_multi_host_workload(prm):
         print("saw exception %s, aborting test" % str(e))
     if not hosts_ready:
         smallfile.abort_test(abortfn, [])
-        if h != None:
+        if h is not None:
             print("ERROR: host %s did not reach starting gate" % h)
         else:
             print("no host reached starting gate")
         if not exception_seen:
             raise SMFRunException(
-                "hosts did not reach starting gate "
-                + "within %d seconds" % host_timeout
+                "hosts did not reach starting gate within %d seconds" % host_timeout
             )
         else:
             print("saw exception %s, aborting test" % str(exception_seen))
@@ -268,7 +258,7 @@ def run_multi_host_workload(prm):
         all_ok = OK
     except IOError as e:
         print("host %s filename %s: %s" % (h, pickle_fn, str(e)))
-    except KeyboardInterrupt as e:
+    except KeyboardInterrupt:
         print("control-C signal seen (SIGINT)")
 
     sys.exit(all_ok)

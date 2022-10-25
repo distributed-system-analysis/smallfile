@@ -23,19 +23,17 @@
 # time since start of test (like before).  The start time as
 # seconds since the epoch (1970) can be obtained from the JSON
 # output in the 'start-time' field.
-#
-#
+
+
 import bisect
 import os
 import re
-import string
 import sys
 from sys import argv
 
 import numpy
 import scipy
 import scipy.stats
-from scipy.stats import tmean, tstd
 
 time_infinity = 1 << 62
 
@@ -49,9 +47,9 @@ start_time = 0.0
 def usage(msg):
     print("ERROR: %s" % msg)
     print("usage: python smallfile_rsptimes_stats.py ")
-    print("           [ --common-hostname-suffix my.suffix ] ")
-    print("           [ --time-interval positive-integer-seconds ] ")
-    print("           [ --start-time seconds-since-1970 ] ")
+    print("           [--common-hostname-suffix my.suffix] ")
+    print("           [--time-interval positive-integer-seconds] ")
+    print("           [--start-time seconds-since-1970] ")
     print("           directory")
     sys.exit(1)
 
@@ -65,7 +63,7 @@ def usage(msg):
 def parse_rsptime_file(result_dir, csv_pathname):
     samples = []
     with open(os.path.join(result_dir, csv_pathname), "r") as f:
-        records = [l.strip() for l in f.readlines()]
+        records = [line.strip() for line in f.readlines()]
         for sample in records:
             components = sample.split(",")
             op = components[0]
@@ -90,10 +88,10 @@ def get_rsp_time(rsptime_tuple):
     return rsp_time
 
 
-# this function avoids duplication of sorting
-
-
 def do_sorting(sample_set, already_sorted=False):
+    """
+    this function avoids duplication of sorting
+    """
     if not already_sorted:
         sorted_samples = sorted(sample_set, key=get_at_time)
     else:
@@ -155,7 +153,7 @@ def reduce_thread_set(sorted_samples_tuple, from_time=0, to_time=time_infinity):
 
 
 def format_stats(all_stats):
-    if all_stats == None:
+    if all_stats is None:
         return " 0,,,,," + ",,,,,,,,,,,,,,,,"[0 : len(percentiles) - 1]
     (sample_count, mintime, maxtime, mean, pctdev, pctiles) = all_stats
     partial_record = "%d, %f, %f, %f, %f, " % (
@@ -207,10 +205,10 @@ print("time interval is %d seconds" % time_interval)
 
 # this regex plucks out a tuple of 2 values:
 #
-## thread number
-## hostname
+# thread number
+# hostname
 
-regex = "rsptimes_([0-9]{2})_([0-9,a-z,\-,\.]*)%s_[-,a-z]*_[.,0-9]*.csv"
+regex = r"rsptimes_([0-9]{2})_([0-9,a-z,\-,\.]*)%s_[-,a-z]*_[.,0-9]*.csv"
 
 # filter out redundant suffix, if any, in hostname
 
@@ -230,8 +228,11 @@ if not os.path.isdir(directory):
 
 samples_by_thread = {}
 hosts = {}
-pathname_matcher = lambda path: path.startswith("rsptimes") and path.endswith(".csv")
-pathnames = filter(pathname_matcher, os.listdir(directory))
+
+pathnames = filter(
+    lambda path: path.startswith("rsptimes") and path.endswith(".csv"),
+    os.listdir(directory),
+)
 max_thread = 0
 for p in pathnames:
     m = re.match(new_regex, p)
@@ -337,7 +338,7 @@ with open(summary_pathname, "w") as outf:
         # avoid re-sorting all response time samples
         # if possible (and it often is)
 
-        if cluster_sample_set == None:
+        if cluster_sample_set is None:
             cluster_sample_set = []
             for per_host_dict in hosts.values():
                 for (_, samples) in per_host_dict.values():
