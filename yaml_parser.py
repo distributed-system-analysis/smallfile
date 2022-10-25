@@ -6,6 +6,7 @@ modifies test_params object with contents of YAML file
 """
 
 import os
+import tempfile
 
 import yaml
 
@@ -134,21 +135,21 @@ class TestYamlParse(unittest_module.TestCase):
         self.params = None
 
     def test_parse_empty(self):
-        fn = "/tmp/sample_parse_empty.yaml"
+        fn = os.path.join(tempfile.gettempdir(), "sample_parse_empty.yaml")
         with open(fn, "w") as f:
             f.write("\n")
         parse_yaml(self.params, fn)
         # just looking for no exception here
 
     def test_parse_all(self):
-        fn = "/tmp/sample_parse.yaml"
+        fn = os.path.join(tempfile.gettempdir(), "sample_parse.yaml")
         with open(fn, "w") as f:
             f.write("operation: create\n")
         parse_yaml(self.params, fn)
         assert self.params.master_invoke.opname == "create"
 
     def test_parse_negint(self):
-        fn = "/tmp/sample_parse_negint.yaml"
+        fn = os.path.join(tempfile.gettempdir(), "sample_parse_negint.yaml")
         with open(fn, "w") as f:
             f.write("files: -3\n")
         try:
@@ -159,14 +160,16 @@ class TestYamlParse(unittest_module.TestCase):
                 raise e
 
     def test_parse_hostset(self):
-        fn = "/tmp/sample_parse_hostset.yaml"
+        fn = os.path.join(tempfile.gettempdir(), "sample_parse_hostset.yaml")
         with open(fn, "w") as f:
             f.write("host-set: host-foo,host-bar\n")
         parse_yaml(self.params, fn)
         assert self.params.host_set == ["host-foo", "host-bar"]
 
     def test_parse_fsdistr_exponential(self):
-        fn = "/tmp/sample_parse_fsdistr_exponential.yaml"
+        fn = os.path.join(
+            tempfile.gettempdir(), "sample_parse_fsdistr_exponential.yaml"
+        )
         with open(fn, "w") as f:
             f.write("file-size-distribution: exponential\n")
         parse_yaml(self.params, fn)
@@ -176,7 +179,7 @@ class TestYamlParse(unittest_module.TestCase):
         )
 
     def test_parse_dir_list(self):
-        fn = "/tmp/sample_parse_dirlist.yaml"
+        fn = os.path.join(tempfile.gettempdir(), "sample_parse_dirlist.yaml")
         with open(fn, "w") as f:
             f.write("top: foo,bar \n")
         parse_yaml(self.params, fn)

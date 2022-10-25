@@ -73,7 +73,7 @@ class Test(unittest_module.TestCase):
         self.invok.tid = "regtest"
         self.invok.start_log()
         shutil.rmtree(self.invok.src_dirs[0], ignore_errors=True)
-        os.makedirs(self.invok.src_dirs[0], 0o644)
+        os.makedirs(self.invok.src_dirs[0])
 
     def test_multiproc_stonewall(self):
         self.invok.log.info("starting stonewall test")

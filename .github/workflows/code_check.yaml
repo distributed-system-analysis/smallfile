@@ -32,7 +32,7 @@ jobs:
       - name: Install required dependencies
         run: pip install PyYAML
       - name: Run unit tests
-        run: python3 -m coverage run -m unittest yaml_parser.py
+        run: python3 -m coverage run -m unittest yaml_parser.py invoke_process.py smallfile.py
       - name: Collect coverage report
         run: |
           python3 -m coverage html
@@ -42,5 +42,32 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: coverage
+          path: htmlcov
+          if-no-files-found: error
+  windows:
+    name: Code Check on Windows
+    runs-on: windows-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+      - name: Install coverage
+        run: pip install coverage html2text
+      - name: Install required dependencies
+        run: pip install PyYAML
+      - name: Run unit tests
+        run: python3 -m coverage run -m unittest yaml_parser.py invoke_process.py smallfile.py
+      - name: Collect coverage report
+        run: |
+          python3 -m coverage html
+      - name: Publish coverage report to job summary
+        run: html2text --ignore-images --ignore-links -b 0 htmlcov/index.html >> $env:GITHUB_STEP_SUMMARY
+      - name: Upload coverage results
+        uses: actions/upload-artifact@v3
+        with:
+          name: win-coverage
           path: htmlcov
           if-no-files-found: error

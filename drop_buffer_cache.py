@@ -34,6 +34,9 @@ def load_libc_function(func_name):
     except AttributeError:
         # print("Unable to locate %s in libc.  Leaving as a no-op."% func_name)
         pass
+    except Exception:
+        # libc not available
+        pass
     return func
 
 
