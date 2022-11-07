@@ -1,6 +1,3 @@
-[pycodestyle]
-max-line-length = 160
-
 [flake8]
 max-line-length = 160
 # E203: flake8 and black disagree on array slices see https://github.com/psf/black/issues/1859

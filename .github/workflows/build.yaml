@@ -1,0 +1,31 @@
+name: Package Build
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+jobs:
+  build:
+    name: Package building
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', 'pypy3.9']
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+      - name: Install poetry
+        run: pip install poetry
+      - name: Run build
+        run: poetry build
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: Artifacts
+          path: dist
+          if-no-files-found: error

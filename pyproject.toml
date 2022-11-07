@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "smallfile"
+version = "1.0.2"
+description = "A distributed workload generator for POSIX-like filesystems"
+authors = ["distributed-system-analysis authors"]
+license = "Apache-2.0"
+readme = "README.md"
+homepage = "https://github.com/distributed-system-analysis/smallfile"
+packages = [
+   { include="*.py", from="."  },
+]
+include = [
+   { path="*.sh", format="sdist" },
+   { path="examples", format="sdist" },
+   { path="poetry.lock", format="sdist" },
+   { path="Dockerfile", format="sdist" },
+]
+[tool.poetry.dependencies]
+python = "^3.9"
+numpy = "^1.23.4"
+scipy = "^1.9.3"
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^2.20.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
