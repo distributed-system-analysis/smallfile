@@ -27,7 +27,7 @@ def write_sync_file(fpath, contents):
         sgf.write(contents)
         sgf.flush()
         os.fsync(sgf.fileno())  # file should close when you exit block
-        os.rename(fpath + notyet, fpath)
+    os.rename(fpath + notyet, fpath)
 
 
 def write_pickle(fpath, obj):
@@ -35,7 +35,7 @@ def write_pickle(fpath, obj):
         pickle.dump(obj, result_file)
         result_file.flush()
         os.fsync(result_file.fileno())  # or else reader may not see data
-        os.rename(fpath + notyet, fpath)
+    os.rename(fpath + notyet, fpath)
 
 
 # create directory if it's not already there
