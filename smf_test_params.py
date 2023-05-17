@@ -30,7 +30,6 @@ class smf_test_params:
         permute_host_dirs=False,
         output_json=None,
     ):
-
         # this field used to calculate timeouts
         self.min_directories_per_sec = 50
         self.cleanup_delay_usec_per_sec = 0
@@ -171,7 +170,6 @@ class smf_test_params:
     # can insert test results before conversion
 
     def to_json(self):
-
         # put params a level down so results can be
         # inserted at same level
 

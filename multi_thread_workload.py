@@ -19,7 +19,6 @@ from sync_files import (
 
 
 def create_worker_list(prm):
-
     # for each thread set up SmallfileWorkload instance,
     # create a thread instance, and delete the thread-ready file
 
@@ -46,7 +45,6 @@ def create_worker_list(prm):
 
 
 def run_multi_thread_workload(prm):
-
     master_invoke = prm.master_invoke
     prm_slave = prm.is_slave
     verbose = master_invoke.verbose
@@ -181,7 +179,6 @@ def run_multi_thread_workload(prm):
             print("ERROR: " + str(e))
             exit_status = NOTOK
     else:
-
         # if we are participating in a multi-host test
         # then write out this host's result in pickle format
         # so test driver can pick up result

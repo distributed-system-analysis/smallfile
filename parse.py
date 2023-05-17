@@ -376,7 +376,7 @@ def parse():
 
     if not test_params.is_slave:
         prm_list = test_params.human_readable()
-        for (prm_name, prm_value) in prm_list:
+        for prm_name, prm_value in prm_list:
             print("%40s : %s" % (prm_name, prm_value))
 
     inv.reset()

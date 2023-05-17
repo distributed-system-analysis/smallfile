@@ -273,7 +273,7 @@ with open(summary_pathname, "w") as outf:
         outf.write("cluster-wide stats:\n")
         cluster_sample_set = []
         for per_host_dict in hosts.values():
-            for (_, samples) in per_host_dict.values():
+            for _, samples in per_host_dict.values():
                 cluster_sample_set.extend(samples)
         sorted_cluster_tuple = do_sorting(cluster_sample_set)
         cluster_results = reduce_thread_set(sorted_cluster_tuple)
@@ -290,7 +290,7 @@ with open(summary_pathname, "w") as outf:
         outf.write("per-host stats:\n")
         for h in sorted(hosts.keys()):
             sample_set = []
-            for (_, samples) in hosts[h].values():
+            for _, samples in hosts[h].values():
                 sample_set.extend(samples)
             sorted_host_tuple = do_sorting(sample_set)
             host_results = reduce_thread_set(sorted_host_tuple)
@@ -341,7 +341,7 @@ with open(summary_pathname, "w") as outf:
         if cluster_sample_set is None:
             cluster_sample_set = []
             for per_host_dict in hosts.values():
-                for (_, samples) in per_host_dict.values():
+                for _, samples in per_host_dict.values():
                     cluster_sample_set.extend(samples)
             sorted_cluster_tuple = do_sorting(cluster_sample_set)
         for from_t in range(int(start_time), quantized_end_time, time_interval):

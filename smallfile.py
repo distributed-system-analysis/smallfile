@@ -247,7 +247,6 @@ def binary_buf_str(b):  # display a binary buffer as a text string
 
 
 class SmallfileWorkload:
-
     rename_suffix = ".rnm"
     all_op_names = [
         "create",
@@ -319,7 +318,6 @@ class SmallfileWorkload:
     # preceding comment describes what happens if parameter is set to True
 
     def __init__(self):
-
         # all threads share same directory
         self.is_shared_dir = False
 
@@ -502,7 +500,6 @@ class SmallfileWorkload:
     # call reset() method between tests
 
     def reset(self):
-
         # results returned in variables below
         self.filenum = 0  # how many files have been accessed so far
         self.filenum_final = None  # how many files accessed when test ended
@@ -623,7 +620,7 @@ class SmallfileWorkload:
         )
         rsptime_fname = join(self.network_dir, fname)
         with open(rsptime_fname, "w") as f:
-            for (opname, start_time, rsp_time) in self.rsptimes:
+            for opname, start_time, rsp_time in self.rsptimes:
                 # time granularity is microseconds, accuracy is less
                 f.write(
                     "%8s, %9.6f, %9.6f\n"
@@ -831,7 +828,6 @@ class SmallfileWorkload:
     # record info needed to compute test statistics
 
     def end_test(self):
-
         # be sure end_test is not called more than once
         # during do_workload()
         if self.test_ended():
@@ -988,12 +984,10 @@ class SmallfileWorkload:
     # compare against them for reads where random data is used,
 
     def create_biggest_buf(self, contents_random):
-
         # generate random byte sequence if desired.
 
         random_segment_size = 1 << self.random_seg_size_bits
         if not self.incompressible:
-
             # generate a random byte sequence of length 2^random_seg_size_bits
             # and then repeat the sequence
             # until we get to size 2^biggest_buf_size_bits in length
@@ -1021,7 +1015,6 @@ class SmallfileWorkload:
                 biggest_buf.extend(biggest_buf[:])
 
         else:  # if incompressible
-
             # for buffer to be incompressible,
             # we can't repeat the same (small) random sequence
             # FIXME: why shouldn't we always do it this way?
@@ -1054,7 +1047,6 @@ class SmallfileWorkload:
     # allocate buffer of correct size with offset based on filenum, tid, etc.
 
     def prepare_buf(self):
-
         # determine max record size of I/Os
 
         total_space_kb = self.record_sz_kb
@@ -1172,7 +1164,6 @@ class SmallfileWorkload:
         if self.tid != "00" and self.is_shared_dir:
             return
         for tree in [self.src_dirs, self.dest_dirs]:
-
             # for efficiency, when we are not using --hash-to-dirs option,
             # we only make filename for every files_per_dir files
 
@@ -1923,7 +1914,6 @@ ok = 0
 if unittest_module:
 
     class Test(unittest_module.TestCase):
-
         # run before every test
         def setUp(self):
             self.invok = SmallfileWorkload()
@@ -1944,7 +1934,7 @@ if unittest_module:
                 return
             if not os.path.isdir(topdir):
                 return
-            for (dir, subdirs, files) in os.walk(topdir, topdown=False):
+            for dir, subdirs, files in os.walk(topdir, topdown=False):
                 for f in files:
                     os.unlink(join(dir, f))
                 for d in subdirs:
