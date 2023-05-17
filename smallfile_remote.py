@@ -28,7 +28,6 @@ import parse_slave
 
 
 def run_workload():
-
     # if a --host-set parameter was passed, it's a multi-host workload
     # each remote instance will wait until all instances reach starting gate
 

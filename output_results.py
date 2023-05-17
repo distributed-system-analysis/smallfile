@@ -13,7 +13,6 @@ KiB_PER_MiB = 1024.0
 
 
 class result_stats:
-
     # start with zeroing because we'll add
     # other objects of this type to it
 
@@ -94,7 +93,6 @@ def output_results(invoke_list, test_params):
     cluster = stats_by_host["stats"] = result_stats()
 
     for invk in invoke_list:  # for each parallel SmallfileWorkload
-
         # add up work that it did
         # and determine time interval over which test ran
 

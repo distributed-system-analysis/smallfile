@@ -47,7 +47,6 @@ pct_files_min = 70  # minimum percentage of files for valid test
 
 
 def run_multi_host_workload(prm):
-
     prm_host_set = prm.host_set
     prm_permute_host_dirs = prm.permute_host_dirs
     master_invoke = prm.master_invoke
@@ -194,7 +193,6 @@ def run_multi_host_workload(prm):
             print("saw exception %s, aborting test" % str(exception_seen))
         sys.exit(NOTOK)
     else:
-
         # ask all hosts to start the test
         # this is like firing the gun at the track meet
 
@@ -226,7 +224,6 @@ def run_multi_host_workload(prm):
         invoke_list = []
         one_shot_delay = True
         for h in prm_host_set:  # for each host in test
-
             # read results for each thread run in that host
             # from python pickle of the list of SmallfileWorkload objects
 
@@ -236,7 +233,6 @@ def run_multi_host_workload(prm):
             host_invoke_list = []
             try:
                 if one_shot_delay and not os.path.exists(pickle_fn):
-
                     # all threads have joined already, they are done
                     # we allow > 1 sec
                     # for this (NFS) client to see other clients' files
@@ -268,7 +264,6 @@ def run_multi_host_workload(prm):
 
 
 def run_workload():
-
     # if a --host-set parameter was passed,
     # it's a multi-host workload
     # each remote instance will wait

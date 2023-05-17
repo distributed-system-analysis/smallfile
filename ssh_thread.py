@@ -16,7 +16,6 @@ import threading
 
 
 class ssh_thread(threading.Thread):
-
     ssh_prefix = "ssh -x -o StrictHostKeyChecking=no "
 
     def __str__(self):
