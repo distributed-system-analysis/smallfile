@@ -211,7 +211,7 @@ Operation types are:
 * append -- open an existing file and append data to it 
 * delete -- delete a file 
 * rename -- rename a file 
-* delete_renamed -- delete a file that had previously been renamed
+* delete-renamed -- delete a file that had previously been renamed
 * read -- read an existing file 
 * stat -- just read metadata from an existing file 
 * chmod -- change protection mask for file
